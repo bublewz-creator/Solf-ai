@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        // Мгновенное применение темы до отрисовки DOM
+        (function() {
+            try {
+                var theme = localStorage.getItem('solfai_theme');
+                if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+                var color = localStorage.getItem('solfai_color');
+                if (color && color !== 'default') {
+                    document.documentElement.setAttribute('data-color', color);
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Terms of Service — Solf.ai</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=8">
+    <link rel="icon" href="favicon.ico?v=8" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=8">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Solf.ai">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f; --bg-secondary: #13131a; --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8; --purple-soft: #8b5cf6; --purple-glow: #a78bfa;
+            --border-color: rgba(139,92,246,0.2); --hover-accent-bg: rgba(139,92,246,0.1);
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8f7fc; --bg-secondary: #ffffff; --text-primary: #1e1b2e;
+            --text-secondary: #64607a; --purple-soft: #7c3aed; --purple-glow: #8b5cf6;
+            --border-color: rgba(139,92,246,0.2); --hover-accent-bg: rgba(139,92,246,0.1);
+        }
+        [data-color="blue"] {
+            --purple-soft: #3b82f6; --purple-glow: #60a5fa; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1);
+        }
+        [data-theme="light"][data-color="blue"] {
+            --purple-glow: #2563eb; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1);
+        }
+        [data-color="green"] {
+            --purple-soft: #10b981; --purple-glow: #34d399; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1);
+        }
+        [data-theme="light"][data-color="green"] {
+            --purple-glow: #059669; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1);
+        }
+        [data-color="rose"] {
+            --purple-soft: #f43f5e; --purple-glow: #fb7185; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1);
+        }
+        [data-theme="light"][data-color="rose"] {
+            --purple-glow: #e11d48; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1);
+        }
+        [data-theme="light"] body {
+            background: linear-gradient(180deg, #f8f7fc 0%, #f0eef7 100%);
+        }
+        body { background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; margin: 0; padding: 40px 20px; transition: all 0.3s; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+        .back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--purple-soft); text-decoration: none; font-size: 14px; }
+        .back-link:hover { text-decoration: underline; }
+        .lang-selector { display: flex; gap: 8px; flex-wrap: wrap; }
+        .lang-btn { padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 14px; transition: all 0.2s; }
+        .lang-btn:hover, .lang-btn.active { border-color: var(--purple-soft); background: var(--hover-accent-bg); }
+        h1 { font-size: 2rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--purple-soft), var(--purple-glow)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
+        .date { color: var(--text-secondary); font-size: 14px; margin-bottom: 40px; }
+        h2 { font-size: 1.25rem; margin: 32px 0 16px; color: var(--text-primary); }
+        p, li { font-size: 15px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 16px; }
+        ul { padding-left: 24px; }
+        strong { color: var(--text-primary); }
+        a { color: var(--purple-soft); }
+        .content { display: none; }
+        .content.active { display: block; }
+    </style>
+</head>
+<body class="preload">
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-link" id="backLink">← Back to Solf.ai</a>
+            <div class="lang-selector">
+                <button class="lang-btn active" data-lang="en">🇺🇸 EN</button>
+                <button class="lang-btn" data-lang="ru">🇷🇺 RU</button>
+                <button class="lang-btn" data-lang="de">🇩🇪 DE</button>
+                <button class="lang-btn" data-lang="es">🇪🇸 ES</button>
+                <button class="lang-btn" data-lang="zh">🇨🇳 中文</button>
+                <button class="lang-btn" data-lang="ja">🇯🇵 日本語</button>
+            </div>
+        </div>
+
+        <!-- English -->
+        <div class="content active" id="content-en">
+            <h1>Terms of Service</h1>
+            <p class="date">Effective date: April 3, 2026 · <a href="privacy.html">Privacy Policy</a></p>
+            <p>By using Solf.ai (the “<strong>Service</strong>”), you agree to these Terms of Service (“<strong>Terms</strong>”) and our <a href="privacy.html">Privacy Policy</a>. If you do not agree, do not use the Service.</p>
+            <h2>1. Operator</h2>
+            <p>The Service is operated by an independent operator (“<strong>Operator</strong>”, “we”, “us”). Primary contact: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> on Telegram.</p>
+            <h2>2. Eligibility</h2>
+            <p>You must be at least <strong>13 years old</strong> (or the age of digital consent in your jurisdiction if that age is higher). If you are not of legal age to enter into contracts where you live, you confirm that a parent or legal guardian has read and accepted these Terms on your behalf.</p>
+            <h2>3. Nature of the Service</h2>
+            <p>Solf.ai provides <strong>AI-generated reference information</strong> about music theory, solfège, ear training, and related topics. The Service is <strong>not</strong> a school or university, does <strong>not</strong> issue official diplomas or certificates, and does <strong>not</strong> replace instruction by a qualified teacher. All outputs are produced automatically and are for general information only.</p>
+            <h2>4. Accounts and sign-in</h2>
+            <p>Optional sign-in via <strong>Google</strong> is subject to Google’s terms and privacy policy. You are responsible for safeguarding your account and for activity under your account.</p>
+            <h2>5. Your messages, images, and API processing</h2>
+            <p>To generate replies, the Service sends your <strong>text messages</strong>, a <strong>limited portion of conversation context</strong>, and any <strong>images</strong> you attach to our backend (API). That processing is essential to provide the Service. Chat history may also be stored <strong>locally in your browser</strong> for your convenience. You grant the Operator a <strong>non-exclusive, worldwide, royalty-free licence</strong> to process your inputs and attachments <strong>solely to operate and improve security and abuse prevention for the Service</strong>, not for unrelated marketing. Do not submit information you are not allowed to share, or illegal content.</p>
+            <h2>6. AI output and reliance</h2>
+            <p>Outputs may be <strong>incorrect, incomplete, biased, or outdated</strong>. They are <strong>not</strong> professional, medical, legal, tax, or financial advice. You alone decide how to use outputs (including in exams, performances, or teaching). The Operator is not responsible for consequences of reliance on AI answers.</p>
+            <h2>7. Acceptable use</h2>
+            <p>You must comply with applicable law. Without limitation, you must not: (a) use the Service for unlawful, harmful, harassing, or discriminatory purposes; (b) attempt to probe, scrape, overload, or reverse engineer the Service or bypass limits; (c) upload malware or infringe others’ intellectual property or privacy; (d) misuse the Service to generate or distribute spam or deceptive content; (e) use another person’s identity without permission.</p>
+            <h2>8. Intellectual property</h2>
+            <p>The Service’s software, branding, and design are protected. Subject to these Terms and third-party rights, you retain rights to prompts you create; <strong>AI-generated text may not be copyrightable in your jurisdiction</strong>. Do not remove proprietary notices or misuse the Operator’s marks.</p>
+            <h2>9. Subscriptions and payments</h2>
+            <p>Paid plans, limits, and pricing are described on <a href="pricing.html">pricing</a>. Payment or upgrades may be arranged through official support channels (e.g. Telegram). Fees, taxes, and refund rules will be communicated for the applicable offer.</p>
+            <h2>10. Disclaimer of warranties</h2>
+            <p>THE SERVICE IS PROVIDED <strong>“AS IS” AND “AS AVAILABLE”</strong>. TO THE MAXIMUM EXTENT PERMITTED BY LAW, WE DISCLAIM ALL WARRANTIES, WHETHER EXPRESS, IMPLIED, OR STATUTORY, INCLUDING MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.</p>
+            <h2>11. Limitation of liability</h2>
+            <p>TO THE MAXIMUM EXTENT PERMITTED BY APPLICABLE LAW, THE OPERATOR AND ITS SUPPLIERS SHALL NOT BE LIABLE FOR ANY INDIRECT, INCIDENTAL, SPECIAL, CONSEQUENTIAL, OR PUNITIVE DAMAGES, OR ANY LOSS OF PROFITS, DATA, GOODWILL, OR BUSINESS. OUR TOTAL LIABILITY FOR ANY CLAIM ARISING OUT OF THESE TERMS OR THE SERVICE SHALL NOT EXCEED THE GREATER OF (A) THE AMOUNTS YOU PAID US FOR THE SERVICE IN THE <strong>12 MONTHS</strong> BEFORE THE CLAIM OR (B) <strong>USD 50</strong>, EXCEPT WHERE LIABILITY CANNOT BE LIMITED UNDER MANDATORY LAW (E.G. GROSS NEGLIGENCE OR WILFUL MISCONDUCT WHERE REQUIRED).</p>
+            <h2>12. Indemnity</h2>
+            <p>You will defend, indemnify, and hold harmless the Operator from claims, damages, losses, and expenses (including reasonable legal fees) arising from your use of the Service, your content, or your breach of these Terms.</p>
+            <h2>13. Suspension and termination</h2>
+            <p>We may suspend or terminate access if we reasonably believe you violated these Terms, pose a security risk, or if required by law. You may stop using the Service at any time.</p>
+            <h2>14. Changes</h2>
+            <p>We may update these Terms; the new effective date will be posted on this page. Continued use after changes constitutes acceptance. If you do not agree, discontinue use.</p>
+            <h2>15. Governing law</h2>
+            <p>These Terms are governed by the <strong>laws of the Russian Federation</strong>, without regard to conflict-of-law principles, <strong>without prejudice to mandatory consumer rights</strong> in the country where you habitually reside where such rights cannot be waived.</p>
+            <h2>16. Contact</h2>
+            <p>Questions: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">Privacy Policy</a></p>
+        </div>
+
+        <!-- Russian -->
+        <div class="content" id="content-ru">
+            <h1>Условия использования</h1>
+            <p class="date">Дата вступления в силу: 3 апреля 2026 г. · <a href="privacy.html">Политика конфиденциальности</a></p>
+            <p>Используя Solf.ai («<strong>Сервис</strong>»), вы принимаете настоящие Условия («<strong>Условия</strong>») и <a href="privacy.html">Политику конфиденциальности</a>. Если вы не согласны — не используйте Сервис.</p>
+            <h2>1. Оператор</h2>
+            <p>Сервис предоставляется независимым оператором («<strong>Оператор</strong>», «мы»). Связь: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <h2>2. Допустимый возраст</h2>
+            <p>Вам должно быть не менее <strong>13 лет</strong> (или достигнут возраст цифрового согласия в вашей юрисдикции, если он выше). Если вы несовершеннолетни, вы подтверждаете, что настоящие Условия приняты родителем или законным представителем.</p>
+            <h2>3. Характер Сервиса</h2>
+            <p>Solf.ai предоставляет <strong>справочную информацию, сгенерированную ИИ</strong>, по теории музыки, сольфеджио, слуху и смежным темам. Сервис <strong>не</strong> является образовательной организацией, <strong>не</strong> выдаёт государственные дипломы и <strong>не</strong> заменяет занятия с квалифицированным педагогом. Ответы формируются автоматически и носят общий информационный характер.</p>
+            <h2>4. Учётная запись и вход</h2>
+            <p>Опциональный вход через <strong>Google</strong> регулируется условиями и политикой конфиденциальности Google. Вы несёте ответственность за сохранность доступа и действия в учётной записи.</p>
+            <h2>5. Сообщения, изображения и обработка на сервере</h2>
+            <p>Для генерации ответов Сервис передаёт на бэкенд (API) ваши <strong>текстовые сообщения</strong>, <strong>ограниченный контекст переписки</strong> и прикреплённые <strong>изображения</strong>. Без такой обработки предоставление Сервиса невозможно. История чатов может дополнительно храниться <strong>локально в браузере</strong>. Вы предоставляете Оператору <strong>неисключительную безвозмездную лицензию</strong> на обработку ваших материалов <strong>исключительно для работы Сервиса, безопасности и предотвращения злоупотреблений</strong>, не для несвязанного маркетинга. Не отправляйте сведения, которые вы не вправе разглашать, и запрещённый контент.</p>
+            <h2>6. Ответы ИИ и риски</h2>
+            <p>Результаты могут быть <strong>неточными, неполными, предвзятыми или устаревшими</strong>. Они <strong>не</strong> являются профессиональной, медицинской, юридической, налоговой или иной консультацией. Решения о использовании ответов принимаете вы; Оператор не отвечает за последствия опоры на ответы ИИ (в т.ч. экзамены, выступления).</p>
+            <h2>7. Допустимое использование</h2>
+            <p>Вы обязуетесь соблюдать закон. Запрещено, в том числе: (a) противоправное, вредоносное, дискриминационное использование; (b) попытки взлома, парсинга, перегрузки, обхода лимитов или реверс-инжиниринга; (c) загрузка вредоносного ПО, нарушение прав третьих лиц; (d) спам и вводящая в заблуждение рассылка; (e) использование чужой личности без согласия.</p>
+            <h2>8. Интеллектуальная собственность</h2>
+            <p>ПО, брендинг и дизайн Сервиса охраняются законом. Права на ваши запросы сохраняются за вами с учётом настоящих Условий; <strong>сгенерированный ИИ текст может не охраняться авторским правом</strong> в вашей юрисдикции. Не удаляйте уведомления о правах и не злоупотребляйте обозначениями Оператора.</p>
+            <h2>9. Тарифы и оплата</h2>
+            <p>Платные функции и лимиты описаны на странице <a href="pricing.html">тарифов</a>. Оплата или переход на платный план может оформляться через официальные каналы поддержки (в т.ч. Telegram). Условия возврата, налоги и комиссии сообщаются для конкретного предложения.</p>
+            <h2>10. Отказ от гарантий</h2>
+            <p>СЕРВИС ПРЕДОСТАВЛЯЕТСЯ <strong>«КАК ЕСТЬ»</strong>. В МАКСИМАЛЬНОЙ СТЕПЕНИИ, ДОПУСТИМОЙ ЗАКОНОМ, МЫ ОТКАЗЫВАЕМСЯ ОТ ВСЕХ ГАРАНТИЙ, ЯВНЫХ И ПОДРАЗУМЕВАЕМЫХ, ВКЛЮЧАЯ ТОВАРНУЮ ПРИГОДНОСТЬ И НЕНАРУШЕНИЕ ПРАВ.</p>
+            <h2>11. Ограничение ответственности</h2>
+            <p>В МАКСИМАЛЬНОЙ СТЕПЕНИ, ДОПУСТИМОЙ ПРИМЕНИМЫМ ПРАВОМ, ОПЕРАТОР И ПОСТАВЩИКИ НЕ НЕСУТ ОТВЕТСТВЕННОСТИ ЗА КОСВЕННЫЙ, СЛУЧАЙНЫЙ, ОСОБЫЙ, ШТРАФНОЙ УЩЕРБ ИЛИ УПУЩЕННУЮ ВЫГОДУ, ПОТЕРЮ ДАННЫХ ИЛИ ДЕЛОВОЙ РЕПУТАЦИИ. СОВОКУПНАЯ ОТВЕТСТВЕННОСТЬ ПО ТРЕБОВАНИЯМ, СВЯЗАННЫМ С УСЛОВИЯМИ ИЛИ СЕРВИСОМ, ОГРАНИЧИВАЕТСЯ БОЛЬШЕЙ ИЗ ВЕЛИЧИН: (A) СУММЫ, УПЛАЧЕННОЙ ВАМИ ЗА СЕРВИС ЗА <strong>12 МЕСЯЦЕВ</strong> ДО ВОЗНИКНОВЕНИЯ ТРЕБОВАНИЯ, ИЛИ (B) <strong>50 ДОЛЛАРАМИ США</strong>, ЗА ИСКЛЮЧЕНИЕМ СЛУЧАЕВ, КОГДА ОГРАНИЧЕНИЕ ЗАПРЕЩЕНО ИМПЕРАТИВНЫМ ПРАВОМ.</p>
+            <h2>12. Возмещение убытков</h2>
+            <p>Вы обязуетесь возместить Оператору убытки, включая разумные судебные расходы, по претензиям, связанным с вашим использованием Сервиса, вашим контентом или нарушением Условий.</p>
+            <h2>13. Приостановление и прекращение</h2>
+            <p>Мы можем приостановить или прекратить доступ при нарушении Условий, угрозе безопасности или по требованию закона. Вы можете прекратить использование в любой момент.</p>
+            <h2>14. Изменения</h2>
+            <p>Мы можем обновлять Условия; новая дата публикуется на этой странице. Продолжение использования после изменений означает согласие. При несогласии прекратите использование.</p>
+            <h2>15. Применимое право</h2>
+            <p>Условия регулируются <strong>законодательством Российской Федерации</strong> без учёта коллизионных норм, <strong>без ущерба для императивных прав потребителей</strong> в стране вашего обычного проживания, если такие права не могут быть отменены соглашением.</p>
+            <h2>16. Контакты</h2>
+            <p>Вопросы: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">Политика конфиденциальности</a></p>
+        </div>
+
+        <!-- German -->
+        <div class="content" id="content-de">
+            <h1>Nutzungsbedingungen</h1>
+            <p class="date">Gültig ab: 3. April 2026 · <a href="privacy.html">Datenschutz</a></p>
+            <p>Mit der Nutzung von Solf.ai (der „<strong>Dienst</strong>“) akzeptieren Sie diese Bedingungen und unsere <a href="privacy.html">Datenschutzerklärung</a>.</p>
+            <h2>1. Betreiber</h2>
+            <p>Unabhängiger Betreiber („<strong>wir</strong>“). Kontakt: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <h2>2. Voraussetzungen</h2>
+            <p>Mindestalter <strong>13 Jahre</strong> (oder höheres gesetzliches Alter in Ihrer Region). Minderjährige bestätigen die Zustimmung eines Erziehungsberechtigten.</p>
+            <h2>3. Leistungsbeschreibung</h2>
+            <p>KI-gestützte <strong>Referenzinformationen</strong> zu Musiktheorie und Solfeggio. <strong>Keine</strong> Bildungseinrichtung, <strong>keine</strong> offiziellen Abschlüsse, <strong>kein</strong> Ersatz für Unterricht durch qualifizierte Lehrkräfte.</p>
+            <h2>4. Konto</h2>
+            <p>Optionaler Login über <strong>Google</strong> unterliegt den Google-Bedingungen. Sie sind für Ihr Konto verantwortlich.</p>
+            <h2>5. Nachrichten, Bilder, API</h2>
+            <p>Zur Antwortgenerierung werden <strong>Text</strong>, ein <strong>begrenzter Gesprächskontext</strong> und <strong>Bilder</strong> an unser Backend übermittelt. Chatverläufe können <strong>lokal im Browser</strong> gespeichert werden. Sie gewähren eine <strong>nicht ausschließliche Lizenz</strong> zur Verarbeitung <strong>nur zum Betrieb, zur Sicherheit und Missbrauchsprävention</strong>. Keine illegalen oder vertraulichen Daten Dritter ohne Berechtigung.</p>
+            <h2>6. KI-Ausgaben</h2>
+            <p>Antworten können <strong>fehlerhaft oder unvollständig</strong> sein; <strong>keine</strong> Rechts-, Medizin- oder Steuerberatung. Sie tragen das Nutzungsrisiko.</p>
+            <h2>7. Erlaubte Nutzung</h2>
+            <p>Keine rechtswidrige Nutzung; kein Reverse Engineering, Scraping, Umgehung von Limits; keine Schadsoftware; keine Rechtsverletzungen.</p>
+            <h2>8. Urheberrecht & Marken</h2>
+            <p>Software und Auftritt des Dienstes sind geschützt. KI-Texte sind in manchen Rechtsordnungen möglicherweise nicht urheberrechtlich schutzfähig.</p>
+            <h2>9. Zahlungen</h2>
+            <p>Siehe <a href="pricing.html">Preise</a>; Abwicklung ggf. über Support (z. B. Telegram).</p>
+            <h2>10. Gewährleistungsausschluss</h2>
+            <p>DER DIENST WIRD <strong>„WIE BESEHEN“</strong> BEREITGESTELLT, IM GESETZLICH ZULÄSSIGEN UMFANG OHNE GEWÄHRLEISTUNG.</p>
+            <h2>11. Haftungsbeschränkung</h2>
+            <p>IM GESETZLICH ZULÄSSIGEN UMFANG KEINE HAFTUNG FÜR INDIREKTE SCHÄDEN ODER FOLGESCHÄDEN. GESAMTHAFTUNG HÖCHSTENS DER GRÖßERE BETRAG AUS (A) IHREN ZAHLUNGEN IN DEN LETZTEN <strong>12 MONATEN</strong> ODER (B) <strong>50 USD</strong>, SOFERN NICHT ZWINGENDES RECHT ETWAS ANDERES VORSCHREIBT.</p>
+            <h2>12. Freistellung</h2>
+            <p>Sie stellen den Betreiber von Ansprüchen frei, die aus Ihrer Nutzung oder Vertragsverletzung entstehen.</p>
+            <h2>13. Kündigung</h2>
+            <p>Wir können den Zugang bei Verstößen oder aus rechtlichen Gründen sperren.</p>
+            <h2>14. Änderungen</h2>
+            <p>Änderungen mit neuem Datum auf dieser Seite; fortgesetzte Nutzung gilt als Zustimmung.</p>
+            <h2>15. Anwendbares Recht</h2>
+            <p>Recht der <strong>Russischen Föderation</strong>, ohne Widerspruch zu zwingenden Verbraucherschutzvorschriften Ihres Wohnsitzlandes.</p>
+            <h2>16. Kontakt</h2>
+            <p><a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">Datenschutz</a></p>
+        </div>
+
+        <!-- Spanish -->
+        <div class="content" id="content-es">
+            <h1>Términos del servicio</h1>
+            <p class="date">Vigencia: 3 de abril de 2026 · <a href="privacy.html">Privacidad</a></p>
+            <p>Al usar Solf.ai (el “<strong>Servicio</strong>”) aceptas estos términos y nuestra <a href="privacy.html">Política de privacidad</a>.</p>
+            <h2>1. Operador</h2>
+            <p>Operador independiente. Contacto: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <h2>2. Edad</h2>
+            <p>Debes tener al menos <strong>13 años</strong> (o la edad digital de tu país si es mayor). Los menores confirman el consentimiento de un padre/madre o tutor.</p>
+            <h2>3. Naturaleza del Servicio</h2>
+            <p>Información de referencia generada por <strong>IA</strong> sobre teoría musical y solfeo. <strong>No</strong> es un centro educativo oficial ni sustituye a un profesor cualificado.</p>
+            <h2>4. Cuenta</h2>
+            <p>Acceso opcional con <strong>Google</strong> (sus términos aplican). Eres responsable de tu cuenta.</p>
+            <h2>5. Mensajes, imágenes y API</h2>
+            <p>Para generar respuestas se envían al backend tu <strong>texto</strong>, un <strong>contexto limitado</strong> del chat e <strong>imágenes</strong>. El historial puede guardarse <strong>localmente</strong> en el navegador. Nos concedes una <strong>licencia no exclusiva</strong> para procesar tus aportaciones <strong>solo para operar el Servicio y prevenir abusos</strong>. No envíes datos ilegales ni información de terceros sin derecho.</p>
+            <h2>6. Salidas de IA</h2>
+            <p>Pueden ser <strong>incorrectas u incompletas</strong>; <strong>no</strong> constituyen asesoramiento profesional. Tú asumes el riesgo de uso.</p>
+            <h2>7. Uso aceptable</h2>
+            <p>Cumple la ley; no revienta ingeniería inversa, no eludas límites, no subas malware ni infrinjas derechos ajenos.</p>
+            <h2>8. Propiedad intelectual</h2>
+            <p>El software y la marca del Servicio están protegidos. El texto generado por IA puede no ser protegible según tu jurisdicción.</p>
+            <h2>9. Pagos</h2>
+            <p>Ver <a href="pricing.html">precios</a>; el pago puede gestionarse por canales de soporte oficiales.</p>
+            <h2>10. Exención de garantías</h2>
+            <p>EL SERVICIO SE OFRECE <strong>“TAL CUAL”</strong>, EN LA MEDIDA MÁXIMA PERMITIDA POR LEY.</p>
+            <h2>11. Limitación de responsabilidad</h2>
+            <p>EN LA MEDIDA PERMITIDA, NO RESPONSABILIDAD POR DAÑOS INDIRECTOS O CONSECUENTES. RESPONSABILIDAD TOTAL COMO MÁXIMO EL MAYOR ENTRE (A) LO QUE PAGASTE EN LOS ÚLTIMOS <strong>12 MESES</strong> O (B) <strong>50 USD</strong>, SALVO DONDE LA LEY LO PROHÍBA.</p>
+            <h2>12. Indemnización</h2>
+            <p>Te obligas a indemnizar al Operador por reclamaciones derivadas de tu uso o incumplimiento.</p>
+            <h2>13. Suspensión</h2>
+            <p>Podemos suspender el acceso por incumplimiento o requisitos legales.</p>
+            <h2>14. Cambios</h2>
+            <p>Publicaremos la nueva fecha en esta página; el uso continuado implica aceptación.</p>
+            <h2>15. Ley aplicable</h2>
+            <p>Leyes de la <strong>Federación Rusa</strong>, sin perjuicio de derechos imperativos del consumidor en tu país de residencia habitual.</p>
+            <h2>16. Contacto</h2>
+            <p><a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">Privacidad</a></p>
+        </div>
+
+        <!-- Chinese -->
+        <div class="content" id="content-zh">
+            <h1>服务条款</h1>
+            <p class="date">生效日期：2026年4月3日 · <a href="privacy.html">隐私政策</a></p>
+            <p>使用 Solf.ai（“<strong>本服务</strong>”）即表示您同意本条款及<a href="privacy.html">隐私政策</a>。</p>
+            <h2>1. 运营方</h2>
+            <p>独立运营者。联系：Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>。</p>
+            <h2>2. 年龄</h2>
+            <p>您须年满<strong>13周岁</strong>（或您所在地更高的数字同意年龄）。未成年人使用须由监护人同意。</p>
+            <h2>3. 服务性质</h2>
+            <p>提供由<strong>人工智能生成</strong>的音乐理论、视唱等参考信息。本服务<strong>并非</strong>学历教育机构，<strong>不替代</strong>合格教师面授。</p>
+            <h2>4. 账户</h2>
+            <p>可通过 <strong>Google</strong> 登录，适用 Google 条款。您需对账户活动负责。</p>
+            <h2>5. 消息、图片与 API</h2>
+            <p>为生成回复，您的<strong>文本</strong>、<strong>有限的对话上下文</strong>及<strong>图片</strong>会发送至后端处理；聊天记录可能<strong>仅保存在浏览器本地</strong>。您授予运营者<strong>非独占许可</strong>，仅为<strong>提供服务、安全与防滥用</strong>而处理您的内容。请勿提交违法或无权披露的信息。</p>
+            <h2>6. 人工智能输出</h2>
+            <p>输出可能<strong>不准确或不完整</strong>，<strong>不构成</strong>专业建议。您自行承担使用风险。</p>
+            <h2>7. 可接受的使用</h2>
+            <p>遵守法律；禁止逆向工程、批量抓取、规避限制、上传恶意程序或侵犯他人权利。</p>
+            <h2>8. 知识产权</h2>
+            <p>本服务的软件与界面受保护。AI 生成文本在部分法域可能不受版权保护。</p>
+            <h2>9. 付费</h2>
+            <p>详见<a href="pricing.html">价格页</a>；付费可能通过官方支持渠道完成。</p>
+            <h2>10. 免责声明</h2>
+            <p>本服务按<strong>“现状”</strong>提供，在法律允许范围内不提供任何明示或默示担保。</p>
+            <h2>11. 责任限制</h2>
+            <p>在法律允许范围内，运营方不对间接、附带或后果性损害负责；总责任上限为（A）您过去<strong>12个月</strong>内向我们支付的金额与（B）<strong>50美元</strong>之较高者，强制性法律另有规定的除外。</p>
+            <h2>12. 赔偿</h2>
+            <p>因您使用本服务或违反条款而引发的索赔，您同意为运营方抗辩并赔偿。</p>
+            <h2>13. 中止与终止</h2>
+            <p>若您违反条款或法律要求，我们可暂停或终止访问。</p>
+            <h2>14. 条款变更</h2>
+            <p>我们将在本页更新生效日期；继续使用即视为接受。</p>
+            <h2>15. 适用法律</h2>
+            <p>适用<strong>俄罗斯联邦</strong>法律，但不影响您作为消费者惯常居所地强制性法律赋予的权利。</p>
+            <h2>16. 联系方式</h2>
+            <p><a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">隐私政策</a></p>
+        </div>
+
+        <!-- Japanese -->
+        <div class="content" id="content-ja">
+            <h1>利用規約</h1>
+            <p class="date">発効日：2026年4月3日 · <a href="privacy.html">プライバシー</a></p>
+            <p>Solf.ai（「<strong>本サービス</strong>」）を利用することで、本規約および<a href="privacy.html">プライバシーポリシー</a>に同意したものとみなします。</p>
+            <h2>1. 運営者</h2>
+            <p>独立した運営者。連絡先：Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a></p>
+            <h2>2. 利用資格</h2>
+            <p><strong>満13歳以上</strong>（お住まいの地域でより高い年齢が定められている場合はその年齢）。未成年の場合は保護者の同意を得たものとします。</p>
+            <h2>3. サービスの性質</h2>
+            <p><strong>AIが生成する</strong>音楽理論・ソルフェージュ等の参考情報を提供します。<strong>学校</strong>や<strong>資格認定機関</strong>ではなく、<strong>専門の指導の代替</strong>ではありません。</p>
+            <h2>4. アカウント</h2>
+            <p><strong>Google</strong>によるログインは Google の規約が適用されます。アカウントの管理については自己責任です。</p>
+            <h2>5. メッセージ・画像・API</h2>
+            <p>回答生成のため、<strong>テキスト</strong>、<strong>限定的な会話文脈</strong>、<strong>画像</strong>がバックエンドに送信されます。チャット履歴は<strong>ブラウザにローカル保存</strong>される場合があります。運営者が入力内容を処理する<strong>非独占的ライセンス</strong>を付与し、<strong>サービス提供・セキュリティ・不正防止</strong>の目的に限ります。違法な情報や権限のない第三者情報を送信しないでください。</p>
+            <h2>6. AI出力</h2>
+            <p>出力は<strong>誤りや不足</strong>がある場合があります。<strong>専門アドバイスではありません。</strong>利用は自己責任です。</p>
+            <h2>7. 禁止事項</h2>
+            <p>法令違反、逆解析、スクレイピング、制限回避、マルウェア、第三者の権利侵害を禁じます。</p>
+            <h2>8. 知的財産</h2>
+            <p>本サービスのソフトウェア・デザインは保護されます。AI生成テキストの著作権は法域によって認められない場合があります。</p>
+            <h2>9. 有料プラン</h2>
+            <p><a href="pricing.html">料金ページ</a>を参照。決済は公式サポート経由の場合があります。</p>
+            <h2>10. 免責</h2>
+            <p>本サービスは<strong>現状有姿</strong>で提供され、適用法により認められる最大限の範囲で保証しません。</p>
+            <h2>11. 責任制限</h2>
+            <p>適用法の範囲で、間接損害等について責任を負いません。総責任額は、直近<strong>12か月</strong>のお支払い額と<strong>米ドル50ドル</strong>のいずれか高い方を上限とし、強行法規で禁じられる場合を除きます。</p>
+            <h2>12. 補償</h2>
+            <p>利用や規約違反に起因する第三者請求について、ユーザーが運営者を補償します。</p>
+            <h2>13. 停止・終了</h2>
+            <p>違反や法令に基づきアクセスを停止できる場合があります。</p>
+            <h2>14. 変更</h2>
+            <p>本ページに発効日を掲示します。継続利用は変更への同意とみなします。</p>
+            <h2>15. 準拠法</h2>
+            <p><strong>ロシア連邦法</strong>に準拠します。慣常的居所国の消費者保護の強行規定は妨げません。</p>
+            <h2>16. 連絡先</h2>
+            <p><a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="privacy.html">プライバシー</a></p>
+        </div>
+    </div>
+
+    <script>
+        // Apply saved theme
+        const theme = localStorage.getItem('solfai_theme');
+        if (theme && theme !== 'default') document.documentElement.setAttribute('data-theme', theme);
+        const color = localStorage.getItem('solfai_color');
+        if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
+        
+        // Language switching
+        const backTexts = {
+            en: '← Back to Solf.ai', ru: '← Вернуться на Solf.ai', de: '← Zurück zu Solf.ai',
+            es: '← Volver a Solf.ai', zh: '← 返回Solf.ai', ja: '← Solf.aiに戻る'
+        };
+        
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lang = btn.dataset.lang;
+                document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+                document.getElementById('content-' + lang).classList.add('active');
+                document.getElementById('backLink').textContent = backTexts[lang];
+            });
+        });
+        
+        // Set initial language from localStorage
+        const savedLang = localStorage.getItem('solfai_lang') || 'en';
+        document.querySelector(`.lang-btn[data-lang="${savedLang}"]`)?.click();
+    </script>
+</body>
+</html>

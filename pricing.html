@@ -1,0 +1,1053 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        // Мгновенное применение темы до отрисовки DOM
+        (function() {
+            try {
+                var theme = localStorage.getItem('solfai_theme');
+                if (theme === 'light') {
+                    document.documentElement.setAttribute('data-theme', 'light');
+                }
+                var color = localStorage.getItem('solfai_color');
+                if (color && color !== 'default') {
+                    document.documentElement.setAttribute('data-color', color);
+                }
+            } catch (e) {}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pricing — Solf.ai</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=8">
+    <link rel="icon" href="favicon.ico?v=8" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=8">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=8">
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Solf.ai">
+    <!-- Google Fonts — НЕ блокирующая загрузка (см. index.html для подробного объяснения).
+         Без VPN fonts.googleapis.com может тянуться долго и оставлять страницу белой. -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap"
+          rel="stylesheet" media="print" onload="this.media='all';this.onload=null;"
+          onerror="this.onerror=null;this.remove();">
+    <noscript><link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet"></noscript>
+    <style>
+        * {
+            font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+                         'Helvetica Neue', Arial, 'Noto Sans', sans-serif;
+            box-sizing: border-box;
+            margin: 0; padding: 0;
+            -webkit-user-select: none; -moz-user-select: none; user-select: none;
+            -webkit-tap-highlight-color: transparent;
+            outline: none;
+        }
+        
+        :root {
+            --bg-primary: #0a0a0f;
+            --bg-secondary: #13131a;
+            --bg-card: #1a1a24;
+            --purple-soft: #8b5cf6;
+            --purple-glow: #a78bfa;
+            --purple-dark: #6d28d9;
+            --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8;
+            --border-color: rgba(139,92,246,0.15);
+            --glow-color: rgba(139,92,246,0.25);
+            --hover-accent-bg: rgba(139,92,246,0.1);
+            --card-glow-shadow: 0 20px 60px rgba(139,92,246,0.2);
+            --button-glow-shadow: 0 4px 20px rgba(139,92,246,0.4);
+            --button-glow-shadow-hover: 0 8px 30px rgba(139,92,246,0.5);
+        }
+        
+        [data-theme="light"] {
+            --bg-primary: #f8f7fc;
+            --bg-secondary: #ffffff;
+            --bg-card: #ffffff;
+            --purple-soft: #7c3aed;
+            --purple-glow: #8b5cf6;
+            --purple-dark: #6d28d9;
+            --text-primary: #1e1b2e;
+            --text-secondary: #64607a;
+            --border-color: rgba(139,92,246,0.2);
+            --glow-color: rgba(139,92,246,0.15);
+            --hover-accent-bg: rgba(139,92,246,0.1);
+            --card-glow-shadow: 0 20px 60px rgba(139,92,246,0.16);
+            --button-glow-shadow: 0 4px 20px rgba(139,92,246,0.24);
+            --button-glow-shadow-hover: 0 8px 30px rgba(139,92,246,0.3);
+        }
+
+        [data-color="blue"] {
+            --purple-soft: #3b82f6;
+            --purple-glow: #60a5fa;
+            --purple-dark: #1d4ed8;
+            --border-color: rgba(59, 130, 246, 0.15);
+            --glow-color: rgba(59, 130, 246, 0.25);
+            --hover-accent-bg: rgba(59, 130, 246, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(59, 130, 246, 0.2);
+            --button-glow-shadow: 0 4px 20px rgba(59, 130, 246, 0.4);
+            --button-glow-shadow-hover: 0 8px 30px rgba(59, 130, 246, 0.5);
+        }
+        [data-theme="light"][data-color="blue"] {
+            --purple-glow: #2563eb;
+            --border-color: rgba(59, 130, 246, 0.2);
+            --glow-color: rgba(59, 130, 246, 0.15);
+            --hover-accent-bg: rgba(59, 130, 246, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(59, 130, 246, 0.16);
+            --button-glow-shadow: 0 4px 20px rgba(59, 130, 246, 0.24);
+            --button-glow-shadow-hover: 0 8px 30px rgba(59, 130, 246, 0.3);
+        }
+
+        [data-color="green"] {
+            --purple-soft: #10b981;
+            --purple-glow: #34d399;
+            --purple-dark: #047857;
+            --border-color: rgba(16, 185, 129, 0.15);
+            --glow-color: rgba(16, 185, 129, 0.25);
+            --hover-accent-bg: rgba(16, 185, 129, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(16, 185, 129, 0.2);
+            --button-glow-shadow: 0 4px 20px rgba(16, 185, 129, 0.4);
+            --button-glow-shadow-hover: 0 8px 30px rgba(16, 185, 129, 0.5);
+        }
+        [data-theme="light"][data-color="green"] {
+            --purple-glow: #059669;
+            --border-color: rgba(16, 185, 129, 0.2);
+            --glow-color: rgba(16, 185, 129, 0.15);
+            --hover-accent-bg: rgba(16, 185, 129, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(16, 185, 129, 0.16);
+            --button-glow-shadow: 0 4px 20px rgba(16, 185, 129, 0.24);
+            --button-glow-shadow-hover: 0 8px 30px rgba(16, 185, 129, 0.3);
+        }
+
+        [data-color="rose"] {
+            --purple-soft: #f43f5e;
+            --purple-glow: #fb7185;
+            --purple-dark: #be123c;
+            --border-color: rgba(244, 63, 94, 0.15);
+            --glow-color: rgba(244, 63, 94, 0.25);
+            --hover-accent-bg: rgba(244, 63, 94, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(244, 63, 94, 0.2);
+            --button-glow-shadow: 0 4px 20px rgba(244, 63, 94, 0.4);
+            --button-glow-shadow-hover: 0 8px 30px rgba(244, 63, 94, 0.5);
+        }
+        [data-theme="light"][data-color="rose"] {
+            --purple-glow: #e11d48;
+            --border-color: rgba(244, 63, 94, 0.2);
+            --glow-color: rgba(244, 63, 94, 0.15);
+            --hover-accent-bg: rgba(244, 63, 94, 0.1);
+            --card-glow-shadow: 0 20px 60px rgba(244, 63, 94, 0.16);
+            --button-glow-shadow: 0 4px 20px rgba(244, 63, 94, 0.24);
+            --button-glow-shadow-hover: 0 8px 30px rgba(244, 63, 94, 0.3);
+        }
+        
+        body {
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            transition: all 0.3s;
+        }
+        
+        [data-theme="light"] body {
+            background: linear-gradient(180deg, #f8f7fc 0%, #f0eef7 100%);
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* Header */
+        .header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 60px;
+        }
+        
+        .back-link {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            color: var(--purple-soft);
+            text-decoration: none;
+            font-size: 14px;
+            padding: 10px 16px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            transition: all 0.3s;
+        }
+        
+        .back-link:hover {
+            border-color: var(--purple-soft);
+            transform: translateX(-4px);
+        }
+        
+        .lang-selector {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+        
+        .lang-btn {
+            padding: 8px 12px;
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 8px;
+            color: var(--text-primary);
+            cursor: pointer;
+            font-size: 14px;
+            transition: all 0.2s;
+        }
+        
+        .lang-btn:hover, .lang-btn.active {
+            border-color: var(--purple-soft);
+            background: var(--hover-accent-bg);
+        }
+        
+        /* Hero */
+        .hero {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        .hero h1 {
+            font-size: 3rem;
+            font-weight: 700;
+            margin-bottom: 16px;
+            background: linear-gradient(135deg, var(--purple-soft), var(--purple-glow));
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .hero p {
+            font-size: 1.2rem;
+            color: var(--text-secondary);
+            max-width: 600px;
+            margin: 0 auto 32px;
+            line-height: 1.6;
+        }
+        
+        /* Toggle */
+        .billing-toggle {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            margin-bottom: 48px;
+        }
+        
+        .billing-option {
+            font-size: 16px;
+            color: var(--text-secondary);
+            transition: color 0.3s;
+        }
+        
+        .billing-option.active {
+            color: var(--text-primary);
+            font-weight: 600;
+        }
+        
+        .toggle-switch {
+            width: 60px;
+            height: 32px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 20px;
+            cursor: pointer;
+            position: relative;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch:hover {
+            border-color: var(--purple-soft);
+        }
+        
+        .toggle-switch::after {
+            content: '';
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--purple-soft), var(--purple-dark));
+            border-radius: 50%;
+            top: 2px;
+            left: 2px;
+            transition: all 0.3s;
+        }
+        
+        .toggle-switch.yearly::after {
+            left: calc(100% - 26px);
+        }
+        
+        .save-badge {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            animation: pulse 2s infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.05); }
+        }
+        
+        /* Pricing Cards */
+        .pricing-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 24px;
+            max-width: 1000px;
+            margin: 0 auto;
+        }
+        
+        .pricing-card {
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 24px;
+            padding: 32px;
+            position: relative;
+            transition: all 0.3s;
+            display: flex;
+            flex-direction: column;
+        }
+        
+        .pricing-card:hover {
+            transform: translateY(-8px);
+            border-color: var(--purple-soft);
+            box-shadow: var(--card-glow-shadow);
+        }
+        
+        .pricing-card.popular {
+            border-color: var(--purple-soft);
+            background: linear-gradient(180deg, var(--hover-accent-bg) 0%, var(--bg-card) 100%);
+        }
+        
+        .popular-badge {
+            position: absolute;
+            top: -12px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: linear-gradient(135deg, var(--purple-soft), var(--purple-dark));
+            color: white;
+            padding: 6px 20px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .plan-icon {
+            width: 48px;
+            height: 48px;
+            margin-bottom: 16px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: var(--purple-glow);
+        }
+        .plan-icon svg {
+            width: 100%;
+            height: 100%;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 1.8;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        
+        .plan-name {
+            font-size: 1.5rem;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+        
+        .plan-desc {
+            color: var(--text-secondary);
+            font-size: 14px;
+            margin-bottom: 24px;
+            line-height: 1.5;
+        }
+        
+        .plan-price {
+            margin-bottom: 24px;
+        }
+        
+        .price-amount {
+            font-size: 3rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+        
+        .price-currency {
+            font-size: 1.5rem;
+            vertical-align: top;
+        }
+        
+        .price-period {
+            color: var(--text-secondary);
+            font-size: 14px;
+        }
+        
+        .price-yearly {
+            display: none;
+            color: var(--text-secondary);
+            font-size: 13px;
+            margin-top: 4px;
+        }
+        
+        .price-yearly.show {
+            display: block;
+        }
+        
+        .plan-features {
+            list-style: none;
+            margin-bottom: 32px;
+            flex: 1;
+        }
+        
+        .plan-features li {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            padding: 10px 0;
+            font-size: 14px;
+            color: var(--text-secondary);
+            border-bottom: 1px solid var(--border-color);
+        }
+        
+        .plan-features li:last-child {
+            border-bottom: none;
+        }
+        
+        .feature-icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        
+        .feature-icon.check { color: #10b981; }
+        .feature-icon.cross { color: #ef4444; opacity: 0.5; }
+        
+        .plan-btn {
+            width: 100%;
+            padding: 16px 24px;
+            border: none;
+            border-radius: 14px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        
+        .plan-btn.primary {
+            background: linear-gradient(135deg, var(--purple-soft), var(--purple-dark));
+            color: white;
+            box-shadow: var(--button-glow-shadow);
+        }
+        
+        .plan-btn.primary:hover {
+            transform: scale(1.02);
+            box-shadow: var(--button-glow-shadow-hover);
+        }
+        
+        .plan-btn.secondary {
+            background: var(--bg-secondary);
+            color: var(--text-primary);
+            border: 2px solid var(--border-color);
+        }
+        
+        .plan-btn.secondary:hover {
+            border-color: var(--purple-soft);
+            background: var(--hover-accent-bg);
+        }
+        
+        /* FAQ */
+        .faq-section {
+            margin-top: 80px;
+            max-width: 700px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+        
+        .faq-title {
+            text-align: center;
+            font-size: 2rem;
+            margin-bottom: 40px;
+        }
+        
+        .faq-item {
+            background: var(--bg-card);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            margin-bottom: 16px;
+            overflow: hidden;
+            transition: all 0.3s;
+        }
+        
+        .faq-item:hover {
+            border-color: var(--purple-soft);
+        }
+        
+        .faq-question {
+            padding: 20px 24px;
+            cursor: pointer;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-weight: 500;
+            transition: background 0.3s;
+        }
+        
+        .faq-question:hover {
+            background: var(--hover-accent-bg);
+        }
+        
+        .faq-arrow {
+            transition: transform 0.3s;
+            font-size: 12px;
+            color: var(--text-secondary);
+        }
+        
+        .faq-item.open .faq-arrow {
+            transform: rotate(180deg);
+        }
+        
+        .faq-answer {
+            padding: 0 24px;
+            max-height: 0;
+            overflow: hidden;
+            transition: all 0.3s;
+            color: var(--text-secondary);
+            font-size: 14px;
+            line-height: 1.7;
+        }
+        
+        .faq-item.open .faq-answer {
+            padding: 0 24px 20px;
+            max-height: 200px;
+        }
+        
+        /* Footer */
+        .footer {
+            text-align: center;
+            margin-top: 80px;
+            padding: 24px;
+            border-top: 1px solid var(--border-color);
+            color: var(--text-secondary);
+            font-size: 13px;
+        }
+        
+        .footer a {
+            color: var(--purple-soft);
+            text-decoration: none;
+        }
+        
+        .footer a:hover {
+            text-decoration: underline;
+        }
+        
+        /* Mobile */
+        @media (max-width: 768px) {
+            .container { padding: 24px 16px; }
+            .header { flex-direction: column; gap: 16px; }
+            .hero h1 { font-size: 2rem; }
+            .hero p { font-size: 1rem; }
+            .pricing-grid { grid-template-columns: 1fr; }
+            .pricing-card { padding: 24px; }
+            .price-amount { font-size: 2.5rem; }
+            .billing-toggle { flex-wrap: wrap; }
+        }
+    </style>
+</head>
+<body class="preload">
+    <div class="container">
+        <header class="header">
+            <a href="index.html" class="back-link" id="backLink">← Back to Solf.ai</a>
+            <div class="lang-selector">
+                <button class="lang-btn" data-lang="en">🇺🇸 EN</button>
+                <button class="lang-btn" data-lang="ru">🇷🇺 RU</button>
+                <button class="lang-btn" data-lang="de">🇩🇪 DE</button>
+                <button class="lang-btn" data-lang="es">🇪🇸 ES</button>
+                <button class="lang-btn" data-lang="zh">🇨🇳 中文</button>
+                <button class="lang-btn" data-lang="ja">🇯🇵 日本語</button>
+            </div>
+        </header>
+        
+        <section class="hero">
+            <h1 id="heroTitle">Choose Your Plan</h1>
+            <p id="heroDesc">Unlock your full musical potential with Solf.ai Premium. Learn faster, practice smarter.</p>
+        </section>
+        
+        <div class="billing-toggle">
+            <span class="billing-option active" id="monthlyLabel">Monthly</span>
+            <div class="toggle-switch" id="billingToggle"></div>
+            <span class="billing-option" id="yearlyLabel">Yearly</span>
+            <span class="save-badge" id="saveBadge">Save 30%</span>
+        </div>
+        
+        <div class="pricing-grid">
+            <div class="pricing-card">
+                <div class="plan-icon"><svg viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div>
+                <h3 class="plan-name" id="basicName">Basic</h3>
+                <p class="plan-desc" id="basicDesc">Perfect for beginners exploring music theory</p>
+                <div class="plan-price">
+                    <span class="price-currency" id="currency1">$</span><span class="price-amount" id="basicPrice">2.99</span>
+                    <span class="price-period" id="perMonth1">/month</span>
+                    <div class="price-yearly" id="basicYearly">$24.99/year (save $10.89)</div>
+                </div>
+                <ul class="plan-features">
+                    <li><span class="feature-icon check">✓</span><span id="feature1_1">10 requests per day</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature1_2">5 quizzes per day</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature1_3">Basic music theory help</span></li>
+                    <li><span class="feature-icon cross">✗</span><span id="feature1_4">Priority responses</span></li>
+                    <li><span class="feature-icon cross">✗</span><span id="feature1_5">Image analysis</span></li>
+                </ul>
+                <button class="plan-btn secondary" id="basicBtn">Get Started</button>
+            </div>
+            
+            <div class="pricing-card popular">
+                <div class="popular-badge" id="popularBadge">Most Popular</div>
+                <div class="plan-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14H11L10 22L20 10H12L13 2Z"/></svg></div>
+                <h3 class="plan-name" id="proName">Pro</h3>
+                <p class="plan-desc" id="proDesc">For serious musicians and students</p>
+                <div class="plan-price">
+                    <span class="price-currency" id="currency2">$</span><span class="price-amount" id="proPrice">5.99</span>
+                    <span class="price-period" id="perMonth2">/month</span>
+                    <div class="price-yearly" id="proYearly">$49.99/year (save $21.89)</div>
+                </div>
+                <ul class="plan-features">
+                    <li><span class="feature-icon check">✓</span><span id="feature2_1">50 requests per day</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_2">Unlimited quizzes</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_3">Advanced theory explanations</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_4">Priority responses</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_5">Image analysis (5/day)</span></li>
+                </ul>
+                <button class="plan-btn secondary" id="proBtn">Get Started</button>
+            </div>
+            
+            <div class="pricing-card">
+                <div class="plan-icon"><svg viewBox="0 0 24 24"><polygon points="12 3 15 9 21 10 16.5 14.5 17.5 21 12 18 6.5 21 7.5 14.5 3 10 9 9 12 3"></polygon></svg></div>
+                <h3 class="plan-name" id="unlimitedName">Unlimited</h3>
+                <p class="plan-desc" id="unlimitedDesc">Maximum power for professionals</p>
+                <div class="plan-price">
+                    <span class="price-currency" id="currency3">$</span><span class="price-amount" id="unlimitedPrice">9.99</span>
+                    <span class="price-period" id="perMonth3">/month</span>
+                    <div class="price-yearly" id="unlimitedYearly">$83.99/year (save $35.89)</div>
+                </div>
+                <ul class="plan-features">
+                    <li><span class="feature-icon check">✓</span><span id="feature3_1">Unlimited requests</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_2">Unlimited quizzes</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_3">All theory topics</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_4">Fastest responses</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_5">Unlimited image analysis</span></li>
+                </ul>
+                <button class="plan-btn secondary" id="unlimitedBtn">Go Unlimited</button>
+            </div>
+        </div>
+        
+        <section class="faq-section">
+            <h2 class="faq-title" id="faqTitle">Frequently Asked Questions</h2>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span id="faq1q">Can I cancel anytime?</span>
+                    <span class="faq-arrow">▼</span>
+                </div>
+                <div class="faq-answer" id="faq1a">Yes! You can cancel your subscription at any time. Your access will continue until the end of your billing period.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span id="faq2q">What payment methods do you accept?</span>
+                    <span class="faq-arrow">▼</span>
+                </div>
+                <div class="faq-answer" id="faq2a">We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and Apple Pay.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span id="faq3q">Can I switch plans later?</span>
+                    <span class="faq-arrow">▼</span>
+                </div>
+                <div class="faq-answer" id="faq3a">Absolutely! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing date.</div>
+            </div>
+            
+            <div class="faq-item">
+                <div class="faq-question">
+                    <span id="faq4q">Is there a free trial?</span>
+                    <span class="faq-arrow">▼</span>
+                </div>
+                <div class="faq-answer" id="faq4a">Yes! All new users get 3 free requests per day. You can try Solf.ai before subscribing.</div>
+            </div>
+        </section>
+        
+        <footer class="footer">
+            <p>© 2026 Solf.ai. All rights reserved. | <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="https://t.me/vwirex" target="_blank">Support</a></p>
+        </footer>
+    </div>
+    
+   <script>
+    // Translations with discounted monthly prices added
+   const pricingTranslations = {
+            en: {
+                back: '← Back to Solf.ai',
+                heroTitle: 'Choose Your Plan',
+                heroDesc: 'Unlock your full musical potential with Solf.ai Premium. Learn faster, practice smarter.',
+                monthly: 'Monthly', yearly: 'Yearly', save: 'Save 30%',
+                currency: '$',
+                basicName: 'Basic', basicDesc: 'Perfect for beginners exploring music theory',
+                basicPrice: '2.99', basicPriceYearlyMo: '1.99', basicYearly: '$23.99/year (save $11.89)',
+                proName: 'Pro', proDesc: 'For serious musicians and students',
+                proPrice: '5.99', proPriceYearlyMo: '3.99', proYearly: '$47.99/year (save $23.89)',
+                unlimitedName: 'Unlimited', unlimitedDesc: 'Maximum power for professionals',
+                unlimitedPrice: '9.99', unlimitedPriceYearlyMo: '6.99', unlimitedYearly: '$83.99/year (save $35.89)',
+                perMonth: '/month', popular: 'Most Popular',
+                feature1_1: '10 requests per day', feature1_2: '5 quizzes per day', feature1_3: 'Basic music theory help',
+                feature1_4: 'Priority responses', feature1_5: 'Image analysis',
+                feature2_1: '50 requests per day', feature2_2: 'Unlimited quizzes', feature2_3: 'Advanced theory explanations',
+                feature2_4: 'Priority responses', feature2_5: 'Image analysis (5/day)',
+                feature3_1: 'Unlimited requests', feature3_2: 'Unlimited quizzes', feature3_3: 'All theory topics',
+                feature3_4: 'Fastest responses', feature3_5: 'Unlimited image analysis',
+                basicBtn: 'Get Started', proBtn: 'Get Started', unlimitedBtn: 'Get Started',
+
+                faqTitle: 'Frequently Asked Questions',
+                faq1q: 'Can I cancel anytime?', faq1a: 'Yes! You can cancel your subscription at any time. Your access will continue until the end of your billing period.',
+                faq2q: 'What payment methods do you accept?', faq2a: 'We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and Apple Pay.',
+                faq3q: 'Can I switch plans later?', faq3a: 'Absolutely! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing date.',
+                faq4q: 'Is there a free trial?', faq4a: 'Yes! All new users get 3 free requests per day. You can try Solf.ai before subscribing.'
+            },
+            ru: {
+                back: '← Вернуться на Solf.ai',
+                heroTitle: 'Выберите тариф',
+                heroDesc: 'Раскройте свой музыкальный потенциал с Solf.ai Premium. Учитесь быстрее, практикуйтесь эффективнее.',
+                monthly: 'Месяц', yearly: 'Год', save: 'Скидка 30%',
+                currency: '₽',
+                basicName: 'Базовый', basicDesc: 'Идеально для начинающих изучать теорию музыки',
+                basicPrice: '299', basicPriceYearlyMo: '199', basicYearly: '2399 ₽/год (экономия 1189 ₽)',
+                proName: 'Про', proDesc: 'Для серьёзных музыкантов и студентов',
+                proPrice: '599', proPriceYearlyMo: '399', proYearly: '4799 ₽/год (экономия 2389 ₽)',
+                unlimitedName: 'Безлимит', unlimitedDesc: 'Максимум возможностей для профессионалов',
+                unlimitedPrice: '999', unlimitedPriceYearlyMo: '699', unlimitedYearly: '8399 ₽/год (экономия 3589 ₽)',
+                perMonth: '/месяц', popular: 'Популярный',
+                feature1_1: '10 запросов в день', feature1_2: '5 викторин в день', feature1_3: 'Базовая помощь по теории',
+                feature1_4: 'Приоритетные ответы', feature1_5: 'Анализ изображений',
+                feature2_1: '50 запросов в день', feature2_2: 'Безлимит викторин', feature2_3: 'Продвинутые объяснения',
+                feature2_4: 'Приоритетные ответы', feature2_5: 'Анализ изображений (5/день)',
+                feature3_1: 'Безлимит запросов', feature3_2: 'Безлимит викторин', feature3_3: 'Все темы теории',
+                feature3_4: 'Самые быстрые ответы', feature3_5: 'Безлимит анализа изображений',
+                basicBtn: 'Начать', proBtn: 'Начать', unlimitedBtn: 'Начать',
+
+                faqTitle: 'Частые вопросы',
+                faq1q: 'Могу ли я отменить подписку?', faq1a: 'Да! Вы можете отменить подписку в любое время. Доступ сохранится до конца оплаченного периода.',
+                faq2q: 'Какие способы оплаты принимаете?', faq2a: 'Мы принимаем все основные карты (Visa, MasterCard, МИР), PayPal и Apple Pay.',
+                faq3q: 'Можно ли сменить тариф?', faq3a: 'Конечно! Вы можете повысить или понизить тариф в любое время. Изменения вступят в силу со следующего платежа.',
+                faq4q: 'Есть ли бесплатный период?', faq4a: 'Да! Все новые пользователи получают 3 бесплатных запроса в день. Попробуйте Solf.ai перед подпиской.'
+            },
+            de: {
+                back: '← Zurück zu Solf.ai',
+                heroTitle: 'Wählen Sie Ihren Plan',
+                heroDesc: 'Entfalten Sie Ihr musikalisches Potenzial mit Solf.ai Premium. Lernen Sie schneller, üben Sie intelligenter.',
+                monthly: 'Monatlich', yearly: 'Jährlich', save: '30% sparen',
+                currency: '€',
+                basicName: 'Basic', basicDesc: 'Perfekt für Anfänger in der Musiktheorie',
+                basicPrice: '2,99', basicPriceYearlyMo: '1,99', basicYearly: '23,99 €/Jahr (Sie sparen 11,89 €)',
+                proName: 'Pro', proDesc: 'Für ernsthafte Musiker und Studenten',
+                proPrice: '5,99', proPriceYearlyMo: '3,99', proYearly: '47,99 €/Jahr (Sie sparen 23,89 €)',
+                unlimitedName: 'Unlimited', unlimitedDesc: 'Maximale Power für Profis',
+                unlimitedPrice: '9,99', unlimitedPriceYearlyMo: '6,99', unlimitedYearly: '83,99 €/Jahr (Sie sparen 35,89 €)',
+                perMonth: '/Monat', popular: 'Beliebteste',
+                feature1_1: '10 Anfragen pro Tag', feature1_2: '5 Quiz pro Tag', feature1_3: 'Grundlegende Theoriehilfe',
+                feature1_4: 'Prioritätsantworten', feature1_5: 'Bildanalyse',
+                feature2_1: '50 Anfragen pro Tag', feature2_2: 'Unbegrenzte Quiz', feature2_3: 'Erweiterte Erklärungen',
+                feature2_4: 'Prioritätsantworten', feature2_5: 'Bildanalyse (5/Tag)',
+                feature3_1: 'Unbegrenzte Anfragen', feature3_2: 'Unbegrenzte Quiz', feature3_3: 'Alle Theoriethemen',
+                feature3_4: 'Schnellste Antworten', feature3_5: 'Unbegrenzte Bildanalyse',
+                basicBtn: 'Loslegen', proBtn: 'Loslegen', unlimitedBtn: 'Loslegen',
+
+                faqTitle: 'Häufig gestellte Fragen',
+                faq1q: 'Kann ich jederzeit kündigen?', faq1a: 'Ja! Sie können Ihr Abonnement jederzeit kündigen. Ihr Zugang bleibt bis zum Ende des Abrechnungszeitraums erhalten.',
+                faq2q: 'Welche Zahlungsmethoden akzeptieren Sie?', faq2a: 'Wir akzeptieren alle gängigen Kreditkarten, PayPal und Apple Pay.',
+                faq3q: 'Kann ich den Plan später wechseln?', faq3a: 'Absolut! Sie können Ihren Plan jederzeit upgraden oder downgraden.',
+                faq4q: 'Gibt es eine kostenlose Testversion?', faq4a: 'Ja! Alle neuen Benutzer erhalten 3 kostenlose Anfragen pro Tag.'
+            },
+            es: {
+                back: '← Volver a Solf.ai',
+                heroTitle: 'Elige tu Plan',
+                heroDesc: 'Desbloquea tu potencial musical con Solf.ai Premium. Aprende más rápido, practica mejor.',
+                monthly: 'Mensual', yearly: 'Anual', save: 'Ahorra 30%',
+                currency: '$',
+                basicName: 'Básico', basicDesc: 'Perfecto para principiantes en teoría musical',
+                basicPrice: '2.99', basicPriceYearlyMo: '1.99', basicYearly: '$23.99/año (ahorra $11.89)',
+                proName: 'Pro', proDesc: 'Para músicos serios y estudiantes',
+                proPrice: '5.99', proPriceYearlyMo: '3.99', proYearly: '$47.99/año (ahorra $23.89)',
+                unlimitedName: 'Ilimitado', unlimitedDesc: 'Máximo poder para profesionales',
+                unlimitedPrice: '9.99', unlimitedPriceYearlyMo: '6.99', unlimitedYearly: '$83.99/año (ahorra $35.89)',
+                perMonth: '/mes', popular: 'Más Popular',
+                feature1_1: '10 solicitudes por día', feature1_2: '5 quiz por día', feature1_3: 'Ayuda básica de teoría',
+                feature1_4: 'Respuestas prioritarias', feature1_5: 'Análisis de imágenes',
+                feature2_1: '50 solicitudes por día', feature2_2: 'Quiz ilimitados', feature2_3: 'Explicaciones avanzadas',
+                feature2_4: 'Respuestas prioritarias', feature2_5: 'Análisis de imágenes (5/día)',
+                feature3_1: 'Solicitudes ilimitadas', feature3_2: 'Quiz ilimitados', feature3_3: 'Todos los temas',
+                feature3_4: 'Respuestas más rápidas', feature3_5: 'Análisis de imágenes ilimitado',
+                basicBtn: 'Comenzar', proBtn: 'Comenzar', unlimitedBtn: 'Comenzar',
+
+                faqTitle: 'Preguntas Frecuentes',
+                faq1q: '¿Puedo cancelar en cualquier momento?', faq1a: '¡Sí! Puedes cancelar tu suscripción cuando quieras.',
+                faq2q: '¿Qué métodos de pago aceptan?', faq2a: 'Aceptamos todas las tarjetas principales, PayPal y Apple Pay.',
+                faq3q: '¿Puedo cambiar de plan?', faq3a: '¡Por supuesto! Puedes cambiar tu plan en cualquier momento.',
+                faq4q: '¿Hay prueba gratuita?', faq4a: '¡Sí! Todos los usuarios nuevos obtienen 3 solicitudes gratuitas por día.'
+            },
+            zh: {
+                back: '← 返回 Solf.ai',
+                heroTitle: '选择您的计划',
+                heroDesc: '使用 Solf.ai Premium 释放您的音乐潜能。学得更快，练得更好。',
+                monthly: '月付', yearly: '年付', save: '节省 30%',
+                currency: '¥',
+                basicName: '基础版', basicDesc: '非常适合探索音乐理论的初学者',
+                basicPrice: '19.99', basicPriceYearlyMo: '14.99', basicYearly: '¥179.99/年 (节省 ¥59.89)',
+                proName: '专业版', proDesc: '适合认真的音乐家和学生',
+                proPrice: '39.99', proPriceYearlyMo: '29.99', proYearly: '¥359.99/年 (节省 ¥119.89)',
+                unlimitedName: '无限版', unlimitedDesc: '专业人士的最大能力',
+                unlimitedPrice: '69.99', unlimitedPriceYearlyMo: '49.99', unlimitedYearly: '¥599.99/年 (节省 ¥239.89)',
+                perMonth: '/月', popular: '最受欢迎',
+                feature1_1: '每天10次请求', feature1_2: '每天5次测验', feature1_3: '基础理论帮助',
+                feature1_4: '优先响应', feature1_5: '图像分析',
+                feature2_1: '每天50次请求', feature2_2: '无限测验', feature2_3: '高级理论解释',
+                feature2_4: '优先响应', feature2_5: '图像分析 (5次/天)',
+                feature3_1: '无限请求', feature3_2: '无限测验', feature3_3: '所有理论主题',
+                feature3_4: '最快响应', feature3_5: '无限图像分析',
+                basicBtn: '开始使用', proBtn: '开始使用', unlimitedBtn: '开始使用',
+
+                faqTitle: '常见问题',
+                faq1q: '可以随时取消吗？', faq1a: '可以！您可以随时取消订阅。',
+                faq2q: '接受哪些支付方式？', faq2a: '我们接受所有主要信用卡、PayPal 和支付宝。',
+                faq3q: '可以更换计划吗？', faq3a: '当然可以！您可以随时升级或降级您的计划。',
+                faq4q: '有免费试用吗？', faq4a: '有！所有新用户每天获得3次免费请求。'
+            },
+            ja: {
+                back: '← Solf.ai に戻る',
+                heroTitle: 'プランを選択',
+                heroDesc: 'Solf.ai Premiumで音楽の可能性を解き放ちましょう。より速く学び、より賢く練習。',
+                monthly: '月額', yearly: '年額', save: '30%節約',
+                currency: '¥',
+                basicName: 'ベーシック', basicDesc: '音楽理論を探求する初心者に最適',
+                basicPrice: '299', basicPriceYearlyMo: '199', basicYearly: '¥2,399/年 (¥1,189節約)',
+                proName: 'プロ', proDesc: '本格的なミュージシャンと学生向け',
+                proPrice: '599', proPriceYearlyMo: '399', proYearly: '¥4,799/年 (¥2,389節約)',
+                unlimitedName: '無制限', unlimitedDesc: 'プロフェッショナル向けの最大パワー',
+                unlimitedPrice: '999', unlimitedPriceYearlyMo: '699', unlimitedYearly: '¥8,399/年 (¥3,589節約)',
+                perMonth: '/月', popular: '人気No.1',
+                feature1_1: '1日10リクエスト', feature1_2: '1日5クイズ', feature1_3: '基本理論ヘルプ',
+                feature1_4: '優先レスポンス', feature1_5: '画像分析',
+                feature2_1: '1日50リクエスト', feature2_2: '無制限クイズ', feature2_3: '高度な理論説明',
+                feature2_4: '優先レスポンス', feature2_5: '画像分析 (5/日)',
+                feature3_1: '無制限リクエスト', feature3_2: '無制限クイズ', feature3_3: 'すべての理論トピック',
+                feature3_4: '最速レスポンス', feature3_5: '無制限画像分析',
+                basicBtn: '始める', proBtn: '始める', unlimitedBtn: '始める',
+
+                faqTitle: 'よくある質問',
+                faq1q: 'いつでもキャンセルできますか？', faq1a: 'はい！いつでもサブスクリプションをキャンセルできます。',
+                faq2q: 'どの支払い方法を受け付けていますか？', faq2a: 'すべての主要クレジットカード、PayPal、Apple Payを受け付けています。',
+                faq3q: 'プランを変更できますか？', faq3a: 'もちろん！いつでもプランをアップグレードまたはダウングレードできます。',
+                faq4q: '無料トライアルはありますか？', faq4a: 'はい！すべての新規ユーザーは1日3回の無料リクエストを取得できます。'
+            }
+        };
+    
+    let isYearly = false;
+    // Добавляем переменную для отслеживания текущего языка
+    let currentPricingLang = localStorage.getItem('solfai_lang') || 'en';
+    const WORKER_URL = 'https://solf-ai-api.mlemonw.workers.dev';
+    
+    // Apply theme
+    const theme = localStorage.getItem('solfai_theme');
+    if (theme && theme !== 'default') {
+        document.documentElement.setAttribute('data-theme', theme);
+    }
+    const color = localStorage.getItem('solfai_color');
+    if (color && color !== 'default') {
+        document.documentElement.setAttribute('data-color', color);
+    }
+    
+    // Set language
+    function setLang(lang) {
+        currentPricingLang = lang; // Сохраняем локально
+        localStorage.setItem('solfai_lang', lang); // И в память браузера
+
+        const t = pricingTranslations[lang];
+        if (!t) return;
+        
+        
+        
+        document.getElementById('backLink').textContent = t.back;
+        document.getElementById('heroTitle').textContent = t.heroTitle;
+        document.getElementById('heroDesc').textContent = t.heroDesc;
+        document.getElementById('monthlyLabel').textContent = t.monthly;
+        document.getElementById('yearlyLabel').textContent = t.yearly;
+        document.getElementById('saveBadge').textContent = t.save;
+        
+        document.getElementById('currency1').textContent = t.currency;
+        document.getElementById('currency2').textContent = t.currency;
+        document.getElementById('currency3').textContent = t.currency;
+        
+        document.getElementById('basicName').textContent = t.basicName;
+        document.getElementById('basicDesc').textContent = t.basicDesc;
+        // Dynamically set price based on yearly toggle
+        document.getElementById('basicPrice').textContent = isYearly ? t.basicPriceYearlyMo : t.basicPrice;
+        document.getElementById('basicYearly').textContent = t.basicYearly;
+        
+        document.getElementById('proName').textContent = t.proName;
+        document.getElementById('proDesc').textContent = t.proDesc;
+        document.getElementById('proPrice').textContent = isYearly ? t.proPriceYearlyMo : t.proPrice;
+        document.getElementById('proYearly').textContent = t.proYearly;
+        
+        document.getElementById('unlimitedName').textContent = t.unlimitedName;
+        document.getElementById('unlimitedDesc').textContent = t.unlimitedDesc;
+        document.getElementById('unlimitedPrice').textContent = isYearly ? t.unlimitedPriceYearlyMo : t.unlimitedPrice;
+        document.getElementById('unlimitedYearly').textContent = t.unlimitedYearly;
+        
+        document.querySelectorAll('[id^="perMonth"]').forEach(el => el.textContent = t.perMonth);
+        document.getElementById('popularBadge').textContent = t.popular;
+        
+        // Features
+        for (let i = 1; i <= 5; i++) {
+            document.getElementById(`feature1_${i}`).textContent = t[`feature1_${i}`];
+            document.getElementById(`feature2_${i}`).textContent = t[`feature2_${i}`];
+            document.getElementById(`feature3_${i}`).textContent = t[`feature3_${i}`];
+        }
+        
+        document.getElementById('basicBtn').textContent = t.basicBtn;
+        document.getElementById('proBtn').textContent = t.proBtn;
+        document.getElementById('unlimitedBtn').textContent = t.unlimitedBtn;
+        
+        document.getElementById('faqTitle').textContent = t.faqTitle;
+        
+        document.getElementById('faq1q').textContent = t.faq1q;
+        document.getElementById('faq1a').textContent = t.faq1a;
+        document.getElementById('faq2q').textContent = t.faq2q;
+        document.getElementById('faq2a').textContent = t.faq2a;
+        document.getElementById('faq3q').textContent = t.faq3q;
+        document.getElementById('faq3a').textContent = t.faq3a;
+        document.getElementById('faq4q').textContent = t.faq4q;
+        document.getElementById('faq4a').textContent = t.faq4a;
+        
+        document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+        document.querySelector(`.lang-btn[data-lang="${lang}"]`)?.classList.add('active');
+    }
+    
+    // Language buttons
+    document.querySelectorAll('.lang-btn').forEach(btn => {
+        btn.addEventListener('click', () => setLang(btn.dataset.lang));
+    });
+    
+    // Billing toggle (NOW UPDATES PRICES)
+    document.getElementById('billingToggle').addEventListener('click', function() {
+        isYearly = !isYearly;
+        this.classList.toggle('yearly', isYearly);
+        document.getElementById('monthlyLabel').classList.toggle('active', !isYearly);
+        document.getElementById('yearlyLabel').classList.toggle('active', isYearly);
+        document.querySelectorAll('.price-yearly').forEach(el => el.classList.toggle('show', isYearly));
+        
+        // Refresh prices to reflect the toggle state using tracked language
+        setLang(currentPricingLang);
+    });
+    
+    // FAQ toggle
+    document.querySelectorAll('.faq-question').forEach(q => {
+        q.addEventListener('click', () => {
+            q.parentElement.classList.toggle('open');
+        });
+    });
+    
+    // Save Plan Logic
+    document.querySelectorAll('.plan-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+            const card = btn.closest('.pricing-card');
+            const planName = card.querySelector('.plan-name').textContent;
+            
+            let planType = 'free';
+            let planEmoji = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>';
+            
+            if (btn.id === 'basicBtn') {
+                planType = 'basic';
+                planEmoji = '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg>';
+            } else if (btn.id === 'proBtn') {
+                planType = 'pro';
+                planEmoji = '<svg class="svg-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2L3 14H11L10 22L20 10H12L13 2Z"/></svg>';
+            } else if (btn.id === 'unlimitedBtn') {
+                planType = 'unlimited';
+                planEmoji = '<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
+            }
+            
+            let currentUser = null;
+            try { currentUser = JSON.parse(localStorage.getItem('solfai_user')); } catch(e) {}
+            const userId = currentUser ? currentUser.id : 'guest';
+            const storageKey = `solfai_plan_${userId}`;
+
+            const planData = {
+                type: planType,
+                emoji: planEmoji,
+                name: planName,
+                subscribedAt: new Date().toISOString(),
+                billing: isYearly ? 'yearly' : 'monthly'
+            };
+
+            // Сохраняем план ЛОКАЛЬНО сразу (это быстрая синхронная операция).
+            // Так юзер не зависит от того, дойдёт ли fetch до Cloudflare Workers.
+            localStorage.setItem(`solfai_plan_${userId}`, JSON.stringify(planData));
+
+            // Редирект НА index.html делаем гарантированно — независимо от ответа БД.
+            // Раньше тут было `fetch().then(() => location.href = ...)` без catch и timeout —
+            // и без VPN (workers.dev режется ТСПУ) промис никогда не резолвился, кнопка
+            // выглядела "мёртвой". Теперь fetch отправляется fire-and-forget, а редирект
+            // случается через 1.2с в любом случае. Если backend дойдёт раньше — отлично,
+            // план запишется в БД; если нет — план уже в localStorage, БД догонит позже
+            // через syncAppData.
+            const goToApp = () => {
+                if (currentUser) {
+                    window.location.href = 'index.html';
+                } else {
+                    alert(`${planName} plan selected! Contact @vwirex on Telegram to complete payment.`);
+                    window.location.href = 'index.html';
+                }
+            };
+
+            if (currentUser) {
+                let redirected = false;
+                const fire = () => { if (!redirected) { redirected = true; goToApp(); } };
+                // Таймаут 6с — если fetch висит, всё равно идём дальше.
+                const failsafe = setTimeout(fire, 6000);
+                // AbortController, чтобы не оставлять висящих запросов после редиректа.
+                let ctrl = null;
+                try { ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null; } catch (_) {}
+                fetch(`${WORKER_URL}/save-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentUser.id, plan_type: planType }),
+                    signal: ctrl ? ctrl.signal : undefined
+                })
+                    .then(() => { clearTimeout(failsafe); fire(); })
+                    .catch(() => { clearTimeout(failsafe); fire(); });
+            } else {
+                goToApp();
+            }
+        });
+    });
+    
+    // Init
+    const savedLang = localStorage.getItem('solfai_lang') || 'en';
+    setLang(savedLang);
+</script>
+</body>
+</html>
