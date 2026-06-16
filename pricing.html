@@ -973,6 +973,16 @@
     // Save Plan Logic
     document.querySelectorAll('.plan-btn').forEach(btn => {
         btn.addEventListener('click', () => {
+            // Менять тариф можно только из аккаунта. Гостя сначала отправляем войти,
+            // чтобы план не сохранялся в "solfai_plan_guest" и не плодил расхождений с БД.
+            let loggedInUser = null;
+            try { loggedInUser = JSON.parse(localStorage.getItem('solfai_user')); } catch (e) {}
+            if (!loggedInUser || !loggedInUser.id) {
+                alert('Войдите в аккаунт, чтобы выбрать тариф.');
+                window.location.href = 'index.html';
+                return;
+            }
+
             const card = btn.closest('.pricing-card');
             const planName = card.querySelector('.plan-name').textContent;
             

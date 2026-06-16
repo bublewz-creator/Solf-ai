@@ -1008,6 +1008,19 @@ function updateSidebarQuotaBadge() {
     const badge = document.getElementById('sidebarQuotaBadge');
     const textEl = document.getElementById('sidebarQuotaText');
     if (!badge || !textEl) return;
+
+    // Защита от клика ДО первичной инициализации (в HTML href зашит статически): если гость
+    // успеет нажать молнию раньше, чем отработает логика ниже — блокируем переход на pricing.
+    if (!badge.dataset.guardBound) {
+        badge.dataset.guardBound = '1';
+        badge.addEventListener('click', e => {
+            if (!isUserLoggedIn()) {
+                e.preventDefault();
+                // Вместо перехода на pricing предлагаем сначала войти.
+                try { ensureGoogleSignInLoaded?.(); openModal?.('loginModal'); } catch (_) {}
+            }
+        });
+    }
     const planType = currentPlan?.type || 'free';
     const reqLimit = PLAN_LIMITS[planType].requests;
     const imgLimit = PLAN_LIMITS[planType].images;
@@ -1030,11 +1043,26 @@ function updateSidebarQuotaBadge() {
         if (reqRemain === 0) badge.classList.add('exhausted');
         else if (reqRemain === 1) badge.classList.add('warning');
     }
-    // Подробный title — на десктопе появится при ховере: "Запросов: 49 · Картинок: 5".
-    const titleParts = [];
-    titleParts.push(`Requests: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
-    if (imgLimit > 0) titleParts.push(`Images: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
-    badge.title = titleParts.join(' · ');
+
+    // Гость не может менять тариф: бейдж-молния показывает счётчик, но НЕ ведёт на pricing,
+    // пока пользователь не войдёт в аккаунт. Снимаем href (ссылка перестаёт быть кликабельной),
+    // помечаем .disabled + aria-disabled и подменяем title-подсказку.
+    const loggedIn = isUserLoggedIn();
+    badge.classList.toggle('disabled', !loggedIn);
+    badge.setAttribute('aria-disabled', String(!loggedIn));
+    if (loggedIn) {
+        badge.setAttribute('href', 'pricing.html');
+        badge.removeAttribute('tabindex');
+        // Подробный title — на десктопе появится при ховере: "Запросов: 49 · Картинок: 5".
+        const titleParts = [];
+        titleParts.push(`Requests: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
+        if (imgLimit > 0) titleParts.push(`Images: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
+        badge.title = titleParts.join(' · ');
+    } else {
+        badge.removeAttribute('href');
+        badge.setAttribute('tabindex', '-1');
+        badge.title = 'Войдите в аккаунт, чтобы изменить тариф';
+    }
 }
 
 function getImageUsageKey() { return `solfai_img_${currentUser?.id || 'guest'}`; }

@@ -320,7 +320,7 @@ body {
     visibility: hidden !important;
     pointer-events: none !important;
 }
-.sidebar { width: 280px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: all 0.3s; position: relative; z-index: 800; overflow: hidden; }
+.sidebar { width: 280px; background: var(--bg-secondary); border-right: 1px solid var(--border-color); display: flex; flex-direction: column; transition: all 0.3s; position: relative; z-index: 800; overflow: hidden; border-top-right-radius: 18px; border-bottom-right-radius: 18px; }
 .sidebar.collapsed { width: 0; min-width: 0; border: none; }
 .sidebar.collapsed * { opacity: 0; visibility: hidden; }
 .sidebar-header { padding: 20px; border-bottom: 1px solid var(--border-color); display: flex; justify-content: space-between; align-items: center; white-space: nowrap; gap: 12px; }
@@ -452,7 +452,7 @@ body {
     transform: none !important;
     box-shadow: none !important;
 }
-.chat-disclaimer { display: block; text-align: center; font-size: 9px; color: var(--text-secondary); margin-top: 8px; opacity: 0.5; letter-spacing: 0.2px; }
+.chat-disclaimer { display: block; text-align: center; font-size: 11px; color: var(--text-secondary); margin-top: 10px; opacity: 0.6; }
 
 /* Нижняя панель тулбара внутри прямоугольного контейнера */
 .chat-input-toolbar {
@@ -897,6 +897,8 @@ body {
         overflow-y: auto;
         overflow-x: hidden;
         -webkit-overflow-scrolling: touch;
+        border-top-right-radius: 18px;
+        border-bottom-right-radius: 18px;
     }
     .sidebar:not(.collapsed) {
         transform: translateX(0);
@@ -1068,8 +1070,31 @@ body {
 [data-theme="light"] .tour-highlighter { box-shadow: 0 0 0 9999px rgba(0,0,0,0.4), 0 0 0 2px var(--purple-dark); }
 [data-theme="light"] .tour-tooltip { background: #fff; box-shadow: 0 10px 30px rgba(0,0,0,0.15); border: 2px solid #000000; }
 
-/* Дисклеймер под input — простая строка, мелкий шрифт.
-   Размер шрифта/цвет заданы в основном правиле .chat-disclaimer (см. ~строку 455). */
+/* ===== COOKIE BANNER ===== */
+.cookie-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    max-width: 320px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 16px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    z-index: 9990;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+[data-theme="light"] .cookie-banner { background: var(--bg-secondary); border: 2px solid #000000; }
+.cookie-banner p { margin: 0; font-size: 13px; color: var(--text-secondary); line-height: 1.4; }
+.cookie-banner a { color: var(--purple-glow); text-decoration: none; }
+.cookie-banner a:hover { text-decoration: underline; }
+.cookie-buttons { display: flex; gap: 8px; justify-content: flex-end; }
+.cookie-btn { padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; border: none; transition: 0.2s; }
+.cookie-btn.primary { background: var(--purple-soft); color: white; }
+.cookie-btn.primary:hover { background: var(--purple-dark); }
+.cookie-btn.secondary { background: transparent; color: var(--text-primary); border: 1px solid var(--border-color); }
 
 /* Стили для кнопок-гайда на стартовом экране */
 .quick-guide {
@@ -1111,6 +1136,7 @@ body {
     .header-quick-actions { display: none !important; }
     .quick-guide { grid-template-columns: 1fr; margin-top: 20px; }
     .guide-card { padding: 12px; }
+    .cookie-banner { bottom: 10px; left: 10px; right: 10px; max-width: none; }
 }
 /* Стили для кнопки "Вопрос" в шапке */
 .help-btn { 
@@ -1195,8 +1221,33 @@ body {
 .sidebar-header-btn { padding: 18px 0; } /* Увеличено для пальцев */
 .theme-toggle, .lang-btn { width: 44px; height: 44px; } /* Унифицированный крупный размер */
 
-/* Cookie-banner: блок удалён вместе с самим выезжающим баннером.
-   Текст-дисклеймер про cookies/условия теперь в .chat-disclaimer-terms (см. выше). */
+/* ===== COOKIE BANNER ===== */
+.cookie-banner {
+    position: fixed;
+    bottom: 20px;
+    left: 50%; 
+    transform: translateX(-50%); /* Строго по центру */
+    width: calc(100% - 40px); /* Отступы по краям для мобилок */
+    max-width: 340px;
+    background: var(--bg-card);
+    border: 1px solid var(--border-color);
+    border-radius: 16px;
+    padding: 20px;
+    box-shadow: 0 10px 40px rgba(0,0,0,0.4);
+    z-index: 9990;
+    display: none; 
+    flex-direction: column;
+    gap: 14px;
+    /* Обновленная анимация с центрированием */
+    animation: slideUpCookieCentered 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+[data-theme="light"] .cookie-banner { background: var(--bg-secondary); border: 2px solid #000000; box-shadow: 0 10px 30px rgba(0,0,0,0.15); }
+
+@keyframes slideUpCookieCentered { 
+    from { transform: translate(-50%, 100px); opacity: 0; } 
+    to { transform: translate(-50%, 0); opacity: 1; } 
+}
+/* Дублирующие правила моб. сайдбара см. блок Mobile Adaptations выше */
 
 /* ===== COLOR THEMES ===== */
 [data-color="blue"] {
@@ -1486,6 +1537,21 @@ body {
     stroke: none;
 }
 .sidebar-quota-text { font-variant-numeric: tabular-nums; }
+/* Неактивная молния для гостей: показывает счётчик, но не ведёт на pricing,
+   пока пользователь не войдёт в аккаунт. Приглушаем цвет и ставим запретный курсор. */
+.sidebar-quota-badge.disabled {
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(148, 163, 184, 0.10);
+    color: #94a3b8;
+    cursor: not-allowed;
+    opacity: 0.7;
+}
+.sidebar-quota-badge.disabled:hover {
+    transform: none;
+    border-color: rgba(148, 163, 184, 0.35);
+    background: rgba(148, 163, 184, 0.10);
+    box-shadow: none;
+}
 .sidebar-quota-badge.warning {
     border-color: rgba(245, 158, 11, 0.45);
     background: rgba(245, 158, 11, 0.12);
