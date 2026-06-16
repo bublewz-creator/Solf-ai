@@ -66,6 +66,7 @@ async function syncAppData() {
         const planType = PLAN_LIMITS[data.plan_type] ? data.plan_type : 'free';
         const requestsCount = Number.isFinite(Number(data.requests_count)) ? Number(data.requests_count) : 0;
         const imagesCount = Number.isFinite(Number(data.images_count)) ? Number(data.images_count) : 0;
+        const quizCount = Number.isFinite(Number(data.quiz_count)) ? Number(data.quiz_count) : 0;
         const planName = planType.charAt(0).toUpperCase() + planType.slice(1);
         const syncedPlan = { type: planType, emoji: PLAN_ICONS[planType] || PLAN_ICONS.free, name: planName };
 
@@ -74,7 +75,8 @@ async function syncAppData() {
             picture: data.picture || currentUser.picture,
             plan_type: planType,
             requests_count: requestsCount,
-            images_count: imagesCount
+            images_count: imagesCount,
+            quiz_count: quizCount
         };
         currentPlan = syncedPlan;
 
@@ -86,6 +88,7 @@ async function syncAppData() {
 
         updateUIForUser();
         updatePlanDisplay();
+        if (typeof updateQuizCounter === 'function') updateQuizCounter();
     } catch (error) {
         console.error('Ошибка синхронизации данных приложения:', error);
     }
@@ -98,7 +101,7 @@ const PLAN_LIMITS = {
     unlimited: { requests: Infinity, images: Infinity }
 };
 
-const GOOGLE_CLIENT_ID = '11947866192-l1gm8td529rr48tuf07mff1tqogrip6d.apps.googleusercontent.com';
+const GOOGLE_CLIENT_ID = '691304539168-iaouqdnkd73iprkcs6cou2i93t11qiak.apps.googleusercontent.com';
 
 // #region agent log
 const __agentDebug = {
@@ -2609,15 +2612,30 @@ window.addEventListener('pageshow', () => {
     scheduleSkipChatInputFocusCleanup();
 });
 
-// Старая логика выезжающего cookie-banner удалена. Дисклеймер теперь — постоянная строка
-// под полем ввода (#chatTermsDisclaimer, см. .chat-disclaimer в index.html), её текст
-// синхронизируется в i18n.js через updateCookieDisclaimer().
-//
-// Backward-compat shims: старые window.acceptCookies/declineCookies могли быть навешаны
-// на onclick в кэшированных HTML или вызываться из других страниц — оставляем no-op,
-// чтобы не падало с ReferenceError.
-window.acceptCookies = function() { try { localStorage.setItem('solfai_cookies_accepted', 'true'); } catch (_) {} };
-window.declineCookies = function() { try { localStorage.setItem('solfai_cookies_accepted', 'false'); } catch (_) {} };
+// ===== COOKIE BANNER LOGIC =====
+window.acceptCookies = function() {
+    localStorage.setItem('solfai_cookies_accepted', 'true');
+    const banner = document.getElementById('cookieBanner');
+    if(banner) banner.style.display = 'none';
+};
+
+window.declineCookies = function() {
+    localStorage.setItem('solfai_cookies_accepted', 'false');
+    const banner = document.getElementById('cookieBanner');
+    if(banner) banner.style.display = 'none';
+};
+
+// Проверка при загрузке
+document.addEventListener('DOMContentLoaded', () => {
+    const banner = document.getElementById('cookieBanner');
+    
+    if (!localStorage.getItem('solfai_cookies_accepted')) {
+        if(banner) banner.style.display = 'flex';
+    }
+    
+    document.getElementById('cookieAcceptBtn')?.addEventListener('click', window.acceptCookies);
+    document.getElementById('cookieDeclineBtn')?.addEventListener('click', window.declineCookies);
+});
 // Закрытие сразу после выбора самого языка
 document.querySelectorAll('.lang-option').forEach(option => {
     option.addEventListener('click', () => {
