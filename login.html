@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        (function () {
+            try {
+                var theme = localStorage.getItem('solfai_theme');
+                if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+                var color = localStorage.getItem('solfai_color');
+                if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
+            } catch (e) {}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'unsafe-inline' https://accounts.google.com https://accounts.google.com/gsi/client https://id.vk.com https://id.vk.ru https://unpkg.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com https://accounts.google.com https://accounts.google.com/gsi/; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https://*.googleusercontent.com https://lh3.googleusercontent.com https://*.userapi.com https://*.vk.com https://vk.com; connect-src 'self' https://solf-ai-api.mlemonw.workers.dev https://accounts.google.com https://id.vk.com https://id.vk.ru https://unpkg.com; frame-src https://accounts.google.com https://id.vk.com https://id.vk.ru; object-src 'none'; base-uri 'self'; form-action 'self';">
+    <title>Sign In — Solf.ai</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=8">
+    <link rel="icon" href="favicon.ico?v=8" sizes="48x48">
+    <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=8">
+    <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=8">
+    <link rel="manifest" href="manifest.json">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .login-page {
+            min-height: 100dvh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 24px 16px;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+        }
+        .login-shell {
+            width: 100%;
+            max-width: 420px;
+            position: relative;
+        }
+        .login-back {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 40px;
+            height: 40px;
+            border-radius: 999px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            color: var(--text-primary);
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            transition: border-color 0.2s ease, transform 0.2s ease;
+        }
+        .login-back:hover {
+            border-color: var(--purple-soft);
+            transform: translateX(-2px);
+        }
+        .login-back svg {
+            width: 18px;
+            height: 18px;
+            fill: none;
+            stroke: currentColor;
+            stroke-width: 2;
+            stroke-linecap: round;
+            stroke-linejoin: round;
+        }
+        .login-card {
+            margin-top: 56px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 24px;
+            padding: 40px 32px 32px;
+            text-align: center;
+            box-shadow: var(--shadow-soft);
+        }
+        .login-logo {
+            font-family: 'Outfit', system-ui, sans-serif;
+            font-size: 2.25rem;
+            font-weight: 800;
+            margin-bottom: 8px;
+        }
+        .login-subtitle {
+            color: var(--text-secondary);
+            font-size: 1rem;
+            line-height: 1.5;
+            margin: 0 0 28px;
+        }
+        .terms-row {
+            display: flex;
+            align-items: flex-start;
+            gap: 12px;
+            text-align: left;
+            padding: 14px 16px;
+            border-radius: 14px;
+            border: 1px solid var(--border-color);
+            background: var(--bg-card);
+            margin-bottom: 24px;
+            cursor: pointer;
+            transition: border-color 0.2s ease, background 0.2s ease;
+        }
+        .terms-row:hover {
+            border-color: var(--purple-soft);
+        }
+        .terms-row input {
+            position: absolute;
+            opacity: 0;
+            width: 0;
+            height: 0;
+        }
+        .terms-switch {
+            flex-shrink: 0;
+            width: 44px;
+            height: 26px;
+            border-radius: 999px;
+            background: var(--border-color);
+            position: relative;
+            transition: background 0.25s ease;
+            margin-top: 2px;
+        }
+        .terms-switch::after {
+            content: '';
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            background: #fff;
+            box-shadow: 0 1px 4px rgba(0, 0, 0, 0.25);
+            transition: transform 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+        .terms-row input:checked + .terms-switch {
+            background: var(--purple-soft);
+        }
+        .terms-row input:checked + .terms-switch::after {
+            transform: translateX(18px);
+        }
+        .terms-row input:focus-visible + .terms-switch {
+            outline: 2px solid var(--purple-glow);
+            outline-offset: 2px;
+        }
+        .terms-text {
+            font-size: 0.875rem;
+            line-height: 1.55;
+            color: var(--text-secondary);
+        }
+        .terms-text a {
+            color: var(--purple-glow);
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .terms-text a:hover {
+            text-decoration: underline;
+        }
+        .login-auth {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 12px;
+            width: 100%;
+        }
+        .login-auth.auth-disabled {
+            opacity: 0.38;
+            pointer-events: none;
+            filter: grayscale(0.25);
+        }
+        .login-auth .google-btn-wrapper {
+            padding: 0;
+            width: 100%;
+            max-width: 320px;
+        }
+        .login-auth .google-btn-wrapper > div {
+            transform: none;
+            width: 100%;
+            display: flex;
+            justify-content: center;
+        }
+        .login-auth .vk-btn-wrapper {
+            width: 100%;
+            max-width: 320px;
+            min-height: 50px;
+        }
+        .terms-hint {
+            margin: 14px 0 0;
+            font-size: 0.82rem;
+            color: var(--text-secondary);
+        }
+        .login-later {
+            display: inline-block;
+            margin-top: 28px;
+            background: none;
+            border: none;
+            color: var(--text-secondary);
+            font-size: 0.92rem;
+            cursor: pointer;
+            text-decoration: none;
+            transition: color 0.2s ease;
+        }
+        .login-later:hover {
+            color: var(--text-primary);
+        }
+        @media (max-width: 480px) {
+            .login-card {
+                padding: 32px 20px 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="login-page">
+        <div class="login-shell">
+            <button type="button" class="login-back" id="loginBackBtn" aria-label="Back">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><polyline points="15 18 9 12 15 6"></polyline></svg>
+            </button>
+
+            <div class="login-card">
+                <div class="login-logo">Solf<span class="logo-dot">.ai</span></div>
+                <p class="login-subtitle">Sign in to save your chat history</p>
+
+                <label class="terms-row" for="termsAccept">
+                    <input type="checkbox" id="termsAccept">
+                    <span class="terms-switch" aria-hidden="true"></span>
+                    <span class="terms-text">
+                        I agree to the <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms of Service</a>
+                        and <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy Policy</a>
+                    </span>
+                </label>
+
+                <div class="login-auth auth-disabled" id="authProviders">
+                    <div class="google-btn-wrapper"><div id="googleSignInButton"></div></div>
+                    <div class="vk-btn-wrapper" id="vkSignInButton"></div>
+                </div>
+                <p class="terms-hint" id="termsHint">Accept the terms above to continue</p>
+
+                <a href="index.html" class="login-later" id="loginLaterBtn">Maybe later</a>
+            </div>
+        </div>
+    </div>
+
+    <script src="login.js?v=1"></script>
+</body>
+</html>

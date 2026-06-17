@@ -101,11 +101,6 @@ const PLAN_LIMITS = {
     unlimited: { requests: Infinity, images: Infinity }
 };
 
-const GOOGLE_CLIENT_ID = '691304539168-iaouqdnkd73iprkcs6cou2i93t11qiak.apps.googleusercontent.com';
-const VK_APP_ID = 54641545;
-const VK_REDIRECT_URL = 'https://bublewz-creator.github.io/Solf-ai/';
-const VKID_SDK_URL = 'https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js';
-
 // #region agent log
 const __agentDebug = {
     runId: 'pre-fix',
@@ -200,7 +195,6 @@ function closeSidebarWhenOpeningTool() {
 }
 const chatsList = document.getElementById('chatsList');
 const chatTitle = document.getElementById('chatTitle');
-const loginModal = document.getElementById('loginModal');
 const limitModal = document.getElementById('limitModal');
 const sidebarUser = document.getElementById('sidebarUser');
 const chatFileInput = document.getElementById('chatFileInput');
@@ -703,9 +697,13 @@ function handleOutsideTapDismiss(el) {
 
 function openModal(modalId) {
     closeAllOverlays();
-    document.querySelectorAll('.login-modal, .limit-modal, .name-modal, .tool-modal, .quiz-modal').forEach(m => m.classList.remove('active'));
+    document.querySelectorAll('.limit-modal, .name-modal, .tool-modal, .quiz-modal').forEach(m => m.classList.remove('active'));
     document.getElementById(modalId)?.classList.add('active');
 }
+
+window.navigateToLogin = function () {
+    window.location.href = 'login.html';
+};
 
 // ===== УПРАВЛЕНИЕ ЧАТАМИ И ГРУППИРОВКА =====
 const TOP_VISIBLE_CHATS = 3;
@@ -1026,7 +1024,7 @@ function updateSidebarQuotaBadge() {
             if (!isUserLoggedIn()) {
                 e.preventDefault();
                 // Вместо перехода на pricing предлагаем сначала войти.
-                try { ensureLoginProvidersLoaded?.(); openModal?.('loginModal'); } catch (_) {}
+                try { navigateToLogin?.(); } catch (_) {}
             }
         });
     }
@@ -2022,10 +2020,24 @@ async function generateResponse(query, imageData = null) {
     }
 }
 function showLoginPrompt() {
-    ensureLoginProvidersLoaded();
-    document.getElementById('loginPromptModal').classList.add('active');
+    if (pendingQuery) {
+        try {
+            sessionStorage.setItem('solfai_pending_query', JSON.stringify(pendingQuery));
+        } catch (_) {}
+    }
+    navigateToLogin();
 }
-function hideLoginPrompt() { document.getElementById('loginPromptModal').classList.remove('active'); pendingQuery = null; }
+
+function restorePendingQueryAfterLogin() {
+    if (!currentUser) return;
+    try {
+        const raw = sessionStorage.getItem('solfai_pending_query');
+        if (!raw) return;
+        const pq = JSON.parse(raw);
+        sessionStorage.removeItem('solfai_pending_query');
+        if (pq?.query) proceedWithQuery(pq.query, pq.imageData);
+    } catch (_) {}
+}
 
 function startNewChat() {
     closeAllOverlays();
@@ -2124,181 +2136,6 @@ function sendChatMessage() {
     lastUserQuery = query;
     if (!currentUser) { pendingQuery = { query, imageData }; showLoginPrompt(); return; }
     proceedWithQuery(query, imageData);
-}
-
-// Ленивый загрузчик Google Sign-In скрипта.
-//
-// Раньше скрипт `accounts.google.com/gsi/client` стоял в <head> с async/defer и грузился
-// при каждом открытии страницы. У пользователей без VPN запрос к accounts.google.com мог
-// подвисать на 3-10 секунд (домен периодически режут провайдеры), и за счёт async это не
-// блокировало парсинг, НО initGoogleAuth дёргал setTimeout каждые 500 мс пока скрипт не
-// придёт — это держало event loop busy и тормозило UI.
-//
-// Теперь скрипт грузится только когда юзер реально открывает окно входа.
-// Откат: вернуть `<script src="https://accounts.google.com/gsi/client" async defer>` в head
-// и удалить функцию ниже + её вызовы в обработчиках login-кнопок.
-function ensureGoogleSignInLoaded() {
-    if (typeof google !== 'undefined' && google.accounts) return; // уже загружен
-    if (window.__solfGsiLoading) return; // уже грузится
-    window.__solfGsiLoading = true;
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.onload = () => { try { initGoogleAuth(); } catch (_) {} };
-    s.onerror = () => {
-        window.__solfGsiLoading = false;
-        console.warn('[Solf.ai] Google Sign-In заблокирован — вход через Google недоступен, но остальной интерфейс работает.');
-    };
-    document.head.appendChild(s);
-}
-
-function initGoogleAuth() {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'B',
-        location: 'app.js:initGoogleAuth',
-        message: 'initGoogleAuth tick',
-        data: { hasGoogle: typeof google !== 'undefined', hasAccounts: Boolean(globalThis?.google?.accounts) }
-    });
-    // #endregion
-    if (typeof google === 'undefined' || !google.accounts) {
-        // Скрипт gsi/client теперь грузится ЛЕНИВО (см. ensureGoogleSignInLoaded). Если его
-        // ещё нет в DOM (никто не открывал login-модалку), просто ждём — НЕ дёргаем повторно
-        // setTimeout бесконечно. Если скрипт не загружен И не подгружается — выходим тихо.
-        if (!window.__solfGsiLoading) return;
-        setTimeout(initGoogleAuth, 500);
-        return;
-    }
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => {
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'B',
-            location: 'app.js:initGoogleAuth:callback',
-            message: 'google callback received',
-            data: { hasCredential: Boolean(r?.credential), credParts: Array.isArray(r?.credential?.split?.('.')) ? r.credential.split('.').length : null }
-        });
-        // #endregion
-        const payload = JSON.parse(atob(r.credential.split('.')[1]));
-        currentUser = { id: payload.sub, email: payload.email, name: payload.name, picture: payload.picture };
-
-        localStorage.setItem('solfai_user', JSON.stringify(currentUser));
-        syncUserWithDB(currentUser);
-
-        loginModal.classList.remove('active');
-        document.getElementById('loginPromptModal').classList.remove('active');
-        updateUIForUser();
-
-        if(pendingQuery){ proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
-    }});
-    document.querySelectorAll('#googleSignInButton, #googleSignInButtonPrompt').forEach(b => google.accounts.id.renderButton(b, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', locale: 'en' }));
-}
-
-function ensureLoginProvidersLoaded() {
-    ensureGoogleSignInLoaded();
-    ensureVkIdLoaded();
-}
-
-function ensureVkIdLoaded() {
-    if (window.VKIDSDK) { initVkIdAuth(); return; }
-    if (window.__solfVkIdLoading) return;
-    window.__solfVkIdLoading = true;
-    const s = document.createElement('script');
-    s.src = VKID_SDK_URL;
-    s.async = true;
-    s.onload = () => { try { initVkIdAuth(); } catch (_) {} };
-    s.onerror = () => {
-        window.__solfVkIdLoading = false;
-        console.warn('[Solf.ai] VK ID SDK недоступен — вход через VK недоступен, но остальной интерфейс работает.');
-    };
-    document.head.appendChild(s);
-}
-
-function getVkIdScheme() {
-    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
-}
-
-function vkidOnError(error) {
-    console.warn('[Solf.ai] VK ID auth error:', error);
-}
-
-async function handleVkIdAuthSuccess(data) {
-    const VKID = window.VKIDSDK;
-    let user = null;
-    try {
-        if (data.id_token) {
-            const info = await VKID.Auth.publicInfo(data.id_token);
-            user = info.user || info;
-        } else if (data.access_token) {
-            const info = await VKID.Auth.userInfo(data.access_token);
-            user = info.user || info;
-        }
-    } catch (e) {
-        console.warn('[Solf.ai] VK user info fetch failed:', e);
-    }
-    const userId = user?.user_id || data.user_id;
-    if (!userId) { vkidOnError(new Error('Missing VK user id')); return; }
-    const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ').trim() : '';
-    currentUser = {
-        id: 'vk_' + userId,
-        email: user?.email || '',
-        name: name || 'VK User',
-        picture: user?.avatar || ''
-    };
-    localStorage.setItem('solfai_user', JSON.stringify(currentUser));
-    syncUserWithDB(currentUser);
-    loginModal.classList.remove('active');
-    document.getElementById('loginPromptModal').classList.remove('active');
-    updateUIForUser();
-    if (pendingQuery) { proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
-}
-
-function renderVkIdOneTap(container) {
-    if (!container || container.dataset.vkRendered === '1') return;
-    const VKID = window.VKIDSDK;
-    if (!VKID) return;
-    container.dataset.vkRendered = '1';
-    const width = Math.min(container.clientWidth || 320, 320);
-    const oneTap = new VKID.OneTap();
-    oneTap.render({
-        container,
-        scheme: getVkIdScheme(),
-        fastAuthEnabled: false,
-        showAlternativeLogin: true,
-        styles: {
-            borderRadius: 13,
-            width,
-            height: 50
-        },
-        oauthList: ['ok_ru', 'mail_ru']
-    })
-    .on(VKID.WidgetEvents.ERROR, vkidOnError)
-    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
-        VKID.Auth.exchangeCode(payload.code, payload.device_id)
-            .then(handleVkIdAuthSuccess)
-            .catch(vkidOnError);
-    });
-}
-
-function initVkIdAuth() {
-    if (!window.VKIDSDK) {
-        if (!window.__solfVkIdLoading) return;
-        setTimeout(initVkIdAuth, 500);
-        return;
-    }
-    const VKID = window.VKIDSDK;
-    if (!window.__solfVkIdConfigured) {
-        VKID.Config.init({
-            app: VK_APP_ID,
-            redirectUrl: VK_REDIRECT_URL,
-            responseMode: VKID.ConfigResponseMode.Callback,
-            source: VKID.ConfigSource.LOWCODE,
-            scope: '',
-        });
-        window.__solfVkIdConfigured = true;
-    }
-    renderVkIdOneTap(document.getElementById('vkSignInButton'));
-    renderVkIdOneTap(document.getElementById('vkSignInButtonPrompt'));
 }
 
 function updateUIForUser() {
@@ -2623,6 +2460,7 @@ async function initApp() {
     // (Cloudflare без VPN) — профиль так и оставался пустым ("есть buttn 'M' и всё").
     // Теперь рисуем профиль СРАЗУ из localStorage-кэша, БД лишь освежит позже.
     updateUIForUser();
+    restorePendingQueryAfterLogin();
     
     // --- ПРАВИЛЬНАЯ РАБОТА ВИЗУАЛЬНЫХ КНОПОК ПРИКРЕПЛЕНИЯ ---
     const attachBtns = document.querySelectorAll('#chatAttachBtn, .attach-btn');
@@ -2727,18 +2565,12 @@ async function initApp() {
         true
     );
     
-    document.getElementById('loginCloseBtn')?.addEventListener('click', () => loginModal.classList.remove('active'));
     document.getElementById('limitCloseBtn')?.addEventListener('click', () => limitModal.classList.remove('active'));
     document.getElementById('subscribeBtn')?.addEventListener('click', () => {
         window.location.href = 'pricing.html';
     });
     document.getElementById('imageLimitCloseBtn')?.addEventListener('click', () => document.getElementById('imageLimitModal').classList.remove('active'));
-    document.getElementById('skipLoginBtn')?.addEventListener('click', hideLoginPrompt);
-    document.getElementById('openLoginBtn')?.addEventListener('click', () => { ensureLoginProvidersLoaded(); openModal('loginModal'); });
-    document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => { ensureLoginProvidersLoaded(); openModal('loginModal'); });
-    // Прямая ссылка на login-кнопку в шапке чата (chatHeaderLoginBtn) и в empty state —
-    // они дёргают openModal('loginModal') через inline onclick. Подцепим там же.
-    document.getElementById('chatHeaderLoginBtn')?.addEventListener('click', ensureLoginProvidersLoaded);
+    document.getElementById('sidebarLoginBtn')?.addEventListener('click', navigateToLogin);
     
     document.getElementById('profileBtnChat')?.addEventListener('click', e => { 
         e.stopPropagation(); 
@@ -2748,7 +2580,6 @@ async function initApp() {
         if (!isActive) dropdown.classList.add('active'); 
     });
     
-    if (document.readyState === 'complete') initGoogleAuth(); else window.addEventListener('load', initGoogleAuth);
     setInterval(() => { 
         updateLimitTimer(); 
         updateImageLimitTimer(); 
@@ -2809,7 +2640,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncViewportCssVar();
     }
     
-    const modals = document.querySelectorAll('.login-modal, .limit-modal, .name-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
+    const modals = document.querySelectorAll('.limit-modal, .name-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
     const obs = new MutationObserver(() => { document.body.style.overflow = Array.from(modals).some(m => m.classList.contains('active')) ? 'hidden' : ''; });
     modals.forEach(m => obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
 
@@ -2832,38 +2663,6 @@ window.addEventListener('load', () => {
 
 window.addEventListener('pageshow', () => {
     scheduleSkipChatInputFocusCleanup();
-});
-
-// ===== COOKIE BANNER LOGIC =====
-window.acceptCookies = function() {
-    localStorage.setItem('solfai_cookies_accepted', 'true');
-    const banner = document.getElementById('cookieBanner');
-    if(banner) banner.style.display = 'none';
-};
-
-window.declineCookies = function() {
-    localStorage.setItem('solfai_cookies_accepted', 'false');
-    const banner = document.getElementById('cookieBanner');
-    if(banner) banner.style.display = 'none';
-};
-
-// Проверка при загрузке
-document.addEventListener('DOMContentLoaded', () => {
-    const banner = document.getElementById('cookieBanner');
-    
-    if (!localStorage.getItem('solfai_cookies_accepted')) {
-        if(banner) banner.style.display = 'flex';
-    }
-    
-    document.getElementById('cookieAcceptBtn')?.addEventListener('click', window.acceptCookies);
-    document.getElementById('cookieDeclineBtn')?.addEventListener('click', window.declineCookies);
-});
-// Закрытие сразу после выбора самого языка
-document.querySelectorAll('.lang-option').forEach(option => {
-    option.addEventListener('click', () => {
-        document.getElementById('langSubmenu')?.classList.remove('active');
-        document.getElementById('langMenuBtn')?.classList.remove('active');
-    });
 });
 
 function abortGeneration() {

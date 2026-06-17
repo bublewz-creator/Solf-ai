@@ -275,38 +275,6 @@
       </symbol>
     </svg>
 
-   <div id="cookieBanner" class="cookie-banner" style="display: none;">
-        <div class="cookie-content">
-            <p class="cookie-text" id="cookieText">We use cookies to save your settings.</p>
-            <div class="cookie-buttons">
-                <button id="cookieDeclineBtn" class="cookie-btn secondary">Decline</button>
-                <button id="cookieAcceptBtn" class="cookie-btn primary">Accept</button>
-            </div>
-        </div>
-    </div>
-
-    <div class="login-modal" id="loginModal">
-        <div class="login-modal-content">
-            <div class="login-modal-logo">Solf<span class="logo-dot">.ai</span></div>
-            <p class="login-modal-subtitle" data-i18n="loginSubtitle">Sign in to save your chat history</p>
-            <div class="auth-providers">
-                <div class="google-btn-wrapper"><div id="googleSignInButton"></div></div>
-                <div class="vk-btn-wrapper" id="vkSignInButton"></div>
-            </div>
-            <button class="login-close-btn" id="loginCloseBtn" data-i18n="later">Later</button>
-        </div>
-    </div>
-    <div class="login-modal" id="loginPromptModal">
-        <div class="login-modal-content">
-            <div class="login-modal-logo"><svg class="svg-icon" style="width: 40px; height: 40px; margin: 0 auto;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div>
-            <h3 id="loginPromptTitle">Sign in to continue</h3>
-            <div class="auth-providers">
-                <div class="google-btn-wrapper"><div id="googleSignInButtonPrompt"></div></div>
-                <div class="vk-btn-wrapper" id="vkSignInButtonPrompt"></div>
-            </div>
-            <button class="login-close-btn" id="skipLoginBtn">Continue without signing in</button>
-        </div>
-    </div>
     <div class="limit-modal" id="limitModal"><div class="limit-modal-content limit-premium"><div class="limit-icon" style="font-size: 40px;"><svg class="svg-icon" style="width: 60px; height: 60px; margin: 0 auto; color: #ef4444;" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"></circle><line x1="12" y1="8" x2="12" y2="12"></line><line x1="12" y1="16" x2="12.01" y2="16"></line></svg></div><h2 class="limit-title">Daily Limit Reached</h2><button type="button" class="subscribe-btn premium-btn" id="subscribeBtn"><span class="btn-text" data-i18n="upgrade">Upgrade</span></button><p class="limit-timer" id="limitTimer"></p><button class="limit-close-btn" id="limitCloseBtn">I'll wait</button></div></div>
     <div class="limit-modal" id="imageLimitModal"><div class="limit-modal-content limit-premium"><div class="limit-icon" style="font-size: 40px;"><svg class="svg-icon" style="width: 60px; height: 60px; margin: 0 auto; color: #a78bfa;" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><circle cx="8.5" cy="8.5" r="1.5"></circle><polyline points="21 15 16 10 5 21"></polyline></svg></div><h2 class="limit-title" style="color: #fff;">Лимит изображений</h2><button class="subscribe-btn premium-btn" onclick="window.location.href='pricing.html'"><span class="btn-text">Перейти на Unlimited</span></button><p class="limit-timer" id="imageLimitTimer"></p><button class="limit-close-btn" id="imageLimitCloseBtn">Подожду</button></div></div>
 
@@ -356,7 +324,7 @@
 
                    
 
-                    <button class="login-btn" id="chatHeaderLoginBtn" onclick="openModal('loginModal')">
+                    <button class="login-btn" id="chatHeaderLoginBtn" onclick="navigateToLogin()">
                         <svg class="svg-icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
                         <span data-i18n="signIn">Sign In</span>
                     </button>
@@ -577,6 +545,6 @@
     <script src="i18n.js?v=2"></script>
     <script src="quiz.js?v=2"></script>
     <script src="theory.js?v=9"></script>
-    <script src="app.js?v=15"></script>
+    <script src="app.js?v=16"></script>
 </body>
 </html>
