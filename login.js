@@ -8,8 +8,6 @@ const VKID_SDK_URL = 'https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js';
 
 let termsAccepted = false;
 let providersLoaded = false;
-let googleReady = false;
-const oauthTriggerMap = {};
 
 (function redirectIfAlreadyLoggedIn() {
     try {
@@ -88,6 +86,21 @@ function ensureGoogleSignInLoaded() {
     document.head.appendChild(s);
 }
 
+function mountGoogleBridge() {
+    const container = document.getElementById('googleBridge');
+    if (!container || container.dataset.rendered === '1') return;
+    if (typeof google === 'undefined' || !google.accounts?.id?.renderButton) return;
+
+    container.dataset.rendered = '1';
+    google.accounts.id.renderButton(container, {
+        type: 'icon',
+        shape: 'circle',
+        size: 'large',
+        theme: 'outline',
+        locale: 'en'
+    });
+}
+
 function initGoogleAuth() {
     if (typeof google === 'undefined' || !google.accounts) {
         if (!window.__solfGsiLoading) return;
@@ -107,7 +120,7 @@ function initGoogleAuth() {
             });
         }
     });
-    googleReady = true;
+    mountGoogleBridge();
 }
 
 function ensureVkIdLoaded() {
@@ -127,6 +140,16 @@ function ensureVkIdLoaded() {
 
 function getVkIdScheme() {
     return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+function getVkLoginParams(provider) {
+    const VKID = window.VKIDSDK;
+    const params = {
+        lang: VKID.Languages.ENG,
+        scheme: getVkIdScheme()
+    };
+    if (provider) params.provider = provider;
+    return params;
 }
 
 async function handleVkIdAuthSuccess(data) {
@@ -162,75 +185,24 @@ function exchangeVkCode(payload) {
         .catch((err) => console.warn('[Solf.ai] VK ID auth error:', err));
 }
 
-function mapHiddenOAuthButtons(container) {
-    if (!container) return;
-    const clickable = container.querySelectorAll('button, a, [role="button"]');
-    clickable.forEach((el, index) => {
-        const label = (el.getAttribute('aria-label') || el.textContent || '').toLowerCase();
-        if (label.includes('mail')) oauthTriggerMap.mail_ru = el;
-        else if (label.includes('ok') || label.includes('odnoklass')) oauthTriggerMap.ok_ru = el;
-        else if (index === 0 && !oauthTriggerMap.mail_ru) oauthTriggerMap.mail_ru = el;
-        else if (index === 1 && !oauthTriggerMap.ok_ru) oauthTriggerMap.ok_ru = el;
-    });
-    if (!oauthTriggerMap.mail_ru && clickable[0]) oauthTriggerMap.mail_ru = clickable[0];
-    if (!oauthTriggerMap.ok_ru && clickable[1]) oauthTriggerMap.ok_ru = clickable[1];
-}
-
-function renderHiddenOAuthList() {
-    const container = document.getElementById('vkOAuthHidden');
-    const VKID = window.VKIDSDK;
-    if (!container || !VKID || container.dataset.oauthRendered === '1') return;
-    container.dataset.oauthRendered = '1';
-
-    const oauthList = new VKID.OAuthList();
-    oauthList.render({
-        container,
-        oauthList: [VKID.OAuthName.MAIL, VKID.OAuthName.OK],
-        scheme: getVkIdScheme(),
-        lang: VKID.Languages.ENG,
-        styles: { height: 44, borderRadius: 8 }
-    })
-    .on(VKID.WidgetEvents.ERROR, (err) => console.warn('[Solf.ai] VK OAuth error:', err))
-    .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, exchangeVkCode);
-
-    setTimeout(() => mapHiddenOAuthButtons(container), 300);
-    setTimeout(() => mapHiddenOAuthButtons(container), 1200);
-}
-
-function triggerOAuthProvider(provider) {
-    const btn = oauthTriggerMap[provider];
-    if (btn) btn.click();
-}
-
-function startVkLogin() {
+function startVkAuth(provider) {
+    if (!termsAccepted) return;
     const VKID = window.VKIDSDK;
     if (!VKID) return;
-    VKID.Auth.login({ lang: VKID.Languages.ENG, scheme: getVkIdScheme() })
+    VKID.Auth.login(getVkLoginParams(provider))
         .then(exchangeVkCode)
-        .catch((err) => console.warn('[Solf.ai] VK auth error:', err));
-}
-
-function startGoogleLogin() {
-    if (!googleReady || typeof google?.accounts?.id?.prompt !== 'function') return;
-    google.accounts.id.prompt();
+        .catch((err) => console.warn('[Solf.ai] VK ID auth error:', err));
 }
 
 function bindAuthCircleClicks() {
-    document.getElementById('authGoogle')?.addEventListener('click', () => {
-        if (!termsAccepted) return;
-        startGoogleLogin();
-    });
     document.getElementById('authMail')?.addEventListener('click', () => {
-        if (!termsAccepted) return;
-        triggerOAuthProvider('mail_ru');
+        startVkAuth('mail_ru');
     });
     document.getElementById('authVk')?.addEventListener('click', () => {
-        if (!termsAccepted) return;
-        startVkLogin();
+        startVkAuth(undefined);
     });
     document.getElementById('authOk')?.addEventListener('click', () => {
-        if (!termsAccepted) return;
-        triggerOAuthProvider('ok_ru');
+        startVkAuth('ok_ru');
     });
 }
 
@@ -251,7 +223,6 @@ function initVkIdAuth() {
         });
         window.__solfVkIdConfigured = true;
     }
-    renderHiddenOAuthList();
 }
 
 function ensureLoginProvidersLoaded() {
