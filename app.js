@@ -1287,7 +1287,52 @@ const NOTATION_BLOCK_RE = /\[\[NOTATION:\s*(\{[\s\S]*?\})\s*\]\]/g;
 
 function stripNotationBlocks(text) {
     if (typeof text !== 'string') return '';
-    return text.replace(NOTATION_BLOCK_RE, '').replace(/\n{3,}/g, '\n\n').trim();
+    return text
+        .replace(NOTATION_BLOCK_RE, '')
+        // Незавершённый (обрезанный ответом модели) хвост "[[NOTATION:..." без закрывающих "]]"
+        // — тоже вырезаем, чтобы он не печатался по буквам как сырой JSON.
+        .replace(/\[\[NOTATION:[\s\S]*$/, '')
+        .replace(/\n{3,}/g, '\n\n')
+        .trim();
+}
+
+// Попытка восстановить ОБРЕЗАННЫЙ нотный блок (ответ модели оборвался на середине JSON,
+// например из-за лимита токенов / "high demand"). Берём пришедший фрагмент, обрезаем его до
+// последней ПОЛНОСТЬЮ закрытой ноты внутри "notes":[...] и достраиваем закрывающие "]}".
+// Возвращает распарсенный объект нотации или null, если чинить нечего.
+function repairTruncatedNotation(fragment) {
+    if (typeof fragment !== 'string') return null;
+    const start = fragment.indexOf('{');
+    if (start === -1) return null;
+    let inStr = false, esc = false;
+    const stack = [];
+    let lastSafe = -1;
+    for (let i = start; i < fragment.length; i++) {
+        const ch = fragment[i];
+        if (inStr) {
+            if (esc) esc = false;
+            else if (ch === '\\') esc = true;
+            else if (ch === '"') inStr = false;
+            continue;
+        }
+        if (ch === '"') { inStr = true; continue; }
+        if (ch === '{' || ch === '[') { stack.push(ch); continue; }
+        if (ch === '}' || ch === ']') {
+            stack.pop();
+            // Закрыли объект-ноту, находясь прямо внутри массива notes корневого объекта
+            // (stack == ['{','[']). Здесь можно безопасно «обрезать» и достроить JSON.
+            if (ch === '}' && stack.length === 2 && stack[0] === '{' && stack[1] === '[') {
+                lastSafe = i + 1;
+            }
+        }
+    }
+    if (lastSafe === -1) return null;
+    try {
+        const obj = JSON.parse(fragment.slice(start, lastSafe) + ']}');
+        return (obj && Array.isArray(obj.notes) && obj.notes.length) ? obj : null;
+    } catch (e) {
+        return null;
+    }
 }
 
 function escapeNotationAttr(json) {
@@ -1315,6 +1360,24 @@ function formatMessage(text) {
         }
     });
 
+    // 1b) Обрезанный (незакрытый) блок "[[NOTATION:..." — ответ модели оборвался на середине
+    //     JSON. Не показываем сырой JSON: пробуем восстановить уже пришедшие ноты, иначе ставим
+    //     спец-токен, который ниже заменим на аккуратное уведомление.
+    let truncatedNotice = false;
+    const truncIdx = working.indexOf('[[NOTATION:');
+    if (truncIdx !== -1) {
+        const before = working.slice(0, truncIdx);
+        const repaired = repairTruncatedNotation(working.slice(truncIdx));
+        if (repaired) {
+            const idx = placeholders.length;
+            placeholders.push(repaired);
+            working = before + `\u0001SOLF_NOT_${idx}\u0001`;
+        } else {
+            truncatedNotice = true;
+            working = before + '\u0001SOLF_NOT_TRUNC\u0001';
+        }
+    }
+
     // 2) Базовое форматирование текста (без нотации)
     let html = working
         .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
@@ -1328,6 +1391,12 @@ function formatMessage(text) {
         const json = escapeNotationAttr(JSON.stringify(data));
         return `<div class="solf-notation" data-notation="${json}" role="img" aria-label="Music notation"><div class="notation-loading">♪</div></div>`;
     });
+
+    // Уведомление вместо обрезанного нотного блока, который не удалось восстановить.
+    if (truncatedNotice) {
+        html = html.replace(/(?:<br>\s*)*\u0001SOLF_NOT_TRUNC\u0001(?:\s*<br>)*/g,
+            '<div class="notation-error">⚠️ Нотный пример не догрузился (ответ оборвался). Попробуйте переспросить.</div>');
+    }
 
     return html;
 }
