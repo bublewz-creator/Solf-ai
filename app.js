@@ -389,10 +389,16 @@ Block format rules (CRITICAL — follow exactly):
 - "keySignature": "C","G","D","A","E","B","F#","C#","F","Bb","Eb","Ab","Db","Gb","Cb","Am","Em","Bm","F#m","C#m","G#m","D#m","A#m","Dm","Gm","Cm","Fm","Bbm","Ebm","Abm".
 - "timeSignature": "4/4","3/4","2/4","6/8","12/8", etc. Можно "" (пустая строка) или "none", чтобы НЕ показывать размер. В barlines:"none"/"manual" размер всё равно не рисуется.
 - "barlines": (необязательно) "auto" | "none" | "manual". Без поля = "auto".
-- "notes": non-empty array of {"keys":[...], "duration":"...", "barAfter": true (необязательно)}.
+- "notes": non-empty array of {"keys":[...], "duration":"...", "barAfter": true (необязательно), "label": "…" (необязательно)}.
   - "keys" pitches "letter[#|b]/octave" e.g. "c/4","f#/4","bb/3". Multiple keys in one entry = a stacked chord.
   - "duration": "w","h","q","8","16". Append "r" for rests ("qr","hr"…).
   - "barAfter": true — ставится ТОЛЬКО при barlines:"manual" и означает «после этой ноты — тактовая черта». В других режимах флаг игнорируется.
+  - "label": КОРОТКАЯ подпись над созвучием на русском (рисуется над нотой). Подписывай КАЖДЫЙ интервал/аккорд:
+    • интервалы — качество+ступеневая величина: "ув.4","ум.5","б.3","м.6","ч.5" и т.п.;
+    • трезвучия по функции: "Т5/3","Т6","Т6/4","S5/3","D5/3" (или по структуре "Б5/3","М5/3","Ув5/3","Ум5/3");
+    • доминантсептаккорд и обращения: "Д7","Д6/5","Д4/3","Д2";
+    • ступени гаммы — римские цифры "I"…"VIII".
+    Если не уверен в функции — давай структурную подпись. Подпись — это ТЕКСТ внутри JSON, не отдельная нота.
   - Октава 4 = middle octave on treble clef, octave 3 for bass clef low notes.
 
 Block placement rules:
@@ -1598,6 +1604,12 @@ function renderNotationCard(container, data) {
     try {
         const isLight = document.documentElement.getAttribute('data-theme') === 'light';
         const noteColor = isLight ? '#1a1a2e' : '#e6e6f0';
+
+        // Авто-подписи: проставляем label каждому интервалу/аккорду, у которого его ещё нет
+        // (например, блок сгенерировала сама модель). Готовые подписи не трогаем.
+        if (window.SolfTheory && typeof window.SolfTheory.autoLabelNotation === 'function') {
+            try { window.SolfTheory.autoLabelNotation(data); } catch (_) {}
+        }
 
         const clef = (data.clef === 'bass') ? 'bass' : 'treble';
         const keySig = typeof data.keySignature === 'string' ? data.keySignature : 'C';

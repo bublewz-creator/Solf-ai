@@ -124,6 +124,97 @@
         return (INTERVAL_QUALITY[deg] && INTERVAL_QUALITY[deg][sem]) || '';
     }
 
+    // ---------- Авто-подписи ЛЮБОГО созвучия (интервал / трезвучие / септаккорд) ----------
+    // Используется для блоков, которые пришли от нейросети (движок их не строил), чтобы
+    // на каждой ноте всё равно была подпись. Готовые подписи (от движка/модели) не трогаем.
+
+    function parseVexKey(k) {
+        const m = String(k).trim().match(/^([a-gA-G])(##|#|bb|b|n)?\/(-?\d+)$/);
+        if (!m) return null;
+        const letter = m[1].toLowerCase();
+        let acc = 0;
+        const a = m[2];
+        if (a === '#') acc = 1; else if (a === '##') acc = 2;
+        else if (a === 'b') acc = -1; else if (a === 'bb') acc = -2;
+        return { letter, acc, octave: parseInt(m[3], 10) };
+    }
+
+    function samePc(a, b) { return pc(a) === pc(b); }
+    function semiUp(root, n) { return (((pc(n) - pc(root)) % 12) + 12) % 12; }
+
+    // Только chord-тоны (по одному на букву), чтобы октавные удвоения не мешали.
+    function distinctByLetter(notes) {
+        const seen = new Map();
+        for (const n of notes) if (!seen.has(n.letter)) seen.set(n.letter, n);
+        return [...seen.values()];
+    }
+
+    // Качество трезвучия по полутонам от примы до терции/квинты.
+    const TRIAD_QUALITY = { '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' };
+    function classifyTriad(tones, bass) {
+        for (const root of tones) {
+            const ti = (letterIdx(root.letter) + 2) % 7;
+            const fi = (letterIdx(root.letter) + 4) % 7;
+            const third = tones.find(n => letterIdx(n.letter) === ti);
+            const fifth = tones.find(n => letterIdx(n.letter) === fi);
+            if (!third || !fifth) continue;
+            const q = TRIAD_QUALITY[`${semiUp(root, third)},${semiUp(root, fifth)}`];
+            if (!q) continue;
+            const fig = samePc(bass, root) ? '5/3' : samePc(bass, third) ? '6' : '6/4';
+            return q + fig;
+        }
+        return '';
+    }
+
+    // Тип септаккорда по полутонам от примы до терции/квинты/септимы.
+    // Д = малый мажорный (доминантовый), Ум = уменьшённый, Б/М — большие/малые.
+    const SEVENTH_TYPE = { '4,7,10': 'Д', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
+    function classifySeventh(tones, bass) {
+        for (const root of tones) {
+            const ti = (letterIdx(root.letter) + 2) % 7;
+            const fi = (letterIdx(root.letter) + 4) % 7;
+            const si = (letterIdx(root.letter) + 6) % 7;
+            const third = tones.find(n => letterIdx(n.letter) === ti);
+            const fifth = tones.find(n => letterIdx(n.letter) === fi);
+            const seventh = tones.find(n => letterIdx(n.letter) === si);
+            if (!third || !fifth || !seventh) continue;
+            const sig = `${semiUp(root, third)},${semiUp(root, fifth)},${semiUp(root, seventh)}`;
+            const q = SEVENTH_TYPE[sig];
+            if (!q) continue;
+            const fig = samePc(bass, root) ? '7' : samePc(bass, third) ? '6/5' : samePc(bass, fifth) ? '4/3' : '2';
+            return q + fig;
+        }
+        return '';
+    }
+
+    function describeKeys(keys) {
+        const notes = (Array.isArray(keys) ? keys : []).map(parseVexKey).filter(Boolean);
+        if (notes.length < 2) return '';
+        notes.sort((a, b) => noteAbs(a) - noteAbs(b));
+        const bass = notes[0];
+        if (notes.length === 2) return intervalLabel(notes[0], notes[1]);
+        const tones = distinctByLetter(notes);
+        if (tones.length === 3) return classifyTriad(tones, bass);
+        if (tones.length >= 4) return classifySeventh(tones, bass);
+        return '';
+    }
+
+    /**
+     * Проставляет подпись (label) каждой ноте/созвучию, у которой её ещё нет.
+     * Мутирует и возвращает тот же объект data. Паузы и одиночные ноты пропускаем.
+     */
+    function autoLabelNotation(data) {
+        if (!data || !Array.isArray(data.notes)) return data;
+        for (const n of data.notes) {
+            if (!n || typeof n !== 'object') continue;
+            if (typeof n.label === 'string' && n.label) continue; // уже подписано — не трогаем
+            if (String(n.duration || '').toLowerCase().includes('r')) continue; // паузы
+            const lbl = describeKeys(n.keys);
+            if (lbl) n.label = lbl;
+        }
+        return data;
+    }
+
     // ---------- Тритоны (ув.4 + ум.5) ----------
     /** Находит пары «кварта-тритон» (буквы на расстоянии 4-й ступени, 6 полутонов). */
     function findTritonePairs(scaleNotes) {
@@ -246,15 +337,18 @@
         naturalMajor: [0, 2, 4, 5, 7, 9, 11]
     };
 
+    // Римские цифры ступеней — для подписи нот гаммы (I … VIII).
+    const ROMAN_DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
+
     /** Строит данные одной гаммы по конкретной формуле (scaleKey из SCALE_FORMULAS). */
     function buildScaleData(tonic, mode, scaleKey) {
         const formula = SCALE_FORMULAS[scaleKey] || SCALE_FORMULAS.major;
         const notes = [];
         for (let i = 0; i < 7; i++) {
             const n = buildIntervalUp(tonic, i + 1, formula[i]);
-            notes.push({ keys: [noteKey(n)], duration: 'q' });
+            notes.push({ keys: [noteKey(n)], duration: 'q', label: ROMAN_DEGREES[i] });
         }
-        notes.push({ keys: [noteKey(buildIntervalUp(tonic, 8, 12))], duration: 'q' });
+        notes.push({ keys: [noteKey(buildIntervalUp(tonic, 8, 12))], duration: 'q', label: ROMAN_DEGREES[7] });
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, mode),
@@ -282,15 +376,15 @@
         const ascFormula  = [0, 2, 3, 5, 7, 9, 11, 12]; // d e f g a b c# d
         const descFormula = [10, 8, 7, 5, 3, 2, 0];     // c bb a g f e d  (от верхней d вниз)
         const notes = [];
-        for (const s of ascFormula) {
-            const deg = ascFormula.indexOf(s) + 1;
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q' });
-        }
+        ascFormula.forEach((s, idx) => {
+            const deg = idx + 1;
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+        });
         // нисходящая часть: верхняя «до октавой выше тоники» УЖЕ есть в ascending,
         // дальше идём от VII вниз к I. degree считаем относительно НИЖНЕЙ тоники.
         const descDegs = [7, 6, 5, 4, 3, 2, 1];
         descDegs.forEach((deg, idx) => {
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q' });
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
         });
         return {
             clef: 'treble',
@@ -330,10 +424,10 @@
         const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
 
         const notes = [];
-        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: 'T5/3' });
+        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: 'Т5/3' });
         if (withInversions) {
-            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: 'T6' });
-            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: 'T6/4' });
+            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: 'Т6' });
+            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: 'Т6/4' });
         }
         return {
             clef: 'treble',
@@ -373,11 +467,11 @@
         const fifth8 = buildIntervalUp(V8, 5, 7);
 
         const notes = [];
-        notes.push({ keys: [noteKey(V), noteKey(third), noteKey(fifth), noteKey(seventh)], duration: 'w', label: 'D7' });
+        notes.push({ keys: [noteKey(V), noteKey(third), noteKey(fifth), noteKey(seventh)], duration: 'w', label: 'Д7' });
         if (withInversions) {
-            notes.push({ keys: [noteKey(third), noteKey(fifth), noteKey(seventh), noteKey(V8)], duration: 'w', label: 'D6/5' });
-            notes.push({ keys: [noteKey(fifth), noteKey(seventh), noteKey(V8), noteKey(third8)], duration: 'w', label: 'D4/3' });
-            notes.push({ keys: [noteKey(seventh), noteKey(V8), noteKey(third8), noteKey(fifth8)], duration: 'w', label: 'D2' });
+            notes.push({ keys: [noteKey(third), noteKey(fifth), noteKey(seventh), noteKey(V8)], duration: 'w', label: 'Д6/5' });
+            notes.push({ keys: [noteKey(fifth), noteKey(seventh), noteKey(V8), noteKey(third8)], duration: 'w', label: 'Д4/3' });
+            notes.push({ keys: [noteKey(seventh), noteKey(V8), noteKey(third8), noteKey(fifth8)], duration: 'w', label: 'Д2' });
         }
         return {
             clef: 'treble',
@@ -653,7 +747,9 @@
     window.SolfTheory = {
         buildNotationForQuery,
         applyBlock,
+        autoLabelNotation,
+        describeKeys,
         // экспонируем для отладки/тестов
-        _internal: { buildScale, buildIntervalUp, noteKey, buildTritones, buildCharacteristic, parseKey, parseExercise }
+        _internal: { buildScale, buildIntervalUp, noteKey, buildTritones, buildCharacteristic, parseKey, parseExercise, classifyTriad, classifySeventh }
     };
 })();

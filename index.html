@@ -123,7 +123,7 @@
          в app.js). Это убирает accounts.google.com из критического пути загрузки — у части
          пользователей без VPN запрос подвисает на несколько секунд и тормозит весь UI. -->
     
-    <link rel="stylesheet" href="styles.css?v=8">
+    <link rel="stylesheet" href="styles.css?v=5">
 
     <style>
         /* Auth-dependent visibility — classes set synchronously in <head>, no FOUC */
@@ -275,10 +275,15 @@
       </symbol>
     </svg>
 
-    <!-- Cookie-баннер (выезжающий снизу) удалён намеренно. Информация про cookies/условия
-         теперь живёт в постоянном тонком дисклеймере под полем ввода чата (#chatInputDisclaimer
-         в .chat-disclaimer) — паттерн как у ChatGPT/Claude. По стандарту "by using = accept"
-         юзер автоматически соглашается, открыв сайт; явное Accept/Decline не требуется. -->
+   <div id="cookieBanner" class="cookie-banner" style="display: none;">
+        <div class="cookie-content">
+            <p class="cookie-text" id="cookieText">We use cookies to save your settings.</p>
+            <div class="cookie-buttons">
+                <button id="cookieDeclineBtn" class="cookie-btn secondary">Decline</button>
+                <button id="cookieAcceptBtn" class="cookie-btn primary">Accept</button>
+            </div>
+        </div>
+    </div>
 
     <div class="login-modal" id="loginModal"><div class="login-modal-content"><div class="login-modal-logo">Solf<span class="logo-dot">.ai</span></div><p class="login-modal-subtitle" data-i18n="loginSubtitle">Sign in to save your chat history</p><div class="google-btn-wrapper"><div id="googleSignInButton"></div></div><button class="login-close-btn" id="loginCloseBtn" data-i18n="later">Later</button></div></div>
     <div class="login-modal" id="loginPromptModal"><div class="login-modal-content"><div class="login-modal-logo"><svg class="svg-icon" style="width: 40px; height: 40px; margin: 0 auto;" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg></div><h3 id="loginPromptTitle">Sign in to continue</h3><div class="google-btn-wrapper"><div id="googleSignInButtonPrompt"></div></div><button class="login-close-btn" id="skipLoginBtn">Continue without signing in</button></div></div>
@@ -453,10 +458,7 @@
 
                     <input type="file" class="attach-input" id="chatFileInput" accept="image/png,image/jpeg,image/gif,image/webp" style="display: none;">
                 </div>
-                <!-- Дисклеймер под полем ввода: только короткий AI-warning, мелким шрифтом.
-                     Ссылки на Terms/Privacy убраны по запросу — сами документы доступны
-                     по прямым URL terms.html / privacy.html. -->
-                <div class="chat-disclaimer" data-i18n="disclaimer">Solf.ai may make mistakes</div>
+                <div class="chat-disclaimer" data-i18n="disclaimer">Solf.ai may make mistakes. Please verify important information.</div>
             </div>
         </main>
     </div>
@@ -552,9 +554,9 @@
             btn.classList.toggle('open');
         }
     </script>
-    <script src="i18n.js?v=4"></script>
+    <script src="i18n.js?v=2"></script>
     <script src="quiz.js?v=2"></script>
-    <script src="theory.js?v=8"></script>
+    <script src="theory.js?v=9"></script>
     <script src="app.js?v=14"></script>
 </body>
 </html>
