@@ -252,113 +252,6 @@
             width: 34px;
             height: 34px;
         }
-        .auth-divider {
-            display: flex;
-            align-items: center;
-            gap: 14px;
-            width: 100%;
-            margin: 26px 0 22px;
-            color: var(--text-secondary);
-            font-size: 0.82rem;
-            text-transform: uppercase;
-            letter-spacing: 0.06em;
-        }
-        .auth-divider::before,
-        .auth-divider::after {
-            content: '';
-            flex: 1;
-            height: 1px;
-            background: var(--border-color);
-        }
-        .otp-auth {
-            width: 100%;
-            text-align: left;
-        }
-        .otp-field {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        .otp-input {
-            width: 100%;
-            box-sizing: border-box;
-            padding: 14px 16px;
-            border-radius: 14px;
-            border: 1px solid var(--border-color);
-            background: var(--bg-card);
-            color: var(--text-primary);
-            font-size: 1rem;
-            outline: none;
-            transition: border-color 0.2s ease, box-shadow 0.2s ease;
-        }
-        .otp-input:focus {
-            border-color: var(--purple-soft);
-            box-shadow: 0 0 0 3px var(--glow-color);
-        }
-        .otp-input::placeholder {
-            color: var(--text-secondary);
-        }
-        .otp-input--code {
-            letter-spacing: 0.35em;
-            text-align: center;
-            font-size: 1.25rem;
-            font-weight: 600;
-        }
-        .otp-btn {
-            width: 100%;
-            padding: 14px 18px;
-            border: none;
-            border-radius: 14px;
-            background: var(--purple-soft);
-            color: #fff;
-            font-size: 0.95rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: transform 0.2s ease, opacity 0.2s ease, box-shadow 0.2s ease;
-        }
-        .otp-btn:hover:not(:disabled) {
-            transform: translateY(-1px);
-            box-shadow: var(--shadow-glow);
-        }
-        .otp-btn:disabled {
-            opacity: 0.55;
-            cursor: not-allowed;
-        }
-        .otp-verify {
-            margin-top: 14px;
-        }
-        .otp-meta {
-            margin: 10px 0 0;
-            font-size: 0.82rem;
-            color: var(--text-secondary);
-            line-height: 1.45;
-        }
-        .otp-message {
-            margin: 12px 0 0;
-            font-size: 0.84rem;
-            line-height: 1.45;
-            min-height: 1.2em;
-        }
-        .otp-message--error {
-            color: #f87171;
-        }
-        .otp-message--success {
-            color: #4ade80;
-        }
-        .otp-resend {
-            margin-top: 8px;
-            background: none;
-            border: none;
-            padding: 0;
-            color: var(--purple-glow);
-            font-size: 0.84rem;
-            font-weight: 500;
-            cursor: pointer;
-        }
-        .otp-resend:disabled {
-            color: var(--text-secondary);
-            cursor: not-allowed;
-        }
         .terms-hint {
             margin: 14px 0 0;
             font-size: 0.82rem;
@@ -440,42 +333,6 @@
                             </svg>
                         </button>
                     </div>
-
-                    <div class="auth-divider" aria-hidden="true"><span>or</span></div>
-
-                    <div class="otp-auth" id="otpAuth">
-                        <div class="otp-field">
-                            <input
-                                type="text"
-                                id="otpContact"
-                                class="otp-input"
-                                placeholder="Email or phone number"
-                                autocomplete="username"
-                                inputmode="email"
-                                spellcheck="false"
-                            >
-                            <button type="button" class="otp-btn" id="otpSendBtn">Send code</button>
-                        </div>
-                        <div class="otp-verify" id="otpVerifySection" hidden>
-                            <div class="otp-field">
-                                <input
-                                    type="text"
-                                    id="otpCode"
-                                    class="otp-input otp-input--code"
-                                    placeholder="000000"
-                                    maxlength="6"
-                                    inputmode="numeric"
-                                    pattern="[0-9]*"
-                                    autocomplete="one-time-code"
-                                    aria-label="Verification code"
-                                >
-                                <button type="button" class="otp-btn" id="otpVerifyBtn">Verify &amp; sign in</button>
-                            </div>
-                            <p class="otp-meta" id="otpSentHint"></p>
-                            <button type="button" class="otp-resend" id="otpResendBtn" disabled>Resend code</button>
-                        </div>
-                        <p class="otp-message" id="otpMessage" role="status" aria-live="polite"></p>
-                    </div>
                 </div>
                 <p class="terms-hint" id="termsHint">Accept the terms above to continue</p>
 
@@ -484,6 +341,6 @@
         </div>
     </div>
 
-    <script src="login.js?v=6"></script>
+    <script src="login.js?v=5"></script>
 </body>
 </html>
