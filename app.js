@@ -393,10 +393,10 @@ Block format rules (CRITICAL — follow exactly):
   - "keys" pitches "letter[#|b]/octave" e.g. "c/4","f#/4","bb/3". Multiple keys in one entry = a stacked chord.
   - "duration": "w","h","q","8","16". Append "r" for rests ("qr","hr"…).
   - "barAfter": true — ставится ТОЛЬКО при barlines:"manual" и означает «после этой ноты — тактовая черта». В других режимах флаг игнорируется.
-  - "label": КОРОТКАЯ подпись над созвучием на русском (рисуется над нотой). Подписывай КАЖДЫЙ интервал/аккорд:
-    • интервалы — качество+ступеневая величина: "ув.4","ум.5","б.3","м.6","ч.5" и т.п.;
-    • трезвучия по функции: "Т5/3","Т6","Т6/4","S5/3","D5/3" (или по структуре "Б5/3","М5/3","Ув5/3","Ум5/3");
-    • доминантсептаккорд и обращения: "Д7","Д6/5","Д4/3","Д2";
+  - "label": КОРОТКАЯ подпись над созвучием (рисуется над нотой). Подписывай КАЖДЫЙ интервал/аккорд:
+    • интервалы — русское качество+величина БЕЗ точки: "ув4","ум5","б3","м6","ч5" и т.п.;
+    • трезвучия по функции латиницей БЕЗ слэша: "T53","T6","T64","S53","D53" (или по структуре "Б53","М53","Ув53","Ум53");
+    • доминантсептаккорд и обращения латиницей БЕЗ слэша: "D7","D65","D43","D2";
     • ступени гаммы — римские цифры "I"…"VIII".
     Если не уверен в функции — давай структурную подпись. Подпись — это ТЕКСТ внутри JSON, не отдельная нота.
   - Октава 4 = middle octave on treble clef, octave 3 for bass clef low notes.
@@ -2185,7 +2185,7 @@ function initGoogleAuth() {
 
         if(pendingQuery){ proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
     }});
-    document.querySelectorAll('#googleSignInButton, #googleSignInButtonPrompt').forEach(b => google.accounts.id.renderButton(b, { theme: 'filled_blue', size: 'large', shape: 'pill' }));
+    document.querySelectorAll('#googleSignInButton, #googleSignInButtonPrompt').forEach(b => google.accounts.id.renderButton(b, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', locale: 'en' }));
 }
 
 function updateUIForUser() {
