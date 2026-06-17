@@ -577,9 +577,12 @@ body {
 @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
 .login-modal-logo { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
 .login-modal-subtitle { color: var(--text-secondary); margin-bottom: 32px; }
-.google-btn-wrapper { display: flex; justify-content: center; align-items: center; padding: 20px 0; margin-bottom: 10px; }
+.auth-providers { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; margin-bottom: 10px; }
+.google-btn-wrapper { display: flex; justify-content: center; align-items: center; padding: 20px 0 0; }
 .google-btn-wrapper > div { transform: scale(1.1); transition: transform 0.3s ease; }
 .google-btn-wrapper > div:hover { transform: scale(1.15); }
+.vk-btn-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; max-width: 320px; min-height: 50px; overflow: hidden; }
+.vk-btn-wrapper > div { width: 100% !important; max-width: 320px; }
 .login-close-btn, .limit-close-btn { margin-top: 20px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
 .login-close-btn:hover, .limit-close-btn:hover { color: var(--text-primary); }
 

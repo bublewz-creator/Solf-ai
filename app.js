@@ -102,6 +102,9 @@ const PLAN_LIMITS = {
 };
 
 const GOOGLE_CLIENT_ID = '691304539168-iaouqdnkd73iprkcs6cou2i93t11qiak.apps.googleusercontent.com';
+const VK_APP_ID = 54641545;
+const VK_REDIRECT_URL = 'https://bublewz-creator.github.io/Solf-ai/';
+const VKID_SDK_URL = 'https://unpkg.com/@vkid/sdk@<3.0.0/dist-sdk/umd/index.js';
 
 // #region agent log
 const __agentDebug = {
@@ -1023,7 +1026,7 @@ function updateSidebarQuotaBadge() {
             if (!isUserLoggedIn()) {
                 e.preventDefault();
                 // Вместо перехода на pricing предлагаем сначала войти.
-                try { ensureGoogleSignInLoaded?.(); openModal?.('loginModal'); } catch (_) {}
+                try { ensureLoginProvidersLoaded?.(); openModal?.('loginModal'); } catch (_) {}
             }
         });
     }
@@ -2018,7 +2021,10 @@ async function generateResponse(query, imageData = null) {
         refreshSendButtonState();
     }
 }
-function showLoginPrompt() { document.getElementById('loginPromptModal').classList.add('active'); }
+function showLoginPrompt() {
+    ensureLoginProvidersLoaded();
+    document.getElementById('loginPromptModal').classList.add('active');
+}
 function hideLoginPrompt() { document.getElementById('loginPromptModal').classList.remove('active'); pendingQuery = null; }
 
 function startNewChat() {
@@ -2186,6 +2192,113 @@ function initGoogleAuth() {
         if(pendingQuery){ proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
     }});
     document.querySelectorAll('#googleSignInButton, #googleSignInButtonPrompt').forEach(b => google.accounts.id.renderButton(b, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', locale: 'en' }));
+}
+
+function ensureLoginProvidersLoaded() {
+    ensureGoogleSignInLoaded();
+    ensureVkIdLoaded();
+}
+
+function ensureVkIdLoaded() {
+    if (window.VKIDSDK) { initVkIdAuth(); return; }
+    if (window.__solfVkIdLoading) return;
+    window.__solfVkIdLoading = true;
+    const s = document.createElement('script');
+    s.src = VKID_SDK_URL;
+    s.async = true;
+    s.onload = () => { try { initVkIdAuth(); } catch (_) {} };
+    s.onerror = () => {
+        window.__solfVkIdLoading = false;
+        console.warn('[Solf.ai] VK ID SDK недоступен — вход через VK недоступен, но остальной интерфейс работает.');
+    };
+    document.head.appendChild(s);
+}
+
+function getVkIdScheme() {
+    return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+}
+
+function vkidOnError(error) {
+    console.warn('[Solf.ai] VK ID auth error:', error);
+}
+
+async function handleVkIdAuthSuccess(data) {
+    const VKID = window.VKIDSDK;
+    let user = null;
+    try {
+        if (data.id_token) {
+            const info = await VKID.Auth.publicInfo(data.id_token);
+            user = info.user || info;
+        } else if (data.access_token) {
+            const info = await VKID.Auth.userInfo(data.access_token);
+            user = info.user || info;
+        }
+    } catch (e) {
+        console.warn('[Solf.ai] VK user info fetch failed:', e);
+    }
+    const userId = user?.user_id || data.user_id;
+    if (!userId) { vkidOnError(new Error('Missing VK user id')); return; }
+    const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ').trim() : '';
+    currentUser = {
+        id: 'vk_' + userId,
+        email: user?.email || '',
+        name: name || 'VK User',
+        picture: user?.avatar || ''
+    };
+    localStorage.setItem('solfai_user', JSON.stringify(currentUser));
+    syncUserWithDB(currentUser);
+    loginModal.classList.remove('active');
+    document.getElementById('loginPromptModal').classList.remove('active');
+    updateUIForUser();
+    if (pendingQuery) { proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
+}
+
+function renderVkIdOneTap(container) {
+    if (!container || container.dataset.vkRendered === '1') return;
+    const VKID = window.VKIDSDK;
+    if (!VKID) return;
+    container.dataset.vkRendered = '1';
+    const width = Math.min(container.clientWidth || 320, 320);
+    const oneTap = new VKID.OneTap();
+    oneTap.render({
+        container,
+        scheme: getVkIdScheme(),
+        fastAuthEnabled: false,
+        showAlternativeLogin: true,
+        styles: {
+            borderRadius: 13,
+            width,
+            height: 50
+        },
+        oauthList: ['ok_ru', 'mail_ru']
+    })
+    .on(VKID.WidgetEvents.ERROR, vkidOnError)
+    .on(VKID.OneTapInternalEvents.LOGIN_SUCCESS, function (payload) {
+        VKID.Auth.exchangeCode(payload.code, payload.device_id)
+            .then(handleVkIdAuthSuccess)
+            .catch(vkidOnError);
+    });
+}
+
+function initVkIdAuth() {
+    if (!window.VKIDSDK) {
+        if (!window.__solfVkIdLoading) return;
+        setTimeout(initVkIdAuth, 500);
+        return;
+    }
+    const VKID = window.VKIDSDK;
+    if (!window.__solfVkIdConfigured) {
+        VKID.Config.init({
+            app: VK_APP_ID,
+            redirectUrl: VK_REDIRECT_URL,
+            responseMode: VKID.ConfigResponseMode.Callback,
+            source: VKID.ConfigSource.LOWCODE,
+            scope: '',
+        });
+        window.__solfVkIdConfigured = true;
+    }
+    renderVkIdOneTap(document.getElementById('vkSignInButton'));
+    renderVkIdOneTap(document.getElementById('vkSignInButtonPrompt'));
 }
 
 function updateUIForUser() {
@@ -2621,11 +2734,11 @@ async function initApp() {
     });
     document.getElementById('imageLimitCloseBtn')?.addEventListener('click', () => document.getElementById('imageLimitModal').classList.remove('active'));
     document.getElementById('skipLoginBtn')?.addEventListener('click', hideLoginPrompt);
-    document.getElementById('openLoginBtn')?.addEventListener('click', () => { ensureGoogleSignInLoaded(); openModal('loginModal'); });
-    document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => { ensureGoogleSignInLoaded(); openModal('loginModal'); });
+    document.getElementById('openLoginBtn')?.addEventListener('click', () => { ensureLoginProvidersLoaded(); openModal('loginModal'); });
+    document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => { ensureLoginProvidersLoaded(); openModal('loginModal'); });
     // Прямая ссылка на login-кнопку в шапке чата (chatHeaderLoginBtn) и в empty state —
     // они дёргают openModal('loginModal') через inline onclick. Подцепим там же.
-    document.getElementById('chatHeaderLoginBtn')?.addEventListener('click', ensureGoogleSignInLoaded);
+    document.getElementById('chatHeaderLoginBtn')?.addEventListener('click', ensureLoginProvidersLoaded);
     
     document.getElementById('profileBtnChat')?.addEventListener('click', e => { 
         e.stopPropagation(); 
