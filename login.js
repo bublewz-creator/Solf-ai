@@ -175,24 +175,6 @@ function exchangeVkCode(payload) {
         .catch((err) => console.warn('[Solf.ai] VK ID auth error:', err));
 }
 
-function renderOAuthBridge(containerId, oauthName) {
-    const container = document.getElementById(containerId);
-    const VKID = window.VKIDSDK;
-    if (!container || !VKID?.OAuthList || container.dataset.rendered === '1') return;
-
-    container.dataset.rendered = '1';
-    const oauthList = new VKID.OAuthList();
-    oauthList.render({
-        container,
-        oauthList: [oauthName],
-        scheme: getVkIdScheme(),
-        lang: VKID.Languages.ENG,
-        styles: { height: 58, borderRadius: 29 }
-    })
-    .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, exchangeVkCode)
-    .on(VKID.WidgetEvents.ERROR, (err) => console.warn('[Solf.ai] OAuth error:', err));
-}
-
 function startVkLogin() {
     if (!termsAccepted) return;
     const VKID = window.VKIDSDK;
@@ -227,8 +209,6 @@ function initVkIdAuth() {
         });
         window.__solfVkIdConfigured = true;
     }
-    renderOAuthBridge('mailBridge', VKID.OAuthName.MAIL);
-    renderOAuthBridge('okBridge', VKID.OAuthName.OK);
 }
 
 function ensureLoginProvidersLoaded() {
