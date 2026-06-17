@@ -208,6 +208,29 @@
             border-radius: 50% !important;
             cursor: pointer !important;
         }
+        .auth-hitbox--oauth .VkIdSdk_oauth_link_text,
+        .auth-hitbox--oauth .VkIdSdk_oauth_button_text {
+            display: none !important;
+        }
+        .auth-hitbox--oauth .VkIdSdk_oauth_container,
+        .auth-hitbox--oauth .VkIdSdk_oauth_list {
+            width: 58px !important;
+            height: 58px !important;
+        }
+        .auth-hitbox--oauth .VkIdSdk_oauth_item {
+            width: 58px !important;
+            height: 58px !important;
+            min-width: 58px !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            border-radius: 50% !important;
+            border: none !important;
+            background: transparent !important;
+            opacity: 0.001;
+        }
+        .auth-hitbox--oauth .VkIdSdk_oauth_item svg {
+            opacity: 0;
+        }
         .auth-circle {
             width: 58px;
             height: 58px;
@@ -251,12 +274,10 @@
             border-color: rgba(0, 119, 255, 0.35);
         }
         .auth-circle--ok {
-            background: #ee8208;
+            background: linear-gradient(180deg, #f5921d 0%, #ee8208 100%);
             border-color: rgba(238, 130, 8, 0.35);
         }
-        .auth-circle--mail svg,
-        .auth-circle--vk svg,
-        .auth-circle--ok svg {
+        .auth-circle--vk svg {
             width: 30px;
             height: 30px;
         }
@@ -268,12 +289,9 @@
             margin-top: -1px;
         }
         .auth-ok-logo {
-            color: #fff;
-            font-family: 'Outfit', system-ui, sans-serif;
-            font-size: 15px;
-            font-weight: 800;
-            letter-spacing: -0.4px;
-            line-height: 1;
+            width: 34px;
+            height: 34px;
+            display: block;
         }
         .terms-hint {
             margin: 14px 0 0;
@@ -341,17 +359,29 @@
                             </div>
                             <div class="auth-hitbox" id="googleBridge" title="Sign in with Google" aria-label="Sign in with Google"></div>
                         </div>
-                        <button type="button" class="auth-circle auth-circle--mail" id="authMail" title="Continue with Mail.ru" aria-label="Continue with Mail.ru">
-                            <span class="auth-mail-at" aria-hidden="true">@</span>
-                        </button>
+                        <div class="auth-slot">
+                            <div class="auth-circle auth-circle--mail" aria-hidden="true">
+                                <span class="auth-mail-at">@</span>
+                            </div>
+                            <div class="auth-hitbox auth-hitbox--oauth" id="mailBridge" title="Continue with Mail.ru" aria-label="Continue with Mail.ru"></div>
+                        </div>
                         <button type="button" class="auth-circle auth-circle--vk" id="authVk" title="Continue with VK" aria-label="Continue with VK">
                             <svg viewBox="0 0 28 28" aria-hidden="true" fill="#fff">
                                 <path fill-rule="evenodd" clip-rule="evenodd" d="M4.55 4.55C3 6.09 3 8.58 3 13.56v.88c0 4.98 0 7.47 1.55 8.9C6.09 25 8.58 25 13.56 25h.88c4.98 0 7.47 0 8.9-1.55C25 21.91 25 19.42 25 14.44v-.88c0-4.98 0-7.47-1.55-8.9C21.91 3 19.42 3 14.44 3h-.88c-4.98 0-7.47 0-8.9 1.55zM6.8 10.15c.12 5.72 3.13 9.16 8.09 9.16h.29v-3.26c1.81.18 3.16 1.52 3.71 3.26h2.61c-.71-2.61-2.54-4.05-3.68-4.6 1.14-.68 2.75-2.32 3.13-4.56h-2.37c-.5 1.82-1.98 3.47-3.39 3.63V10.15H12.77V16.5c-1.47-.37-3.38-2.15-3.46-6.35H6.8z"/>
                             </svg>
                         </button>
-                        <button type="button" class="auth-circle auth-circle--ok" id="authOk" title="Continue with Odnoklassniki" aria-label="Continue with Odnoklassniki">
-                            <span class="auth-ok-logo" aria-hidden="true">OK</span>
-                        </button>
+                        <div class="auth-slot">
+                            <div class="auth-circle auth-circle--ok" aria-hidden="true">
+                                <svg class="auth-ok-logo" viewBox="0 0 48 48" fill="none" aria-hidden="true">
+                                    <circle cx="24" cy="13" r="7.5" stroke="#fff" stroke-width="5"/>
+                                    <path stroke="#fff" stroke-width="5.5" stroke-linecap="round" d="M15 23 L24 38"/>
+                                    <path stroke="#fff" stroke-width="5.5" stroke-linecap="round" d="M33 23 L24 38"/>
+                                    <path stroke="#fff" stroke-width="5.5" stroke-linecap="round" d="M15 23 L24 15"/>
+                                    <path stroke="#fff" stroke-width="5.5" stroke-linecap="round" d="M33 23 L24 15"/>
+                                </svg>
+                            </div>
+                            <div class="auth-hitbox auth-hitbox--oauth" id="okBridge" title="Continue with Odnoklassniki" aria-label="Continue with Odnoklassniki"></div>
+                        </div>
                     </div>
                 </div>
                 <p class="terms-hint" id="termsHint">Accept the terms above to continue</p>
@@ -361,6 +391,6 @@
         </div>
     </div>
 
-    <script src="login.js?v=3"></script>
+    <script src="login.js?v=4"></script>
 </body>
 </html>

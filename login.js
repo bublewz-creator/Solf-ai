@@ -142,16 +142,6 @@ function getVkIdScheme() {
     return document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
 }
 
-function getVkLoginParams(provider) {
-    const VKID = window.VKIDSDK;
-    const params = {
-        lang: VKID.Languages.ENG,
-        scheme: getVkIdScheme()
-    };
-    if (provider) params.provider = provider;
-    return params;
-}
-
 async function handleVkIdAuthSuccess(data) {
     const VKID = window.VKIDSDK;
     let user = null;
@@ -185,25 +175,38 @@ function exchangeVkCode(payload) {
         .catch((err) => console.warn('[Solf.ai] VK ID auth error:', err));
 }
 
-function startVkAuth(provider) {
+function renderOAuthBridge(containerId, oauthName) {
+    const container = document.getElementById(containerId);
+    const VKID = window.VKIDSDK;
+    if (!container || !VKID?.OAuthList || container.dataset.rendered === '1') return;
+
+    container.dataset.rendered = '1';
+    const oauthList = new VKID.OAuthList();
+    oauthList.render({
+        container,
+        oauthList: [oauthName],
+        scheme: getVkIdScheme(),
+        lang: VKID.Languages.ENG,
+        styles: { height: 58, borderRadius: 29 }
+    })
+    .on(VKID.OAuthListInternalEvents.LOGIN_SUCCESS, exchangeVkCode)
+    .on(VKID.WidgetEvents.ERROR, (err) => console.warn('[Solf.ai] OAuth error:', err));
+}
+
+function startVkLogin() {
     if (!termsAccepted) return;
     const VKID = window.VKIDSDK;
     if (!VKID) return;
-    VKID.Auth.login(getVkLoginParams(provider))
+    VKID.Auth.login({
+        lang: VKID.Languages.ENG,
+        scheme: getVkIdScheme()
+    })
         .then(exchangeVkCode)
-        .catch((err) => console.warn('[Solf.ai] VK ID auth error:', err));
+        .catch((err) => console.warn('[Solf.ai] VK auth error:', err));
 }
 
 function bindAuthCircleClicks() {
-    document.getElementById('authMail')?.addEventListener('click', () => {
-        startVkAuth('mail_ru');
-    });
-    document.getElementById('authVk')?.addEventListener('click', () => {
-        startVkAuth(undefined);
-    });
-    document.getElementById('authOk')?.addEventListener('click', () => {
-        startVkAuth('ok_ru');
-    });
+    document.getElementById('authVk')?.addEventListener('click', startVkLogin);
 }
 
 function initVkIdAuth() {
@@ -218,11 +221,14 @@ function initVkIdAuth() {
             app: VK_APP_ID,
             redirectUrl: VK_REDIRECT_URL,
             responseMode: VKID.ConfigResponseMode.Callback,
+            mode: VKID.ConfigAuthMode.InNewTab,
             source: VKID.ConfigSource.LOWCODE,
             scope: ''
         });
         window.__solfVkIdConfigured = true;
     }
+    renderOAuthBridge('mailBridge', VKID.OAuthName.MAIL);
+    renderOAuthBridge('okBridge', VKID.OAuthName.OK);
 }
 
 function ensureLoginProvidersLoaded() {
