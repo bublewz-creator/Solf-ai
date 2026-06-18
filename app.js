@@ -26,29 +26,6 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
     }
 }
 
-async function syncUserWithDB(user) {
-    try {
-        const res = await fetchWithTimeout(`${WORKER_URL}/save-user`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                picture: user.picture
-            })
-        }, 12000);
-
-        if (!res.ok) {
-            console.error('Ошибка синхронизации пользователя с БД');
-        } else {
-            console.log('Пользователь успешно синхронизирован с БД');
-        }
-    } catch (error) {
-        console.error('Сетевая ошибка при синхронизации пользователя:', error);
-    }
-}
-
 async function syncAppData() {
     if (!currentUser?.id) return;
 
@@ -101,46 +78,6 @@ const PLAN_LIMITS = {
     unlimited: { requests: Infinity, images: Infinity }
 };
 
-// #region agent log
-const __agentDebug = {
-    runId: 'pre-fix',
-    send(payload) {
-        try {
-            const isLocalhost =
-                location.hostname === 'localhost' ||
-                location.hostname === '127.0.0.1' ||
-                location.hostname === '[::1]';
-            if (!isLocalhost) return;
-
-            fetch('http://127.0.0.1:7506/ingest/9a7aba86-9003-45f5-81ab-51ebecfce514', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'd42321' }, body: JSON.stringify({ sessionId: 'd42321', ...payload, timestamp: Date.now() }) }).catch(() => { });
-        } catch (_) { }
-    }
-};
-
-window.addEventListener('error', (e) => {
-    __agentDebug.send({
-        hypothesisId: 'E',
-        location: 'app.js:global',
-        message: 'window.error',
-        data: {
-            message: e?.message,
-            filename: e?.filename,
-            lineno: e?.lineno,
-            colno: e?.colno
-        }
-    });
-});
-
-window.addEventListener('unhandledrejection', (e) => {
-    __agentDebug.send({
-        hypothesisId: 'E',
-        location: 'app.js:global',
-        message: 'unhandledrejection',
-        data: { reason: String(e?.reason?.message || e?.reason) }
-    });
-});
-// #endregion
-
 // ===== СТРОГИЙ ПРОМПТ =====
 const SYSTEM_PROMPT = `You are Solf.ai, an AI assistant for music theory and solfeggio.
 Your tasks: explain music theory in simple terms, analyze images with musical notes.
@@ -184,7 +121,6 @@ function getLanguageInstruction(lang) {
 }
 
 // Элементы
-const chatPage = document.getElementById('chatPage');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
@@ -208,13 +144,8 @@ function syncMobileSidebarDrawerState() {
 }
 
 function resetSidebarExpandedMenus() {
-    document.querySelectorAll('#toolsAccordion, #settingsAccordion').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('#toolsAccordion').forEach(el => el.classList.remove('open'));
     document.querySelectorAll('.sidebar-header-btn').forEach(btn => btn.classList.remove('open'));
-    document.querySelectorAll('#langDropdown, #colorDropdown').forEach(el => el?.classList.remove('active'));
-    const langArrow = document.getElementById('langArrow');
-    if (langArrow) langArrow.style.transform = 'rotate(0deg)';
-    const colorArrow = document.getElementById('colorArrow');
-    if (colorArrow) colorArrow.style.transform = 'rotate(0deg)';
 }
 
 /** Сайдбар на мобилке имеет z-index выше модалок; при открытии инструмента закрываем drawer и сбрасываем аккордеоны */
@@ -230,7 +161,6 @@ function closeSidebarWhenOpeningTool() {
 const chatsList = document.getElementById('chatsList');
 const chatTitle = document.getElementById('chatTitle');
 const limitModal = document.getElementById('limitModal');
-const sidebarUser = document.getElementById('sidebarUser');
 const chatFileInput = document.getElementById('chatFileInput');
 const chatAttachedFiles = document.getElementById('chatAttachedFiles');
 
@@ -703,22 +633,8 @@ function closeAllOverlays(exceptElement = null) {
             if (dropdown.contains(exceptElement) || triggerButton?.contains(exceptElement)) return;
             dropdown.classList.remove('active');
             dropdown.classList.remove('open');
-            const arrow = document.getElementById('langArrow');
-            if(arrow && dropdown.id === 'langDropdown') arrow.style.transform = 'rotate(0deg)';
         });
     });
-
-    const langSubmenuPage = document.getElementById('langSubmenu');
-    const langMenuBtnPage = document.getElementById('langMenuBtn');
-    if (langSubmenuPage?.classList.contains('active')) {
-        const keep =
-            exceptElement &&
-            (langSubmenuPage.contains(exceptElement) || langMenuBtnPage?.contains(exceptElement));
-        if (!keep) {
-            langSubmenuPage.classList.remove('active');
-            langMenuBtnPage?.classList.remove('active');
-        }
-    }
 
     if (isMobileLayout() && sidebar && !sidebar.classList.contains('collapsed')) {
         const el = exceptElement;
@@ -757,12 +673,6 @@ function handleOutsideTapDismiss(el) {
             resetSidebarExpandedMenus();
         }
     }
-}
-
-function openModal(modalId) {
-    closeAllOverlays();
-    document.querySelectorAll('.limit-modal, .name-modal, .tool-modal, .quiz-modal').forEach(m => m.classList.remove('active'));
-    document.getElementById(modalId)?.classList.add('active');
 }
 
 window.navigateToLogin = function () {
@@ -944,32 +854,6 @@ function setColor(color) {
 
 function initColor() {
     setColor(currentColor);
-
-    const colorBtn = document.getElementById('colorBtn');
-    const colorDropdown = document.getElementById('colorDropdown');
-    const colorArrow = document.getElementById('colorArrow');
-    if (colorBtn && colorDropdown) {
-        colorBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isActive = colorDropdown.classList.contains('active');
-            closeAllOverlays(colorBtn);
-            if (isActive) {
-                colorDropdown.classList.remove('active');
-                if (colorArrow) colorArrow.style.transform = 'rotate(0deg)';
-            } else {
-                colorDropdown.classList.add('active');
-                if (colorArrow) colorArrow.style.transform = 'rotate(180deg)';
-            }
-        });
-    }
-
-    document.querySelectorAll('.color-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setColor(btn.dataset.color);
-        });
-    });
-
 }
 
 function setFontSize(size) {
@@ -1063,12 +947,7 @@ function useRequest() {
 function updateRequestsCounter() {
     const remaining = getRemainingRequests();
     const limit = PLAN_LIMITS[currentPlan?.type || 'free'].requests;
-    document.querySelectorAll('#chatRequestsCount').forEach(el => el.textContent = (limit === Infinity) ? '∞' : remaining);
-    document.querySelectorAll('#chatRequestsCounter').forEach(c => {
-        c.classList.remove('warning', 'exhausted');
-        if (limit !== Infinity) { if (remaining === 0) c.classList.add('exhausted'); else if (remaining === 1) c.classList.add('warning'); }
-    });
-    // Новый компактный бейдж в шапке сайдбара: "молния X/Y" (запросы / картинки).
+    // Компактный бейдж в шапке сайдбара: "молния X/Y" (запросы / картинки).
     // Логика: ∞-тариф — показываем ∞; тариф без картинок — только число запросов;
     // иначе — "X/Y". Окрашиваем в warning/exhausted по тем же правилам, что и старый счётчик.
     updateSidebarQuotaBadge();
@@ -1480,7 +1359,6 @@ function formatMessage(text) {
 function renderAllNotations(root) {
     if (!root || !root.querySelectorAll) return;
     const containers = root.querySelectorAll('.solf-notation[data-notation]:not([data-rendered])');
-    console.log('[Solf.ai/render] containers found=', containers.length, 'VexFlow=', !!getVexFlowNamespace());
     if (!containers.length) return;
 
     // Если VexFlow ещё не догрузился — пробуем чуть позже (CDN, deferred script)
@@ -1835,20 +1713,6 @@ function showTypingIndicator() {
 }
 
 async function generateResponse(query, imageData = null) {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'C',
-        location: 'app.js:generateResponse:start',
-        message: 'generateResponse called',
-        data: {
-            hasQuery: Boolean(query && String(query).trim()),
-            hasImage: Boolean(imageData),
-            remainingRequests: getRemainingRequests(),
-            remainingImages: getRemainingImages(),
-            isGenerating
-        }
-    });
-    // #endregion
     if (getRemainingRequests() <= 0) { showNoRequestsToast(); refreshSendButtonState(); return; }
     if (imageData && getRemainingImages() <= 0) { 
         refreshImageAttachVisibility();
@@ -1917,15 +1781,6 @@ async function generateResponse(query, imageData = null) {
             signal: currentAbortController.signal 
         });
 
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'C',
-            location: 'app.js:generateResponse:fetch',
-            message: 'WORKER fetch resolved',
-            data: { ok: res.ok, status: res.status, contentType: res.headers?.get?.('content-type') }
-        });
-        // #endregion
-
         const data = await res.json();
         if (!res.ok || data.error) {
             console.error("ПОЛНАЯ ОШИБКА ОТ СЕРВЕРА:", data);
@@ -1951,9 +1806,6 @@ async function generateResponse(query, imageData = null) {
         if (notationModeEnabled && typeof window !== 'undefined' && window.SolfTheory) {
             try {
                 const det = window.SolfTheory.buildNotationForQuery(baseUserContent);
-                console.log('[Solf.ai/theory] query=', JSON.stringify(baseUserContent),
-                            'engine_result=', det ? 'OK' : 'NULL',
-                            det && det.blockString ? '\nblock=' + det.blockString.slice(0, 220) + '...' : '');
                 if (det && det.blockString) deterministicBlock = det.blockString;
             } catch (theoryErr) {
                 console.warn('[Solf.ai] Theory engine skipped:', theoryErr);
@@ -2028,9 +1880,7 @@ async function generateResponse(query, imageData = null) {
         // Текст-объяснение модели при этом сохраняется — меняется только сам нотный блок.
         if (deterministicBlock) {
             try {
-                const before = aiText.slice(-200);
                 aiText = window.SolfTheory.applyBlock(aiText, deterministicBlock);
-                console.log('[Solf.ai/apply] tail BEFORE=', before, '\ntail AFTER=', aiText.slice(-300));
             } catch (applyErr) {
                 console.warn('[Solf.ai] Theory block apply skipped:', applyErr);
             }
@@ -2082,14 +1932,6 @@ async function generateResponse(query, imageData = null) {
         
     } catch (e) {
         document.getElementById('typingIndicator')?.remove();
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'C',
-            location: 'app.js:generateResponse:catch',
-            message: 'generateResponse error',
-            data: { name: e?.name, message: e?.message }
-        });
-        // #endregion
         if (e.name === 'AbortError') {
             addMessageToUI('ai', '🛑 Stopped.', [], false); 
         } else {
@@ -2222,18 +2064,6 @@ function sendChatMessage() {
 }
 
 function updateUIForUser() {
-    // #region agent log
-    const __requiredIds = ['profileMenuChat', 'profileImgChat', 'profileNameChat', 'profileFullNameChat', 'profileEmailChat', 'userAvatarSidebar', 'userNameSidebar'];
-    __agentDebug.send({
-        hypothesisId: 'A',
-        location: 'app.js:updateUIForUser:entry',
-        message: 'updateUIForUser called',
-        data: {
-            hasUser: Boolean(currentUser),
-            missingRequired: __requiredIds.filter(id => !document.getElementById(id))
-        }
-    });
-    // #endregion
     if (currentUser) {
         document.documentElement.classList.add('is-logged-in');
 
@@ -2507,20 +2337,6 @@ function migrateRemoveStaleUsageKeysOnce() {
 
 // ===== ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ =====
 async function initApp() {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'A',
-        location: 'app.js:initApp',
-        message: 'initApp start',
-        data: {
-            readyState: document.readyState,
-            hasChatInput: Boolean(chatInput),
-            hasChatSendBtn: Boolean(chatSendBtn),
-            hasChatMessages: Boolean(chatMessages),
-            hasSidebar: Boolean(sidebar)
-        }
-    });
-    // #endregion
     migrateRemoveStaleUsageKeysOnce();
     // КРИТИЧНО: НЕ ждём `await syncAppData()`. Раньше тут было `await`, и если Cloudflare
     // Workers не отвечал (юзер без VPN — workers.dev часто режется ТСПУ), весь initApp
@@ -2559,32 +2375,10 @@ async function initApp() {
         });
     });
 
-    const landingAttachBtns = document.querySelectorAll('#landingAttachBtn');
-    landingAttachBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (getRemainingImages() <= 0) {
-                showImageLimitModal();
-            } else {
-                const lfi = document.getElementById('landingFileInput');
-                if (lfi) lfi.click();
-            }
-        });
-    });
-
-    // Обработка скрытых инпутов
     if (chatFileInput) {
         chatFileInput.addEventListener('change', e => { 
             handleFileSelect(e.target.files, chatAttachedFiles); 
             // Задержка нужна, чтобы FileReader успел загрузить файл в память
-            setTimeout(() => { e.target.value = ''; }, 100);
-        });
-    }
-
-    const landingFileInput = document.getElementById('landingFileInput');
-    if (landingFileInput) {
-        landingFileInput.addEventListener('change', e => { 
-            handleFileSelect(e.target.files, document.getElementById('landingAttachedFiles')); 
             setTimeout(() => { e.target.value = ''; }, 100);
         });
     }
@@ -2723,7 +2517,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncViewportCssVar();
     }
     
-    const modals = document.querySelectorAll('.limit-modal, .name-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
+    const modals = document.querySelectorAll('.limit-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
     const obs = new MutationObserver(() => { document.body.style.overflow = Array.from(modals).some(m => m.classList.contains('active')) ? 'hidden' : ''; });
     modals.forEach(m => obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
 

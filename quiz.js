@@ -446,7 +446,3 @@ function stopAllSounds() {
         audioContext = null;
     }
 }
-
-function resetQuiz() {
-    showQuizModes();
-}

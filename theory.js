@@ -352,8 +352,7 @@
         minor: [0, 2, 3, 5, 7, 8, 10],
         harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
         melodicMinor: [0, 2, 3, 5, 7, 9, 11],
-        harmonicMajor: [0, 2, 4, 5, 7, 8, 11],
-        naturalMajor: [0, 2, 4, 5, 7, 9, 11]
+        harmonicMajor: [0, 2, 4, 5, 7, 8, 11]
     };
 
     // Римские цифры ступеней — для подписи нот гаммы (I … VIII).
@@ -571,9 +570,6 @@
     }
 
     // ---------- Ключевые знаки для VexFlow ----------
-    const VEX_MAJOR = new Set(['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb']);
-    const VEX_MINOR = new Set(['Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm']);
-
     function keySigFor(tonic, mode) {
         // ВАЖНО: возвращаем 'C' (без ключевых знаков) НАМЕРЕННО.
         // Рендерер (buildStaveNote) рисует диезы/бемоли явно, но НЕ ставит бекары
@@ -837,9 +833,6 @@
         buildNotationForQuery,
         applyBlock,
         autoLabelNotation,
-        setLabelLocale,
-        describeKeys,
-        // экспонируем для отладки/тестов
-        _internal: { buildScale, buildIntervalUp, noteKey, buildTritones, buildCharacteristic, parseKey, parseExercise, classifyTriad, classifySeventh }
+        setLabelLocale
     };
 })();

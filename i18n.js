@@ -56,7 +56,7 @@ const translations = {
         support: 'Support',
         upgrade: 'Upgrade',
         home: 'Home',
-        disclaimer: 'Solf.ai may make mistakes',
+        disclaimer: 'Solf.ai may make mistakes. Please verify important information.',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Skip',
@@ -103,12 +103,9 @@ const translations = {
         getUnlimited: 'Get Pro | Unlimited',
         language: 'Language',
         themeToggle: 'Change Theme',
-        // cookieText больше не отрисовывается напрямую (длинная форма осталась для legacy
-        // баннеров на других страницах). В чате под input'ом видны только короткие лейблы
-        // cookieTerms / cookiePrivacy в виде ссылок, разделённых "·".
-        cookieText: 'By using Solf.ai you accept our {terms} and {privacy}.',
+        cookieText: 'We use cookies to save your settings. By continuing, you agree to our ',
         cookieTerms: 'Terms',
-        cookiePrivacy: 'Privacy',
+        cookiePrivacy: 'Privacy Policy',
         cookieAccept: 'Accept',
         cookieDecline: 'Decline',
         contextCopy: 'Copy',
@@ -183,7 +180,7 @@ const translations = {
         support: 'Поддержка',
         upgrade: 'Улучшить',
         home: 'На главную',
-        disclaimer: 'Solf.ai может ошибаться',
+        disclaimer: 'Solf.ai может допускать ошибки. Пожалуйста, проверяйте важную информацию.',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Пропустить',
@@ -230,9 +227,9 @@ const translations = {
         getUnlimited: 'Перейти на Pro | Unlimited',
         language: 'Язык',
         themeToggle: 'Сменить тему',
-        cookieText: 'Используя Solf.ai, вы принимаете {terms} и {privacy}.',
-        cookieTerms: 'Условия',
-        cookiePrivacy: 'Политика',
+        cookieText: 'Мы используем файлы cookie. Продолжая, вы соглашаетесь с ',
+        cookieTerms: 'Условиями',
+        cookiePrivacy: 'Политикой',
         cookieAccept: 'Принять',
         cookieDecline: 'Отклонить',
         contextCopy: 'Копировать',
@@ -307,7 +304,7 @@ const translations = {
         support: 'Support',
         upgrade: 'Upgrade',
         home: 'Startseite',
-        disclaimer: 'Solf.ai kann Fehler machen',
+        disclaimer: 'Solf.ai kann Fehler machen. Bitte überprüfen Sie wichtige Informationen.',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Überspringen',
@@ -354,9 +351,9 @@ const translations = {
         getUnlimited: 'Pro | Unlimited holen',
         language: 'Sprache',
         themeToggle: 'Design ändern',
-        cookieText: 'Durch die Nutzung von Solf.ai akzeptieren Sie unsere {terms} und {privacy}.',
-        cookieTerms: 'AGB',
-        cookiePrivacy: 'Datenschutz',
+        cookieText: 'Wir verwenden Cookies. Durch die weitere Nutzung stimmen Sie unseren zu ',
+        cookieTerms: 'Bedingungen',
+        cookiePrivacy: 'Datenschutzrichtlinie',
         cookieAccept: 'Akzeptieren',
         cookieDecline: 'Ablehnen',
         contextCopy: 'Kopieren',
@@ -429,7 +426,7 @@ const translations = {
         support: 'Soporte',
         upgrade: 'Mejorar',
         home: 'Inicio',
-        disclaimer: 'Solf.ai puede cometer errores',
+        disclaimer: 'Solf.ai puede cometer errores. Por favor, verifica la información importante.',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Omitir',
@@ -476,9 +473,9 @@ const translations = {
         getUnlimited: 'Obtener Pro | Unlimited',
         language: 'Idioma',
         themeToggle: 'Cambiar Tema',
-        cookieText: 'Al usar Solf.ai aceptas nuestros {terms} y {privacy}.',
+        cookieText: 'Usamos cookies para guardar tus ajustes. Al continuar, aceptas nuestros ',
         cookieTerms: 'Términos',
-        cookiePrivacy: 'Privacidad',
+        cookiePrivacy: 'Política de Privacidad',
         cookieAccept: 'Aceptar',
         cookieDecline: 'Rechazar',
         contextCopy: 'Copiar',
@@ -551,7 +548,7 @@ const translations = {
         support: '支持',
         upgrade: '升级',
         home: '首页',
-        disclaimer: 'Solf.ai 可能会犯错',
+        disclaimer: 'Solf.ai 可能会犯错。请验证重要信息。',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: '跳过',
@@ -598,9 +595,9 @@ const translations = {
         getUnlimited: '获取 Pro | Unlimited',
         language: '语言',
         themeToggle: '更改主题',
-        cookieText: '使用 Solf.ai 即表示您接受我们的{terms}和{privacy}。',
+        cookieText: '我们使用cookie来保存您的设置。继续即表示您同意我们的 ',
         cookieTerms: '条款',
-        cookiePrivacy: '隐私',
+        cookiePrivacy: '隐私政策',
         cookieAccept: '接受',
         cookieDecline: '拒绝',
         contextCopy: '复制',
@@ -673,7 +670,7 @@ const translations = {
         support: 'サポート',
         upgrade: 'アップグレード',
         home: 'ホーム',
-        disclaimer: 'Solf.ai は誤る可能性があります',
+        disclaimer: 'Solf.ai は間違いを犯す可能性があります。',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'スキップ',
@@ -720,9 +717,9 @@ const translations = {
         getUnlimited: 'Pro | Unlimited を取得',
         language: '言語',
         themeToggle: 'テーマを変更',
-        cookieText: 'Solf.ai のご利用により、{terms}および{privacy}に同意したものとみなされます。',
-        cookieTerms: '規約',
-        cookiePrivacy: 'プライバシー',
+        cookieText: '設定を保存するためにCookieを使用しています。続行すると、同意したことになります ',
+        cookieTerms: '利用規約',
+        cookiePrivacy: 'プライバシーポリシー',
         cookieAccept: '同意する',
         cookieDecline: '拒否する',
         contextCopy: 'コピー',
@@ -752,30 +749,8 @@ window.solfaiGetText = solfaiGetText;
 
 let currentLang = localStorage.getItem('solfai_lang') || 'en';
 
-// #region agent log
-function __agentLogI18n(payload) {
-    try {
-        const isLocalhost =
-            location.hostname === 'localhost' ||
-            location.hostname === '127.0.0.1' ||
-            location.hostname === '[::1]';
-        if (!isLocalhost) return;
-        fetch('http://127.0.0.1:7506/ingest/9a7aba86-9003-45f5-81ab-51ebecfce514', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'd42321' }, body: JSON.stringify({ sessionId: 'd42321', ...payload, timestamp: Date.now() }) }).catch(() => { });
-    } catch (_) { }
-}
-// #endregion
-
 function setLanguage(lang) {
     if (translations[lang]) {
-        // #region agent log
-        __agentLogI18n({
-            runId: 'pre-fix',
-            hypothesisId: 'D',
-            location: 'i18n.js:setLanguage',
-            message: 'setLanguage accepted',
-            data: { from: currentLang, to: lang }
-        });
-        // #endregion
         currentLang = lang;
         localStorage.setItem('solfai_lang', lang);
         updateTexts();
@@ -785,20 +760,6 @@ function setLanguage(lang) {
 
 function updateTexts() {
     const t = translations[currentLang] || translations.en;
-    // #region agent log
-    __agentLogI18n({
-        runId: 'pre-fix',
-        hypothesisId: 'D',
-        location: 'i18n.js:updateTexts:entry',
-        message: 'updateTexts',
-        data: {
-            currentLang,
-            hasT: Boolean(t),
-            keys: t ? Object.keys(t).length : null,
-            dataI18nCount: document.querySelectorAll('[data-i18n]').length
-        }
-    });
-    // #endregion
     
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -850,115 +811,42 @@ function updateTexts() {
 }
 
 function initI18n() {
-    // #region agent log
-    __agentLogI18n({
-        runId: 'pre-fix',
-        hypothesisId: 'D',
-        location: 'i18n.js:initI18n:entry',
-        message: 'initI18n start',
-        data: {
-            readyState: document.readyState,
-            currentLang,
-            langOptionCount: document.querySelectorAll('.lang-option').length,
-            hasLangDropdown: Boolean(document.getElementById('langDropdown'))
-        }
-    });
-    // #endregion
-    document.querySelectorAll('.toggle-lang-dropdown, #langBtn').forEach(btn => {
+    document.querySelectorAll('.toggle-lang-dropdown').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const dropdown = btn.nextElementSibling || document.getElementById('langDropdown');
+            const dropdown = btn.nextElementSibling;
             const isActive = dropdown?.classList.contains('active');
-            
-            // ИСПРАВЛЕНИЕ: Передаем btn, чтобы сайдбар понимал, что клик внутри, и не сворачивался
-            if (typeof closeAllOverlays === 'function') closeAllOverlays(btn); 
-            
+            if (typeof closeAllOverlays === 'function') closeAllOverlays(btn);
             if (!dropdown) return;
-            if (isActive) {
-                dropdown.classList.remove('active');
-                if (btn.id === 'langBtn') {
-                    const arrow = document.getElementById('langArrow');
-                    if (arrow) arrow.style.transform = 'rotate(0deg)';
-                }
-                return;
-            }
-
-            dropdown.classList.add('active');
-            if (btn.id === 'langBtn') {
-                const arrow = document.getElementById('langArrow');
-                if (arrow) arrow.style.transform = 'rotate(180deg)';
-            }
+            dropdown.classList.toggle('active', !isActive);
         });
     });
 
-    
-
-    // Обработка клика по языку
     document.querySelectorAll('.lang-option').forEach(option => {
         option.addEventListener('click', (e) => {
             e.stopPropagation();
             const lang = option.getAttribute('data-lang');
             setLanguage(lang);
-            
-            // Закрываем все меню выбора языка
             document.querySelectorAll('.lang-dropdown, .lang-submenu').forEach(d => d.classList.remove('active'));
-            // Делаем активным только выбранный пункт везде
             document.querySelectorAll('.lang-option').forEach(opt => opt.classList.remove('active'));
             document.querySelectorAll(`.lang-option[data-lang="${lang}"]`).forEach(opt => opt.classList.add('active'));
         });
     });
-// --- ДОБАВИТЬ В КОНЕЦ ФУНКЦИИ initI18n() ---
 
-// 1. Логика для мобильного аккордеона языка в профиле
-const mobileLangBtn = document.getElementById('mobileLangMenuBtn');
-if (mobileLangBtn) {
-    mobileLangBtn.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (typeof closeAllOverlays === 'function') closeAllOverlays(mobileLangBtn);
-        const submenu = document.getElementById('mobileLangSubmenu');
-        if (submenu) {
-            submenu.classList.toggle('active');
-            mobileLangBtn.classList.toggle('active');
-        }
-    });
-}
+    const mobileLangBtn = document.getElementById('mobileLangMenuBtn');
+    if (mobileLangBtn) {
+        mobileLangBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            if (typeof closeAllOverlays === 'function') closeAllOverlays(mobileLangBtn);
+            const submenu = document.getElementById('mobileLangSubmenu');
+            if (submenu) {
+                submenu.classList.toggle('active');
+                mobileLangBtn.classList.toggle('active');
+            }
+        });
+    }
 
-// 2. Закрытие мобильного меню после выбора языка
-document.querySelectorAll('.mobile-lang-submenu .lang-option').forEach(option => {
-    option.addEventListener('click', () => {
-        document.getElementById('mobileLangSubmenu')?.classList.remove('active');
-        document.getElementById('mobileLangMenuBtn')?.classList.remove('active');
-        
-        // Сворачиваем всё меню профиля при выборе языка
-        if (window.matchMedia?.('(max-width: 768px)')?.matches && typeof closeAllOverlays === 'function') {
-            closeAllOverlays();
-        }
-    });
-});
     updateTexts();
-    updateCookieConsent();
-}
-
-function updateCookieConsent() {
-    // Сами ссылки #chatTermsLink / #chatPrivacyLink в index.html уже имеют data-i18n
-    // ("cookieTerms" / "cookiePrivacy") — их текст обновляет updateTexts() автоматически.
-    // Эта функция оставлена для двух случаев:
-    //   1. Подсказки (title) на ссылках с полным текстом cookieText (для accessibility).
-    //   2. Старый выезжающий cookie-banner мог остаться в кэшированных html-страницах —
-    //      на этот случай обновляем там legacy-элементы, чтобы не было stale-текста.
-    const t = translations[currentLang] || translations.en;
-
-    const fullText = (t.cookieText || '')
-        .replace('{terms}', t.cookieTerms || 'Terms')
-        .replace('{privacy}', t.cookiePrivacy || 'Privacy');
-
-    const termsLink = document.getElementById('chatTermsLink');
-    const privacyLink = document.getElementById('chatPrivacyLink');
-    if (termsLink) termsLink.title = fullText;
-    if (privacyLink) privacyLink.title = fullText;
-
-    const legacyCookieText = document.getElementById('cookieText');
-    if (legacyCookieText && fullText) legacyCookieText.textContent = fullText;
 }
 
 // Инициализация при загрузке страницы

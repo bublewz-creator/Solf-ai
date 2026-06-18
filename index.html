@@ -140,7 +140,6 @@
         html.is-logged-in #sidebarAuthContainer { display: none; }
 
         html:not(.is-logged-in) #sidebarToolsSection { display: none; }
-        html:not(.is-logged-in) #sidebarPricingLink { display: none; }
 
         #sidebarUpgradeBadge { display: none; }
         html.show-upgrade #sidebarUpgradeBadge { display: inline-block; }
@@ -238,7 +237,6 @@
             flex-direction: column;
             gap: 0px;
         }
-        .sidebar-content-wrapper#settingsAccordion { margin-top: 4px !important; }
         #toolsAccordion .sidebar-content-inner { gap: 0px; padding-bottom: 28px; }
 
         .sidebar-settings-link { display: flex; align-items: center; gap: 10px; color: var(--text-primary); text-decoration: none; padding: 10px 14px !important; min-height: 40px !important; font-size: 14px; border-radius: 8px; transition: background 0.2s ease, color 0.2s ease; cursor: pointer; }
@@ -475,13 +473,6 @@
             <div class="chats-list" id="chatsList"></div>
         </div>
         <div class="sidebar-bottom">
-            <!-- Счётчик "Requests left" переехал в шапку сайдбара (#sidebarQuotaBadge) в виде
-                 компактной плашки "молния X/Y". Этот блок оставлен как СКРЫТЫЙ контейнер,
-                 чтобы updateRequestsCounter() и прочий старый код продолжали находить элементы
-                 #chatRequestsCounter / #chatRequestsCount без падений. Откат — снять `hidden`. -->
-            <div class="sidebar-limits" id="chatRequestsCounter" hidden style="display:none;">
-                <span id="chatRequestsCount">3</span>
-            </div>
             <div class="sidebar-section" id="sidebarToolsSection" style="border-top: 1px solid var(--border-color);">
                 <button class="sidebar-header-btn" onclick="toggleAccordion('toolsAccordion')">
                     <span style="display: flex; align-items: center; gap: 8px;">
@@ -526,14 +517,7 @@
         </div>
     </aside>
 
-    <div id="landingPage" style="display: none;"><input type="file" id="landingFileInput"><input type="text" id="landingInput"><button id="landingBtn"></button><div id="landingAttachedFiles"></div></div>
-
     <script>
-        function refreshAccordionHeight(id) {
-            const content = document.getElementById(id);
-            if (!content || !content.classList.contains('open')) return;
-        }
-
         function toggleAccordion(id) {
             const content = document.getElementById(id);
             const btn = content.previousElementSibling;
