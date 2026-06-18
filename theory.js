@@ -359,9 +359,14 @@
     }
 
     function buildScaleExercise(tonic, mode, form) {
+        if (form === 'melodic') {
+            return mode === 'minor'
+                ? buildMelodicMinorBothWays(tonic)
+                : buildMelodicMajorBothWays(tonic);
+        }
         let key;
         if (mode === 'minor') {
-            key = form === 'harmonic' ? 'harmonicMinor' : form === 'melodic' ? 'melodicMinor' : 'minor';
+            key = form === 'harmonic' ? 'harmonicMinor' : 'minor';
         } else {
             key = form === 'harmonic' ? 'harmonicMajor' : 'major';
         }
@@ -395,6 +400,31 @@
         };
     }
 
+    /**
+     * Мелодический мажор: ВВЕРХ — натуральный мажор, ВНИЗ — с пониженными VI и VII.
+     * Возвращает один блок из 15 нот (8 вверх + 7 вниз без повтора верхней).
+     */
+    function buildMelodicMajorBothWays(tonic) {
+        const ascFormula  = [0, 2, 4, 5, 7, 9, 11, 12]; // e f# g# a b c# d# e
+        const descFormula = [10, 8, 7, 5, 4, 2, 0];     // d  c  b a g# f# e  (от верхней e вниз)
+        const notes = [];
+        ascFormula.forEach((s, idx) => {
+            const deg = idx + 1;
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+        });
+        const descDegs = [7, 6, 5, 4, 3, 2, 1];
+        descDegs.forEach((deg, idx) => {
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+        });
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'major'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
     /** Все виды гаммы: натуральная, гармоническая, мелодическая — каждая отдельным блоком. */
     function buildAllScaleForms(tonic, mode, isRu) {
         const L = isRu
@@ -410,7 +440,7 @@
         return [
             { label: L.nat,  data: buildScaleData(tonic, 'major', 'major') },
             { label: L.harm, data: buildScaleData(tonic, 'major', 'harmonicMajor') },
-            { label: L.mel,  data: buildScaleData(tonic, 'major', 'major') }
+            { label: L.mel,  data: buildMelodicMajorBothWays(tonic) }
         ];
     }
 
