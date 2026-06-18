@@ -107,21 +107,38 @@
     }
 
     // Качественное имя интервала по ступеневой величине + количеству полутонов.
-    // Используется для автоматических подписей (ув.4, ум.5, м.6, б.3 и т.п.).
-    const INTERVAL_QUALITY = {
-        1: { 0: 'ч.1', 1: 'ув.1' },
-        2: { 0: 'ум.2', 1: 'м.2', 2: 'б.2', 3: 'ув.2' },
-        3: { 2: 'ум.3', 3: 'м.3', 4: 'б.3', 5: 'ув.3' },
-        4: { 4: 'ум.4', 5: 'ч.4', 6: 'ув.4' },
-        5: { 6: 'ум.5', 7: 'ч.5', 8: 'ув.5' },
-        6: { 7: 'ум.6', 8: 'м.6', 9: 'б.6', 10: 'ув.6' },
-        7: { 9: 'ум.7', 10: 'м.7', 11: 'б.7', 12: 'ув.7' },
-        8: { 11: 'ум.8', 12: 'ч.8', 13: 'ув.8' }
+    const INTERVAL_QUALITY_RU = {
+        1: { 0: 'ч1', 1: 'ув1' },
+        2: { 0: 'ум2', 1: 'м2', 2: 'б2', 3: 'ув2' },
+        3: { 2: 'ум3', 3: 'м3', 4: 'б3', 5: 'ув3' },
+        4: { 4: 'ум4', 5: 'ч4', 6: 'ув4' },
+        5: { 6: 'ум5', 7: 'ч5', 8: 'ув5' },
+        6: { 7: 'ум6', 8: 'м6', 9: 'б6', 10: 'ув6' },
+        7: { 9: 'ум7', 10: 'м7', 11: 'б7', 12: 'ув7' },
+        8: { 11: 'ум8', 12: 'ч8', 13: 'ув8' }
     };
+    const INTERVAL_QUALITY_EN = {
+        1: { 0: 'P1', 1: 'A1' },
+        2: { 0: 'd2', 1: 'm2', 2: 'M2', 3: 'A2' },
+        3: { 2: 'd3', 3: 'm3', 4: 'M3', 5: 'A3' },
+        4: { 4: 'd4', 5: 'P4', 6: 'A4' },
+        5: { 6: 'd5', 7: 'P5', 8: 'A5' },
+        6: { 7: 'd6', 8: 'm6', 9: 'M6', 10: 'A6' },
+        7: { 9: 'd7', 10: 'm7', 11: 'M7', 12: 'A7' },
+        8: { 11: 'd8', 12: 'P8', 13: 'A8' }
+    };
+    let labelLocale = 'en';
+    function setLabelLocale(lang) {
+        labelLocale = lang === 'ru' ? 'ru' : 'en';
+    }
+    function intervalQualityTable() {
+        return labelLocale === 'ru' ? INTERVAL_QUALITY_RU : INTERVAL_QUALITY_EN;
+    }
     function intervalLabel(lo, hi) {
         const deg = intervalDegree(lo, hi);
         const sem = intervalSemis(lo, hi);
-        return (INTERVAL_QUALITY[deg] && INTERVAL_QUALITY[deg][sem]) || '';
+        const table = intervalQualityTable();
+        return (table[deg] && table[deg][sem]) || '';
     }
 
     // ---------- Авто-подписи ЛЮБОГО созвучия (интервал / трезвучие / септаккорд) ----------
@@ -150,26 +167,28 @@
     }
 
     // Качество трезвучия по полутонам от примы до терции/квинты.
-    const TRIAD_QUALITY = { '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' };
+    const TRIAD_QUALITY_RU = { '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' };
+    const TRIAD_QUALITY_EN = { '4,7': 'M', '3,7': 'm', '3,6': 'd', '4,8': 'A' };
     function classifyTriad(tones, bass) {
+        const qualityMap = labelLocale === 'ru' ? TRIAD_QUALITY_RU : TRIAD_QUALITY_EN;
         for (const root of tones) {
             const ti = (letterIdx(root.letter) + 2) % 7;
             const fi = (letterIdx(root.letter) + 4) % 7;
             const third = tones.find(n => letterIdx(n.letter) === ti);
             const fifth = tones.find(n => letterIdx(n.letter) === fi);
             if (!third || !fifth) continue;
-            const q = TRIAD_QUALITY[`${semiUp(root, third)},${semiUp(root, fifth)}`];
+            const q = qualityMap[`${semiUp(root, third)},${semiUp(root, fifth)}`];
             if (!q) continue;
-            const fig = samePc(bass, root) ? '5/3' : samePc(bass, third) ? '6' : '6/4';
+            const fig = samePc(bass, root) ? '53' : samePc(bass, third) ? '6' : '64';
             return q + fig;
         }
         return '';
     }
 
-    // Тип септаккорда по полутонам от примы до терции/квинты/септимы.
-    // D = малый мажорный (доминантовый), Ум = уменьшённый, Б/М — большие/малые.
-    const SEVENTH_TYPE = { '4,7,10': 'D', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
+    const SEVENTH_TYPE_RU = { '4,7,10': 'D', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
+    const SEVENTH_TYPE_EN = { '4,7,10': 'D', '3,6,9': 'd', '3,6,10': 'd', '4,7,11': 'M', '3,7,10': 'm' };
     function classifySeventh(tones, bass) {
+        const typeMap = labelLocale === 'ru' ? SEVENTH_TYPE_RU : SEVENTH_TYPE_EN;
         for (const root of tones) {
             const ti = (letterIdx(root.letter) + 2) % 7;
             const fi = (letterIdx(root.letter) + 4) % 7;
@@ -179,9 +198,9 @@
             const seventh = tones.find(n => letterIdx(n.letter) === si);
             if (!third || !fifth || !seventh) continue;
             const sig = `${semiUp(root, third)},${semiUp(root, fifth)},${semiUp(root, seventh)}`;
-            const q = SEVENTH_TYPE[sig];
+            const q = typeMap[sig];
             if (!q) continue;
-            const fig = samePc(bass, root) ? '7' : samePc(bass, third) ? '6/5' : samePc(bass, fifth) ? '4/3' : '2';
+            const fig = samePc(bass, root) ? '7' : samePc(bass, third) ? '65' : samePc(bass, fifth) ? '43' : '2';
             return q + fig;
         }
         return '';
@@ -254,7 +273,7 @@
             const uv4hi = buildIntervalUp(uv4lo, 4, 6);
             if (!checkInterval(uv4lo, uv4hi, 4, 6)) return;
             const r1 = resolveInterval(uv4lo, uv4hi, 'aug', triad);
-            notes.push(chord(uv4lo, uv4hi, false, 'ув.4'));
+            notes.push(chord(uv4lo, uv4hi, false, labelLocale === 'ru' ? 'ув4' : 'A4'));
             notes.push(chord(r1[0], r1[1], true, intervalLabel(r1[0], r1[1])));
 
             // ум.5: lb -> квинта вверх
@@ -262,7 +281,7 @@
             const um5hi = buildIntervalUp(um5lo, 5, 6);
             if (!checkInterval(um5lo, um5hi, 5, 6)) return;
             const r2 = resolveInterval(um5lo, um5hi, 'dim', triad);
-            notes.push(chord(um5lo, um5hi, false, 'ум.5'));
+            notes.push(chord(um5lo, um5hi, false, labelLocale === 'ru' ? 'ум5' : 'd5'));
             notes.push(chord(r2[0], r2[1], true, intervalLabel(r2[0], r2[1])));
         });
         if (notes.length < 4) return null;
@@ -453,11 +472,14 @@
         const I8 = buildIntervalUp(I, 8, 12);
         const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
 
+        const tonicLabels = labelLocale === 'ru'
+            ? ['Т53', 'Т6', 'Т64']
+            : ['T53', 'T6', 'T64'];
         const notes = [];
-        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: 'Т5/3' });
+        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: tonicLabels[0] });
         if (withInversions) {
-            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: 'Т6' });
-            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: 'Т6/4' });
+            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: tonicLabels[1] });
+            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: tonicLabels[2] });
         }
         return {
             clef: 'treble',
@@ -471,12 +493,9 @@
     /** Все четыре вида трезвучий от ноты: маж., мин., ув., ум. */
     function buildAllTriadsFromNote(root) {
         const r = { ...root, octave: 4 };
-        const defs = [
-            [4, 7, 'Б5/3'],   // мажорное (Большое)
-            [3, 7, 'М5/3'],   // минорное (Малое)
-            [4, 8, 'Ув5/3'],  // увеличенное
-            [3, 6, 'Ум5/3']   // уменьшенное
-        ];
+        const defs = labelLocale === 'ru'
+            ? [[4, 7, 'Б53'], [3, 7, 'М53'], [4, 8, 'Ув53'], [3, 6, 'Ум53']]
+            : [[4, 7, 'M53'], [3, 7, 'm53'], [4, 8, 'A53'], [3, 6, 'd53']];
         const notes = defs.map(([t, f, label]) => ({
             keys: [noteKey(r), noteKey(buildIntervalUp(r, 3, t)), noteKey(buildIntervalUp(r, 5, f))],
             duration: 'w',
@@ -731,8 +750,7 @@
             case 'scale':
                 // «все виды гамм» → несколько блоков (натуральная/гармоническая/мелодическая)
                 if (wantsAllForms(t) && !form) {
-                    const isRu = /[а-яё]/.test(t);
-                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, isRu));
+                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
                 }
                 data = buildScaleExercise(key.tonic, key.mode, form);
                 break;
@@ -819,6 +837,7 @@
         buildNotationForQuery,
         applyBlock,
         autoLabelNotation,
+        setLabelLocale,
         describeKeys,
         // экспонируем для отладки/тестов
         _internal: { buildScale, buildIntervalUp, noteKey, buildTritones, buildCharacteristic, parseKey, parseExercise, classifyTriad, classifySeventh }

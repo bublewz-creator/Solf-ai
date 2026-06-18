@@ -145,9 +145,43 @@ window.addEventListener('unhandledrejection', (e) => {
 const SYSTEM_PROMPT = `You are Solf.ai, an AI assistant for music theory and solfeggio.
 Your tasks: explain music theory in simple terms, analyze images with musical notes.
 CRITICAL INSTRUCTION: DO NOT mention the built-in site tools (Piano, Metronome, Quiz) in your regular answers! Only mention them IF the user explicitly asks how to practice or train their ear. Answer directly and concisely.
-IMPORTANT: ALWAYS answer in the SAME language the user is speaking.`;
+IMPORTANT: ALWAYS answer in the SAME language the user is speaking. Never default to Russian when the user writes in English (or any other language).`;
 
 const TYPING_SPEED = 20;
+
+/** Язык ответа: из текущего сообщения, недавней истории пользователя, затем язык UI. */
+function detectResponseLanguage(userText, chatMessages = []) {
+    const parts = [String(userText || '')];
+    (chatMessages || [])
+        .filter(m => m.role === 'user')
+        .slice(-5)
+        .forEach(m => parts.push(String(m.content || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '')));
+    const combined = parts.join('\n');
+
+    if (/[\u0400-\u04FF]/.test(combined)) return 'ru';
+    if (/[\u4e00-\u9fff]/.test(combined)) return 'zh';
+    if (/[\u3040-\u30ff]/.test(combined)) return 'ja';
+    if (/\b(der|die|das|und|ich|nicht|wie|was|akkord|tonleiter|dur|moll)\b/i.test(combined)) return 'de';
+    if (/\b(el|la|los|cómo|qué|acorde|escala|mayor|menor)\b/i.test(combined)) return 'es';
+    if (/\b(the|what|how|build|chord|hello|hi|want|please|scale|interval|major|minor)\b/i.test(combined)) return 'en';
+    // Латиница без кириллицы (D7, C major, Hi…) — английский, даже если UI на русском
+    if (/[a-zA-Z]/.test(combined)) return 'en';
+
+    const uiLang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('solfai_lang') || 'en';
+    return uiLang;
+}
+
+function getLanguageInstruction(lang) {
+    const map = {
+        en: 'RESPONSE LANGUAGE: English. Every word of your answer — prose, note names (C, D, E…), theory terms, and JSON "label" fields — MUST be in English. Never use Russian note names (до, ре, ми…) or Cyrillic labels (ув4, Б53) when the user writes in English.',
+        ru: 'ЯЗЫК ОТВЕТА: русский. Весь текст, названия нот (до, ре, ми…) и подписи на стане (ув4, Б53…) — по-русски. Не переходи на английский, если пользователь пишет по-русски.',
+        de: 'ANTWORTSPRACHE: Deutsch. Die gesamte Antwort auf Deutsch.',
+        es: 'IDIOMA DE RESPUESTA: español. Toda la respuesta en español.',
+        zh: '回答语言：中文。请用中文作答。',
+        ja: '回答言語：日本語。日本語で答えてください。'
+    };
+    return `\n\n${map[lang] || map.en}`;
+}
 
 // Элементы
 const chatPage = document.getElementById('chatPage');
@@ -305,6 +339,15 @@ const NOTATION_PROMPT_INSTRUCTION = `
 
 NOTATION MODE IS ON. These rules OVERRIDE every other instruction (including any “long”, “verbose”, or “berserk” style). You MUST always draw notes in the answer.
 
+LANGUAGE RULE (ABSOLUTE — beats every Russian example below):
+- Match the user's language in ALL visible text: prose, note names, chord names, interval names, and JSON "label" fields.
+- English user → English only: "D7 = D, F#, A, C"; labels like "A4","d5","M3","P5","D7","T53".
+- Russian user → Russian: "D7 = ре, фа♯, ля, до"; labels like "ув4","ум5","б3","D7" (chord symbol D7 stays Latin).
+- German / Spanish / Chinese / Japanese user → same language throughout.
+- The Russian terminology in this prompt is INTERNAL theory reference only — NEVER copy its language into the answer unless the user writes in that language.
+- WRONG: user writes "D7" in English → "Доминантсептаккорд от ноты Ре…"
+- RIGHT: user writes "D7" → "D7 is D, F#, A, and C — a dominant seventh chord."
+
 LENGTH RULES (HARD LIMIT — be strict):
 - DEFAULT for any normal question (definitions, theory, simple examples, off-topic) →
   1–2 SHORT sentences (≤ ~30 words) before the notation. NO numbered lists, NO multiple paragraphs, NO headings, NO restatement of the question. Text only frames the staff. The staff IS the answer.
@@ -340,6 +383,8 @@ EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAU
 - «Главные трезвучия лада» = T, S, D (3 трезвучия), при просьбе «с обращениями» — все обращения по порядку.
 - «Обращения T5/3» = T5/3, T6, T6/4 (3 аккорда).
 - «Доминантсептаккорд с обращениями» = D7, D6/5, D4/3, D2 (4 аккорда).
+- «D7 с разрешениями» / «D7, обращения и разрешения» = каждое созвучие D7 + тоническое трезвучие (D7→T53, D6/5→T6, D4/3→T6/4, D2→T6), всего 8 аккордов; barlines:"manual" + barAfter после каждой пары.
+- Подписи доминантсептаккорда — ТОЛЬКО латиницей: "D7","D6/5","D4/3","D2" (НЕ кириллическая «Д»).
 - «Все виды трезвучий от ноты N» = мажорное, минорное, увеличенное, уменьшенное (4 аккорда).
 - «Все виды септаккордов от N» = малый мажорный, малый минорный, малый ум., ум.7 и т.д. — выводи столько, сколько корректно для запроса, не один.
 
@@ -390,12 +435,14 @@ Block format rules (CRITICAL — follow exactly):
   - "keys" pitches "letter[#|b]/octave" e.g. "c/4","f#/4","bb/3". Multiple keys in one entry = a stacked chord.
   - "duration": "w","h","q","8","16". Append "r" for rests ("qr","hr"…).
   - "barAfter": true — ставится ТОЛЬКО при barlines:"manual" и означает «после этой ноты — тактовая черта». В других режимах флаг игнорируется.
-  - "label": КОРОТКАЯ подпись над созвучием (рисуется над нотой). Подписывай КАЖДЫЙ интервал/аккорд:
-    • интервалы — русское качество+величина БЕЗ точки: "ув4","ум5","б3","м6","ч5" и т.п.;
-    • трезвучия по функции латиницей БЕЗ слэша: "T53","T6","T64","S53","D53" (или по структуре "Б53","М53","Ув53","Ум53");
-    • доминантсептаккорд и обращения латиницей БЕЗ слэша: "D7","D65","D43","D2";
-    • ступени гаммы — римские цифры "I"…"VIII".
-    Если не уверен в функции — давай структурную подпись. Подпись — это ТЕКСТ внутри JSON, не отдельная нота.
+  - "label": short label above each chord/interval — SAME language as the user:
+    • English intervals: "A4","d5","M3","m6","P5","A2","d7" (no dots);
+    • Russian intervals: "ув4","ум5","б3","м6","ч5" (no dots);
+    • functional triads (any language): "T53","T6","T64","S53","D53";
+    • structural triads EN: "M5/3","m5/3","A5/3","d5/3"; RU: "Б53","М53","Ув53","Ум53";
+    • dominant seventh (Latin D always): "D7","D65","D43","D2";
+    • scale degrees: Roman numerals "I"…"VIII".
+    If unsure of function — use structural labels in the user's language.
   - Октава 4 = middle octave on treble clef, octave 3 for bass clef low notes.
 
 Block placement rules:
@@ -474,9 +521,17 @@ Block placement rules:
 2) Альтерации — чтобы и буквы шли подряд (a-b-c-d-...), и интервалы соответствовали формуле.
 3) Вывод нотами в barlines:"none", без размера. Подряд, четвертями. Если две октавы — просто продолжай ноты без разрывов.
 
+CORRECT EXAMPLE (user: "D7"):
+D7 is a dominant seventh chord: D, F#, A, and C.
+[[NOTATION:{"clef":"treble","keySignature":"D","barlines":"none","notes":[{"keys":["d/4","f#/4","a/4","c/5"],"duration":"w","label":"D7"}]}]]
+
+CORRECT EXAMPLE (user: "build the tonic triad in C major"):
+The tonic triad T53 in C major is C, E, and G:
+[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w","label":"T53"}]}]]
+
 CORRECT EXAMPLE (user: "построй тоническое трезвучие в до мажоре"):
 Тоническое трезвучие T5/3 в до мажоре строится из I, III и V ступеней — нот до, ми и соль:
-[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w"}]}]]
+[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w","label":"Т53"}]}]]
 
 CORRECT EXAMPLE (user: "что такое доминанта"):
 Доминанта — это V ступень лада. В до мажоре это нота соль, а доминантовое трезвучие D5/3 — соль-си-ре:
@@ -503,6 +558,7 @@ CORRECT EXAMPLE (user: "построй характерные интервалы
 [[NOTATION:{"clef":"treble","keySignature":"Am","barlines":"manual","notes":[{"keys":["f/4","g#/4"],"duration":"h"},{"keys":["e/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","f/5"],"duration":"h"},{"keys":["a/4","e/5"],"duration":"h","barAfter":true},{"keys":["c/4","g#/4"],"duration":"h"},{"keys":["c/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","c/5"],"duration":"h"},{"keys":["a/4","c/5"],"duration":"h"}]}]]
 
 WRONG EXAMPLES (do NOT do this):
+- User writes in English but you answer in Russian (or use Russian note names / Cyrillic labels).
 - Replying with text only and no [[NOTATION:...]] block.
 - Putting the block in the middle of the answer instead of at the end.
 - Wrapping the block in \`\`\` or quotes.
@@ -513,6 +569,8 @@ WRONG EXAMPLES (do NOT do this):
 - Построить «тритоны» → нарисовать только одну пару (ув.4 ИЛИ ум.5) и остановиться. ВСЕГДА обе пары.
 - Построить «характерные интервалы» → нарисовать 1–2 из 4 и остановиться. ВСЕГДА все 4 пары (8 созвучий).
 - Построить «обращения трезвучия» → нарисовать только основной вид. ВСЕГДА все 3 (T5/3, T6, T6/4).
+- Построить «D7 с разрешениями» → нарисовать только D7 без тоники. ВСЕГДА каждое обращение + разрешение (8 аккордов).
+- Подписывать доминантсептаккорд кириллицей «Д7» вместо латинской "D7".
 
 REMEMBER:
 - Easy / normal questions → 1–3 short sentences + ONE small notation block. Stop.
@@ -520,14 +578,17 @@ REMEMBER:
 - The very last line is always a valid [[NOTATION:{...}]] block. Never send prose with no notation.
 - Гамма / одиночный интервал / одиночный аккорд → barlines:"none", без timeSignature.
 - Тритоны и характерные интервалы с разрешениями → barlines:"manual" с "barAfter":true после каждой пары.
+- D7 с разрешениями → barlines:"manual" с "barAfter":true после каждой пары D7→T.
 - Метрическая музыка (диктант, гармонизация, кадансы) → barlines:"auto" с реальным timeSignature.
 - «Тритоны» = ВСЕГДА обе пары (ув.4+разр., ум.5+разр.). «Характерные» = ВСЕГДА все 4 пары. Никогда не урезай комплект до одного примера.`;
 
-function getSystemInstruction() {
-    let prompt = SYSTEM_PROMPT;
+function getSystemInstruction(responseLang) {
+    const lang = responseLang || detectResponseLanguage('', []);
+    let prompt = SYSTEM_PROMPT + getLanguageInstruction(lang);
     if (currentAiMode === 'berserk' && !notationModeEnabled) {
-        // Без оскорблений/брани: максимально прямолинейный, “жесткий” стиль с фокусом на полезность
-        prompt += `\n\nStyle: Be максимально прямолинейным и резким по тону, но без мата, унижений и личных оскорблений. Коротко, по делу, с сарказмом допускается, но всегда давай корректный и полезный ответ.`;
+        prompt += lang === 'ru'
+            ? `\n\nStyle: Be максимально прямолинейным и резким по тону, но без мата, унижений и личных оскорблений. Коротко, по делу, с сарказмом допускается, но всегда давай корректный и полезный ответ.`
+            : `\n\nStyle: Be blunt and direct, but no slurs or personal insults. Short, useful answers; light sarcasm is fine.`;
     }
     if (notationModeEnabled) {
         prompt += NOTATION_PROMPT_INSTRUCTION;
@@ -540,17 +601,20 @@ function getSystemInstruction() {
  * Дублирует ключевое требование на уровне user-сообщения — модели легко "забывают"
  * системный промпт после нескольких ходов, а вот свежее user-сообщение всегда соблюдают.
  */
-const NOTATION_USER_REMINDER =
-    '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
-    'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
-    'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
-    'JSON PRIORITY: полный закрытый JSON-блок важнее длинного текста — если кажется, что ответ длинный, сокращай ТЕКСТ, не обрывай JSON. Блок обязан заканчиваться на ]}]]. ' +
-    'EXERCISE COMPLETENESS: «тритоны лада X» (без слова «натуральные») = ГАРМОНИЧЕСКАЯ форма = 2 пары = 8 созвучий (натуральная пара + дополнительная пара из-за VII# в миноре или bVI в мажоре), barAfter после каждой разрешённой пары. «Натуральные тритоны» / «тритоны натурального X» = 1 пара = 4 созвучия. «Две пары тритонов» / «обе пары» = ВСЕГДА 8 созвучий (даже если кажется, что натуральный лад «достаточен»). «Характерные интервалы» = ВСЕГДА все 4 пары (ув.2/ум.7/ув.5/ум.4 + разрешения, 8 созвучий). «Обращения» / «все виды» = полный комплект, не один пример. Гаммы и одиночные созвучия — barlines:"none" без timeSignature. ' +
-    'РАЗРЕШЕНИЯ ТРИТОНОВ: ув.4 → СЕКСТА (м.6/б.6, 8–9 полутонов), ум.5 → ТЕРЦИЯ (м.3/б.3, 3–4 полутона). НИКОГДА не разрешай тритон в кварту или квинту — это математически невозможно. Перед выводом созвучия посчитай полутоны.';
+function buildNotationUserReminder(responseLang) {
+    const langName = { en: 'English', ru: 'Russian', de: 'German', es: 'Spanish', zh: 'Chinese', ja: 'Japanese' }[responseLang] || 'the user\'s language';
+    return '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
+        `LANGUAGE: reply in ${langName} only — match the user, NOT the Russian theory examples in the system prompt.\n` +
+        'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
+        'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
+        'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
+        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. Scales and single chords — barlines:"none" without timeSignature. ' +
+        'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth.';
+}
 
 /** Жёсткий повторный промпт, если первый ответ всё-таки пришёл без блока. */
 const NOTATION_RETRY_PROMPT =
-    'NOTATION MODE: твой прошлый ответ был НЕДОПУСТИМ — в нём не было строки [[NOTATION:{...}]]. Перепиши ответ заново: тот же смысл и язык, но КОРОТКО (2–5 предложений), и ОБЯЗАТЕЛЬНО последней строкой добавь РОВНО ОДИН валидный блок [[NOTATION:{"clef":"...","keySignature":"...","timeSignature":"...","notes":[...]}]]. После блока — ничего. Без markdown и без пояснений про формат.';
+    'NOTATION MODE: your last answer was INVALID — no [[NOTATION:{...}]] line. Rewrite: same meaning and the USER\'S language, SHORT (2–5 sentences), and end with exactly ONE valid [[NOTATION:{"clef":"...","keySignature":"...","timeSignature":"...","notes":[...]}]] block. Nothing after the block. No markdown.';
 
 /** Второй ретрай — ещё короче инструкция, максимально прямой императив. */
 const NOTATION_RETRY_PROMPT_2 =
@@ -561,7 +625,7 @@ const NOTATION_RETRY_PROMPT_2 =
  * это гарантированно влезает в любой токен-лимит и закрывается на `]}]]`.
  */
 const NOTATION_RETRY_PROMPT_3 =
-    'Твой прошлый JSON-блок был ОБРЕЗАН (нет закрывающего ]}]]). Сейчас выведи РОВНО один полный валидный блок [[NOTATION:{...}]] и БОЛЬШЕ НИЧЕГО — ни одного слова до и после, никакого markdown, никаких пояснений. Закрой блок последовательностью ]}]] на той же строке.';
+    'Your JSON block was TRUNCATED (missing closing ]}]]). Output EXACTLY one complete valid [[NOTATION:{...}]] block and NOTHING else — no words before or after, no markdown. Close with ]}]] on the same line.';
 
 function hasNotationBlock(text) {
     return /\[\[NOTATION:\s*\{[\s\S]*?\}\s*\]\]/.test(String(text || ''));
@@ -1205,6 +1269,10 @@ function loadChat(chatId) {
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
     currentChatId = chatId; chatTitle.textContent = chat.title; chatMessages.innerHTML = '';
+    window.__solfaiResponseLang = detectResponseLanguage('', chat.messages);
+    if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
+        window.SolfTheory.setLabelLocale(window.__solfaiResponseLang);
+    }
     chat.messages.forEach(msg => addMessageToUI(msg.role, msg.content, msg.attachments, false, msg.id));
     renderChatsList();
 }
@@ -1609,7 +1677,16 @@ function renderNotationCard(container, data) {
         // Авто-подписи: проставляем label каждому интервалу/аккорду, у которого его ещё нет
         // (например, блок сгенерировала сама модель). Готовые подписи не трогаем.
         if (window.SolfTheory && typeof window.SolfTheory.autoLabelNotation === 'function') {
-            try { window.SolfTheory.autoLabelNotation(data); } catch (_) {}
+            try {
+                const labelLang = window.__solfaiResponseLang
+                    || (typeof currentLang === 'string' && currentLang)
+                    || localStorage.getItem('solfai_lang')
+                    || 'en';
+                if (typeof window.SolfTheory.setLabelLocale === 'function') {
+                    window.SolfTheory.setLabelLocale(labelLang);
+                }
+                window.SolfTheory.autoLabelNotation(data);
+            } catch (_) {}
         }
 
         const clef = (data.clef === 'bass') ? 'bass' : 'treble';
@@ -1789,8 +1866,14 @@ async function generateResponse(query, imageData = null) {
     showTypingIndicator(); useRequest(); if(imageData) useImage();
     
     try {
-        const messages = [{ role: 'system', content: getSystemInstruction() }];
         const chat = chats.find(c => c.id === currentChatId);
+        const responseLang = detectResponseLanguage(query, chat?.messages);
+        window.__solfaiResponseLang = responseLang;
+        if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
+            window.SolfTheory.setLabelLocale(responseLang);
+        }
+
+        const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
         
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -1811,7 +1894,7 @@ async function generateResponse(query, imageData = null) {
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
         const baseUserContent = query || 'Analyze image';
         const apiUserContent = notationModeEnabled
-            ? `${baseUserContent}${NOTATION_USER_REMINDER}`
+            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}`
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
