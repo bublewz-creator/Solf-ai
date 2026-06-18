@@ -167,8 +167,8 @@
     }
 
     // Тип септаккорда по полутонам от примы до терции/квинты/септимы.
-    // Д = малый мажорный (доминантовый), Ум = уменьшённый, Б/М — большие/малые.
-    const SEVENTH_TYPE = { '4,7,10': 'Д', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
+    // D = малый мажорный (доминантовый), Ум = уменьшённый, Б/М — большие/малые.
+    const SEVENTH_TYPE = { '4,7,10': 'D', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
     function classifySeventh(tones, bass) {
         for (const root of tones) {
             const ti = (letterIdx(root.letter) + 2) % 7;
@@ -485,29 +485,68 @@
         return { clef: 'treble', keySignature: 'C', timeSignature: '', barlines: 'none', notes };
     }
 
-    // ---------- Доминантсептаккорд D7 + обращения ----------
-    function buildDominantSeventh(tonic, mode, withInversions) {
-        const scale = buildScale(tonic, mode);
-        const V = { ...scale[4], octave: 4 }; // доминанта
-        const third = buildIntervalUp(V, 3, 4);   // большая терция (вводный тон)
+    // ---------- Доминантсептаккорд D7 + обращения + разрешения ----------
+    /** Голоса D7 и обращений + целевые тонические трезвучия для разрешения. */
+    function getD7Voicings(tonic, mode) {
+        const V = { ...buildScale(tonic, mode)[4], octave: 4 };
+        const third = buildIntervalUp(V, 3, 4);
         const fifth = buildIntervalUp(V, 5, 7);
-        const seventh = buildIntervalUp(V, 7, 10); // малая септима
+        const seventh = buildIntervalUp(V, 7, 10);
         const V8 = buildIntervalUp(V, 8, 12);
         const third8 = buildIntervalUp(V8, 3, 4);
         const fifth8 = buildIntervalUp(V8, 5, 7);
+        return [
+            { label: 'D7',   notes: [V, third, fifth, seventh], roles: ['root', 'third', 'fifth', 'seventh'], target: 'T53' },
+            { label: 'D6/5', notes: [third, fifth, seventh, V8], roles: ['third', 'fifth', 'seventh', 'root'], target: 'T6' },
+            { label: 'D4/3', notes: [fifth, seventh, V8, third8], roles: ['fifth', 'seventh', 'root', 'third'], target: 'T6/4' },
+            { label: 'D2',   notes: [seventh, V8, third8, fifth8], roles: ['seventh', 'root', 'third', 'fifth'], target: 'T6' }
+        ];
+    }
 
+    function getTonicVoicing(tonic, mode, fig) {
+        const I = { ...tonic, octave: 4 };
+        const III = buildIntervalUp(I, 3, mode === 'major' ? 4 : 3);
+        const V = buildIntervalUp(I, 5, 7);
+        const I8 = buildIntervalUp(I, 8, 12);
+        const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
+        const map = {
+            T53:   { keys: [I, III, V], label: 'T53' },
+            T6:    { keys: [III, V, I8], label: 'T6' },
+            'T6/4': { keys: [V, I8, III8], label: 'T6/4' }
+        };
+        return map[fig] || map.T53;
+    }
+
+    function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
+        const voicings = getD7Voicings(tonic, mode);
+        const selected = withInversions ? voicings : [voicings[0]];
         const notes = [];
-        notes.push({ keys: [noteKey(V), noteKey(third), noteKey(fifth), noteKey(seventh)], duration: 'w', label: 'Д7' });
-        if (withInversions) {
-            notes.push({ keys: [noteKey(third), noteKey(fifth), noteKey(seventh), noteKey(V8)], duration: 'w', label: 'Д6/5' });
-            notes.push({ keys: [noteKey(fifth), noteKey(seventh), noteKey(V8), noteKey(third8)], duration: 'w', label: 'Д4/3' });
-            notes.push({ keys: [noteKey(seventh), noteKey(V8), noteKey(third8), noteKey(fifth8)], duration: 'w', label: 'Д2' });
-        }
+
+        selected.forEach((v, idx) => {
+            notes.push({
+                keys: v.notes.map(noteKey),
+                duration: 'w',
+                label: v.label
+            });
+            if (withResolutions) {
+                const target = getTonicVoicing(tonic, mode, v.target);
+                const isLast = idx === selected.length - 1;
+                notes.push({
+                    keys: target.keys.map(noteKey),
+                    duration: 'w',
+                    label: target.label,
+                    barAfter: !isLast
+                });
+            }
+        });
+
+        if (withResolutions && notes.length) delete notes[notes.length - 1].barAfter;
+
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, mode),
             timeSignature: '',
-            barlines: 'none',
+            barlines: withResolutions ? 'manual' : 'none',
             notes
         };
     }
@@ -701,7 +740,9 @@
                 data = buildTonicTriadExercise(key.tonic, key.mode, wantsInversions(t));
                 break;
             case 'dominant7':
-                data = buildDominantSeventh(key.tonic, key.mode, wantsInversions(t));
+                data = buildDominantSeventh(
+                    key.tonic, key.mode, wantsInversions(t), wantsResolution(t)
+                );
                 break;
         }
         return finalize(data);
