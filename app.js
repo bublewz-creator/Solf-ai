@@ -120,6 +120,31 @@ function getLanguageInstruction(lang) {
     return `\n\n${map[lang] || map.en}`;
 }
 
+function getAppLang() {
+    return (typeof currentLang === 'string' && currentLang)
+        || localStorage.getItem('solfai_lang')
+        || 'en';
+}
+
+function getChatLang() {
+    return window.__solfaiResponseLang
+        || (typeof detectResponseLanguage === 'function' ? detectResponseLanguage('', []) : null)
+        || getAppLang();
+}
+
+function uiText(key, { chat = false, fallback = '' } = {}) {
+    const lang = chat ? getChatLang() : getAppLang();
+    if (typeof solfaiGetText === 'function') {
+        const text = solfaiGetText(key, lang);
+        if (text) return text;
+    }
+    return fallback || key;
+}
+
+function formatResetTimer(prefix, hours, minutes) {
+    return `${prefix} ${hours}h ${minutes}m`;
+}
+
 // Элементы
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
@@ -598,8 +623,7 @@ function showNoRequestsToast() {
     const now = Date.now();
     if (now - __lastNoRequestsToastAt < 700) return;
     __lastNoRequestsToastAt = now;
-    const lang = localStorage.getItem('solfai_lang') || 'en';
-    showToast(lang === 'ru' ? 'У вас 0 запросов' : 'You have 0 requests', 'error', { dedupeKey: 'no-requests', dismissOnClick: true });
+    showToast(uiText('noRequests', { fallback: 'You have 0 requests' }), 'error', { dedupeKey: 'no-requests', dismissOnClick: true });
 }
 
 function refreshSendButtonState() {
@@ -749,8 +773,7 @@ window.togglePinChat = function(id, e) {
 
 window.deleteChatFromSidebar = function(id, e) {
     e.stopPropagation();
-    const msg = localStorage.getItem('solfai_lang') === 'ru' ? 'Удалить этот чат?' : 'Are you sure you want to delete this chat?';
-    if(confirm(msg)) {
+    if (confirm(uiText('deleteChatConfirm', { fallback: 'Are you sure you want to delete this chat?' }))) {
         chats = chats.filter(c => c.id !== id);
         saveChatToStorage();
         
@@ -1005,13 +1028,13 @@ function updateSidebarQuotaBadge() {
         badge.removeAttribute('tabindex');
         // Подробный title — на десктопе появится при ховере: "Запросов: 49 · Картинок: 5".
         const titleParts = [];
-        titleParts.push(`Requests: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
-        if (imgLimit > 0) titleParts.push(`Images: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
+        titleParts.push(`${uiText('quotaRequests', { fallback: 'Requests' })}: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
+        if (imgLimit > 0) titleParts.push(`${uiText('quotaImages', { fallback: 'Images' })}: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
         badge.title = titleParts.join(' · ');
     } else {
         badge.removeAttribute('href');
         badge.setAttribute('tabindex', '-1');
-        badge.title = 'Войдите в аккаунт, чтобы изменить тариф';
+        badge.title = uiText('signInToChangePlan', { fallback: 'Sign in to change your plan' });
     }
 }
 
@@ -1071,8 +1094,10 @@ function updateLimitTimer() {
     const data = JSON.parse(localStorage.getItem(getUsageKey()) || '{}');
     if (data.timestamp) {
         const remaining = (12 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
-        timerEl.textContent = remaining > 0 ? `Reset in: ${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m` : `Reset in: 0h`;
-    } else timerEl.textContent = `Reset in: 12h`;
+        timerEl.textContent = remaining > 0
+            ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
+            : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
+    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 12, 0);
 }
 function updateImageLimitTimer() {
     const timerEl = document.getElementById('imageLimitTimer');
@@ -1080,8 +1105,10 @@ function updateImageLimitTimer() {
     const data = JSON.parse(localStorage.getItem(getImageUsageKey()) || '{}');
     if (data.timestamp) {
         const remaining = (24 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
-        timerEl.textContent = remaining > 0 ? `Reset in: ${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m` : `Reset in: 0h`;
-    } else timerEl.textContent = `Reset in: 24h`;
+        timerEl.textContent = remaining > 0
+            ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
+            : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
+    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 24, 0);
 }
 
 function showToast(message, type = 'success', options = {}) {
@@ -1348,8 +1375,12 @@ function formatMessage(text) {
 
     // Уведомление вместо обрезанного нотного блока, который не удалось восстановить.
     if (truncatedNotice) {
+        const msg = uiText('notationTruncated', {
+            chat: true,
+            fallback: 'The notation example did not finish loading (response was cut off). Try asking again.'
+        });
         html = html.replace(/(?:<br>\s*)*\u0001SOLF_NOT_TRUNC\u0001(?:\s*<br>)*/g,
-            '<div class="notation-error">⚠️ Нотный пример не догрузился (ответ оборвался). Попробуйте переспросить.</div>');
+            `<div class="notation-error">⚠️ ${msg}</div>`);
     }
 
     return html;
@@ -1369,7 +1400,7 @@ function renderAllNotations(root) {
             setTimeout(() => renderAllNotations(root), 150);
         } else {
             containers.forEach(c => {
-                c.innerHTML = '<div class="notation-error">⚠️ Music engine failed to load</div>';
+                c.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineFailed', { chat: true, fallback: 'Music engine failed to load' })}</div>`;
                 c.setAttribute('data-rendered', '1');
             });
         }
@@ -1381,7 +1412,7 @@ function renderAllNotations(root) {
         try {
             data = JSON.parse(container.getAttribute('data-notation'));
         } catch (e) {
-            container.innerHTML = '<div class="notation-error">⚠️ Invalid notation data</div>';
+            container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationInvalidData', { chat: true, fallback: 'Invalid notation data' })}</div>`;
             container.setAttribute('data-rendered', '1');
             return;
         }
@@ -1543,7 +1574,7 @@ function getBarlineNoneType(VF) {
 function renderNotationCard(container, data) {
     const VF = getVexFlowNamespace();
     if (!VF) {
-        container.innerHTML = '<div class="notation-error">⚠️ Music engine not loaded</div>';
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineNotLoaded', { chat: true, fallback: 'Music engine not loaded' })}</div>`;
         return;
     }
     container.innerHTML = '';
@@ -1690,7 +1721,7 @@ function renderNotationCard(container, data) {
         }
     } catch (err) {
         console.error('[Solf.ai] VexFlow render error:', err);
-        container.innerHTML = `<div class="notation-error">⚠️ Could not render notation: ${err.message || err}</div>`;
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationRenderFailed', { chat: true, fallback: 'Could not render notation' })}: ${err.message || err}</div>`;
     }
 }
 
@@ -1702,7 +1733,7 @@ window.copyAiMessage = async function(button) {
         button.classList.add('copied');
         setTimeout(() => button.classList.remove('copied'), 1000);
     } catch (_) {
-        showToast('Copy failed', 'error');
+        showToast(uiText('copyFailed', { fallback: 'Copy failed' }), 'error');
     }
 };
 
@@ -1933,9 +1964,9 @@ async function generateResponse(query, imageData = null) {
     } catch (e) {
         document.getElementById('typingIndicator')?.remove();
         if (e.name === 'AbortError') {
-            addMessageToUI('ai', '🛑 Stopped.', [], false); 
+            addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
         } else {
-            addMessageToUI('ai', '❌ Error: ' + e.message, [], false); 
+            addMessageToUI('ai', `❌ ${uiText('chatError', { chat: true, fallback: 'Error' })}: ${e.message}`, [], false);
         }
     } finally {
         isGenerating = false; currentAbortController = null;
@@ -2046,11 +2077,12 @@ function scheduleSkipChatInputFocusCleanup() {
 
 function proceedWithQuery(query, imageData) {
     if (!currentChatId) { createNewChat(query || 'Image'); chatTitle.textContent = (query || 'Image').slice(0, 30); }
-    chatAttachedFiles.innerHTML = ''; chatInput.value = ''; chatInput.style.height = 'auto';
     const chat = chats.find(c => c.id === currentChatId);
+    window.__solfaiResponseLang = detectResponseLanguage(query, chat?.messages);
+    chatAttachedFiles.innerHTML = ''; chatInput.value = ''; chatInput.style.height = 'auto';
     chat.messages.push({ role: 'user', content: query || 'Analyze', attachments: imageData ? [{ type: 'image/png', data: imageData }] : [], time: new Date().toISOString(), id: Date.now().toString() });
     saveChatToStorage();
-    addMessageToUI('user', query || 'Analyze image', imageData ? [{ type: 'image/png', data: imageData }] : []);
+    addMessageToUI('user', query || uiText('analyzeImage', { chat: true, fallback: 'Analyze image' }), imageData ? [{ type: 'image/png', data: imageData }] : []);
     generateResponse(query, imageData); attachedFiles = [];
 }
 
@@ -2138,7 +2170,7 @@ function handleFileSelect(files, container) {
     
     // Мягкая проверка: либо тип начинается на image/, либо расширение файла подходящее
     if (!file || (!file.type.startsWith('image/') && !file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i))) {
-        showToast('Пожалуйста, выберите изображение', 'error');
+        showToast(uiText('imageOnly', { fallback: 'Please select an image file' }), 'error');
         return;
     }
 
@@ -2211,12 +2243,12 @@ function startMetronome() {
     if (!metronomeAudioContext) metronomeAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (metronomeAudioContext.state === 'suspended') metronomeAudioContext.resume();
     isMetronomePlaying = true; currentBeat = 0;
-    document.getElementById('metronomePlayBtn').innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> <span>Stop</span>';
+    document.getElementById('metronomePlayBtn').innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> <span>${uiText('metronomeStop', { fallback: 'Stop' })}</span>`;
     playMetronomeTick(); metronomeInterval = setInterval(playMetronomeTick, 60000 / metronomeBpm);
 }
 function stopMetronome() {
     isMetronomePlaying = false; clearInterval(metronomeInterval);
-    document.getElementById('metronomePlayBtn').innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>Start</span>';
+    document.getElementById('metronomePlayBtn').innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>${uiText('metronomeStart', { fallback: 'Start' })}</span>`;
 }
 function playMetronomeTick() {
     const isAccent = currentBeat === 0; const frequency = isAccent ? 1000 : 800; const duration = 0.05;
