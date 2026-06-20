@@ -122,21 +122,6 @@ const translations = {
         mode_berserk: 'Berserk',
         notationMode: 'Notation mode',
         chatLimitNotice: 'For now only the last 8 chats are kept here.',
-        notationTruncated: 'The notation example did not finish loading (response was cut off). Try asking again.',
-        notationEngineFailed: 'Music engine failed to load',
-        notationInvalidData: 'Invalid notation data',
-        notationEngineNotLoaded: 'Music engine not loaded',
-        notationRenderFailed: 'Could not render notation',
-        copyFailed: 'Copy failed',
-        chatStopped: 'Stopped.',
-        chatError: 'Error',
-        analyzeImage: 'Analyze image',
-        imageOnly: 'Please select an image file',
-        noRequests: 'You have 0 requests',
-        deleteChatConfirm: 'Are you sure you want to delete this chat?',
-        signInToChangePlan: 'Sign in to change your plan',
-        quotaRequests: 'Requests',
-        quotaImages: 'Images',
         langFlag: '🇺🇸'
     },
     ru: {
@@ -261,21 +246,6 @@ const translations = {
         mode_berserk: 'Берсерк',
         notationMode: 'Режим нотации',
         chatLimitNotice: 'Пока что здесь сохраняются только последние 8 чатов.',
-        notationTruncated: 'Нотный пример не догрузился (ответ оборвался). Попробуйте переспросить.',
-        notationEngineFailed: 'Не удалось загрузить движок нотации',
-        notationInvalidData: 'Некорректные данные нотации',
-        notationEngineNotLoaded: 'Движок нотации не загружен',
-        notationRenderFailed: 'Не удалось отрисовать нотацию',
-        copyFailed: 'Не удалось скопировать',
-        chatStopped: 'Остановлено.',
-        chatError: 'Ошибка',
-        analyzeImage: 'Проанализируй изображение',
-        imageOnly: 'Пожалуйста, выберите изображение',
-        noRequests: 'У вас 0 запросов',
-        deleteChatConfirm: 'Удалить этот чат?',
-        signInToChangePlan: 'Войдите в аккаунт, чтобы изменить тариф',
-        quotaRequests: 'Запросов',
-        quotaImages: 'Картинок',
         langFlag: '🇷🇺'
     },
     de: {
@@ -398,21 +368,6 @@ const translations = {
         featureUnavailable: 'Funktion nicht verfügbar',
         notationMode: 'Notenmodus',
         chatLimitNotice: 'Vorerst werden hier nur die letzten 8 Chats gespeichert.',
-        notationTruncated: 'Das Notenbeispiel wurde nicht vollständig geladen (Antwort abgeschnitten). Bitte erneut fragen.',
-        notationEngineFailed: 'Noten-Engine konnte nicht geladen werden',
-        notationInvalidData: 'Ungültige Notendaten',
-        notationEngineNotLoaded: 'Noten-Engine nicht geladen',
-        notationRenderFailed: 'Notation konnte nicht gerendert werden',
-        copyFailed: 'Kopieren fehlgeschlagen',
-        chatStopped: 'Gestoppt.',
-        chatError: 'Fehler',
-        analyzeImage: 'Bild analysieren',
-        imageOnly: 'Bitte wählen Sie eine Bilddatei',
-        noRequests: 'Sie haben 0 Anfragen',
-        deleteChatConfirm: 'Diesen Chat wirklich löschen?',
-        signInToChangePlan: 'Melden Sie sich an, um den Tarif zu ändern',
-        quotaRequests: 'Anfragen',
-        quotaImages: 'Bilder',
         langFlag: '🇩🇪'
     },
     es: {
@@ -535,21 +490,6 @@ const translations = {
         featureUnavailable: 'Función no disponible',
         notationMode: 'Modo notación',
         chatLimitNotice: 'Por ahora solo se guardan aquí los últimos 8 chats.',
-        notationTruncated: 'El ejemplo de notación no terminó de cargarse (respuesta cortada). Inténtalo de nuevo.',
-        notationEngineFailed: 'No se pudo cargar el motor de notación',
-        notationInvalidData: 'Datos de notación no válidos',
-        notationEngineNotLoaded: 'Motor de notación no cargado',
-        notationRenderFailed: 'No se pudo renderizar la notación',
-        copyFailed: 'Error al copiar',
-        chatStopped: 'Detenido.',
-        chatError: 'Error',
-        analyzeImage: 'Analizar imagen',
-        imageOnly: 'Selecciona un archivo de imagen',
-        noRequests: 'Tienes 0 solicitudes',
-        deleteChatConfirm: '¿Eliminar este chat?',
-        signInToChangePlan: 'Inicia sesión para cambiar tu plan',
-        quotaRequests: 'Solicitudes',
-        quotaImages: 'Imágenes',
         langFlag: '🇪🇸'
     },
     zh: {
@@ -672,21 +612,6 @@ const translations = {
         featureUnavailable: '功能不可用',
         notationMode: '乐谱模式',
         chatLimitNotice: '目前此处仅保留最近 8 个聊天。',
-        notationTruncated: '乐谱示例未完整加载（回复被截断）。请重试。',
-        notationEngineFailed: '无法加载乐谱引擎',
-        notationInvalidData: '乐谱数据无效',
-        notationEngineNotLoaded: '乐谱引擎未加载',
-        notationRenderFailed: '无法渲染乐谱',
-        copyFailed: '复制失败',
-        chatStopped: '已停止。',
-        chatError: '错误',
-        analyzeImage: '分析图片',
-        imageOnly: '请选择图片文件',
-        noRequests: '今日请求次数为 0',
-        deleteChatConfirm: '确定删除此聊天吗？',
-        signInToChangePlan: '登录后可更改套餐',
-        quotaRequests: '请求',
-        quotaImages: '图片',
         langFlag: '🇨🇳'
     },
     ja: {
@@ -809,28 +734,13 @@ const translations = {
         featureUnavailable: '機能は利用できません',
         notationMode: '楽譜モード',
         chatLimitNotice: '現在、ここには直近の8件のチャットのみ保存されます。',
-        notationTruncated: '楽譜の例が読み込み切れませんでした（応答が途中で切れました）。もう一度お試しください。',
-        notationEngineFailed: '楽譜エンジンの読み込みに失敗しました',
-        notationInvalidData: '無効な楽譜データ',
-        notationEngineNotLoaded: '楽譜エンジンが読み込まれていません',
-        notationRenderFailed: '楽譜を描画できませんでした',
-        copyFailed: 'コピーに失敗しました',
-        chatStopped: '停止しました。',
-        chatError: 'エラー',
-        analyzeImage: '画像を分析',
-        imageOnly: '画像ファイルを選択してください',
-        noRequests: 'リクエストが0件です',
-        deleteChatConfirm: 'このチャットを削除しますか？',
-        signInToChangePlan: 'プランを変更するにはサインインしてください',
-        quotaRequests: 'リクエスト',
-        quotaImages: '画像',
         langFlag: '🇯🇵'
     }
 };
 
 /** Строки из словаря для кода без data-i18n (app.js, quiz.js) */
-function solfaiGetText(key, langOverride) {
-    const lang = langOverride || localStorage.getItem('solfai_lang') || 'en';
+function solfaiGetText(key) {
+    const lang = localStorage.getItem('solfai_lang') || 'en';
     const t = translations[lang] || translations.en;
     if (t && t[key] !== undefined) return t[key];
     return translations.en[key] !== undefined ? translations.en[key] : '';
@@ -839,8 +749,30 @@ window.solfaiGetText = solfaiGetText;
 
 let currentLang = localStorage.getItem('solfai_lang') || 'en';
 
+// #region agent log
+function __agentLogI18n(payload) {
+    try {
+        const isLocalhost =
+            location.hostname === 'localhost' ||
+            location.hostname === '127.0.0.1' ||
+            location.hostname === '[::1]';
+        if (!isLocalhost) return;
+        fetch('http://127.0.0.1:7506/ingest/9a7aba86-9003-45f5-81ab-51ebecfce514', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'd42321' }, body: JSON.stringify({ sessionId: 'd42321', ...payload, timestamp: Date.now() }) }).catch(() => { });
+    } catch (_) { }
+}
+// #endregion
+
 function setLanguage(lang) {
     if (translations[lang]) {
+        // #region agent log
+        __agentLogI18n({
+            runId: 'pre-fix',
+            hypothesisId: 'D',
+            location: 'i18n.js:setLanguage',
+            message: 'setLanguage accepted',
+            data: { from: currentLang, to: lang }
+        });
+        // #endregion
         currentLang = lang;
         localStorage.setItem('solfai_lang', lang);
         updateTexts();
@@ -850,6 +782,20 @@ function setLanguage(lang) {
 
 function updateTexts() {
     const t = translations[currentLang] || translations.en;
+    // #region agent log
+    __agentLogI18n({
+        runId: 'pre-fix',
+        hypothesisId: 'D',
+        location: 'i18n.js:updateTexts:entry',
+        message: 'updateTexts',
+        data: {
+            currentLang,
+            hasT: Boolean(t),
+            keys: t ? Object.keys(t).length : null,
+            dataI18nCount: document.querySelectorAll('[data-i18n]').length
+        }
+    });
+    // #endregion
     
     document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
@@ -901,42 +847,107 @@ function updateTexts() {
 }
 
 function initI18n() {
-    document.querySelectorAll('.toggle-lang-dropdown').forEach(btn => {
+    // #region agent log
+    __agentLogI18n({
+        runId: 'pre-fix',
+        hypothesisId: 'D',
+        location: 'i18n.js:initI18n:entry',
+        message: 'initI18n start',
+        data: {
+            readyState: document.readyState,
+            currentLang,
+            langOptionCount: document.querySelectorAll('.lang-option').length,
+            hasLangDropdown: Boolean(document.getElementById('langDropdown'))
+        }
+    });
+    // #endregion
+    document.querySelectorAll('.toggle-lang-dropdown, #langBtn').forEach(btn => {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
-            const dropdown = btn.nextElementSibling;
+            const dropdown = btn.nextElementSibling || document.getElementById('langDropdown');
             const isActive = dropdown?.classList.contains('active');
-            if (typeof closeAllOverlays === 'function') closeAllOverlays(btn);
+            
+            // ИСПРАВЛЕНИЕ: Передаем btn, чтобы сайдбар понимал, что клик внутри, и не сворачивался
+            if (typeof closeAllOverlays === 'function') closeAllOverlays(btn); 
+            
             if (!dropdown) return;
-            dropdown.classList.toggle('active', !isActive);
+            if (isActive) {
+                dropdown.classList.remove('active');
+                if (btn.id === 'langBtn') {
+                    const arrow = document.getElementById('langArrow');
+                    if (arrow) arrow.style.transform = 'rotate(0deg)';
+                }
+                return;
+            }
+
+            dropdown.classList.add('active');
+            if (btn.id === 'langBtn') {
+                const arrow = document.getElementById('langArrow');
+                if (arrow) arrow.style.transform = 'rotate(180deg)';
+            }
         });
     });
 
+    
+
+    // Обработка клика по языку
     document.querySelectorAll('.lang-option').forEach(option => {
         option.addEventListener('click', (e) => {
             e.stopPropagation();
             const lang = option.getAttribute('data-lang');
             setLanguage(lang);
+            
+            // Закрываем все меню выбора языка
             document.querySelectorAll('.lang-dropdown, .lang-submenu').forEach(d => d.classList.remove('active'));
+            // Делаем активным только выбранный пункт везде
             document.querySelectorAll('.lang-option').forEach(opt => opt.classList.remove('active'));
             document.querySelectorAll(`.lang-option[data-lang="${lang}"]`).forEach(opt => opt.classList.add('active'));
         });
     });
+// --- ДОБАВИТЬ В КОНЕЦ ФУНКЦИИ initI18n() ---
 
-    const mobileLangBtn = document.getElementById('mobileLangMenuBtn');
-    if (mobileLangBtn) {
-        mobileLangBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            if (typeof closeAllOverlays === 'function') closeAllOverlays(mobileLangBtn);
-            const submenu = document.getElementById('mobileLangSubmenu');
-            if (submenu) {
-                submenu.classList.toggle('active');
-                mobileLangBtn.classList.toggle('active');
-            }
-        });
-    }
+// 1. Логика для мобильного аккордеона языка в профиле
+const mobileLangBtn = document.getElementById('mobileLangMenuBtn');
+if (mobileLangBtn) {
+    mobileLangBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        if (typeof closeAllOverlays === 'function') closeAllOverlays(mobileLangBtn);
+        const submenu = document.getElementById('mobileLangSubmenu');
+        if (submenu) {
+            submenu.classList.toggle('active');
+            mobileLangBtn.classList.toggle('active');
+        }
+    });
+}
 
+// 2. Закрытие мобильного меню после выбора языка
+document.querySelectorAll('.mobile-lang-submenu .lang-option').forEach(option => {
+    option.addEventListener('click', () => {
+        document.getElementById('mobileLangSubmenu')?.classList.remove('active');
+        document.getElementById('mobileLangMenuBtn')?.classList.remove('active');
+        
+        // Сворачиваем всё меню профиля при выборе языка
+        if (window.matchMedia?.('(max-width: 768px)')?.matches && typeof closeAllOverlays === 'function') {
+            closeAllOverlays();
+        }
+    });
+});
     updateTexts();
+    updateCookieConsent();
+}
+
+function updateCookieConsent() {
+    const t = translations[currentLang] || translations.en;
+
+    const cookieText = document.getElementById('cookieText');
+    const cookieAccept = document.getElementById('cookieAcceptBtn');
+    const cookieDecline = document.getElementById('cookieDeclineBtn');
+
+    if (cookieText) {
+        cookieText.innerHTML = `${t.cookieText} <a href="terms.html">${t.cookieTerms}</a> & <a href="privacy.html">${t.cookiePrivacy}</a>.`;
+    }
+    if (cookieAccept) cookieAccept.textContent = t.cookieAccept || 'Accept';
+    if (cookieDecline) cookieDecline.textContent = t.cookieDecline || 'Decline';
 }
 
 // Инициализация при загрузке страницы

@@ -65,11 +65,23 @@ function saveQuizUsage(data) {
     localStorage.setItem(getQuizUsageKey(), JSON.stringify(data));
 }
 
+// Залогинен ли пользователь (источник истины по попыткам — БД, как у запросов к ИИ).
+function isQuizUserLoggedIn() {
+    return typeof currentUser !== 'undefined' && Boolean(currentUser?.id);
+}
+
 function getRemainingQuizzes() {
     const planType = (typeof currentPlan !== 'undefined' && currentPlan) ? currentPlan.type : 'free';
     const limit = QUIZ_LIMITS[planType] !== undefined ? QUIZ_LIMITS[planType] : 3;
 
     if (limit === Infinity) return 999; 
+
+    // Залогиненные: считаем от quiz_count в БД (приходит через syncAppData / increment-quiz).
+    // Если sync ещё не отработал — считаем 0 потраченных, бэк всё равно проверит лимит сам.
+    if (isQuizUserLoggedIn()) {
+        const dbUsage = Number(currentUser?.quiz_count);
+        return Math.max(0, limit - (Number.isFinite(dbUsage) ? dbUsage : 0));
+    }
 
     const usage = getQuizUsage();
     return Math.max(0, limit - usage.count);
@@ -81,6 +93,17 @@ function useQuiz() {
 
     if (limit === Infinity) return true;
 
+    // Залогиненные: оптимистичный +1 в памяти (UI сразу обновляется), затем фиксируем в БД
+    // через /increment-quiz. БД — источник истины: ответ перезапишет currentUser.quiz_count.
+    if (isQuizUserLoggedIn()) {
+        const cur = Number(currentUser.quiz_count) || 0;
+        if (cur >= limit) return false;
+        currentUser.quiz_count = cur + 1;
+        updateQuizCounter();
+        incrementQuizUsageDB();
+        return true;
+    }
+
     const usage = getQuizUsage();
     if (usage.count < limit) {
         usage.count++;
@@ -90,6 +113,32 @@ function useQuiz() {
         return true;
     }
     return false;
+}
+
+// Фиксируем потраченную попытку квиза в NeonDB. По образцу /increment-usage:
+// используем общий fetchWithTimeout (из app.js), чтобы запрос не висел вечно в РФ без VPN.
+async function incrementQuizUsageDB() {
+    if (!isQuizUserLoggedIn()) return;
+    try {
+        const fetcher = (typeof fetchWithTimeout === 'function') ? fetchWithTimeout : (u, o) => fetch(u, o);
+        const res = await fetcher(`${WORKER_URL}/increment-quiz`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentUser.id })
+        }, 12000);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) throw new Error(data.error || 'Failed to increment quiz usage');
+
+        // Источник истины — БД. Если бэк вернул значение, перезаписываем оптимистичный инкремент.
+        if (Number.isFinite(Number(data.quiz_count))) {
+            currentUser.quiz_count = Number(data.quiz_count);
+            try { localStorage.setItem('solfai_user', JSON.stringify(currentUser)); } catch (_) {}
+            updateQuizCounter();
+        }
+    } catch (e) {
+        // Сеть упала — оставляем оптимистичный +1, при следующем syncAppData значение поправится из БД.
+        console.error('Ошибка сохранения попытки квиза в БД:', e);
+    }
 }
 
 function updateQuizCounter() {
@@ -445,4 +494,8 @@ function stopAllSounds() {
         audioContext.close();
         audioContext = null;
     }
+}
+
+function resetQuiz() {
+    showQuizModes();
 }
