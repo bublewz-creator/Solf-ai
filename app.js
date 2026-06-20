@@ -2490,7 +2490,13 @@ async function initApp() {
         }
     });
     // #endregion
-    migrateRemoveStaleUsageKeysOnce();
+    // ЗАЩИТА ОТ «ПОЛОВИНА КНОПОК НЕ РАБОТАЕТ»: каждый ранний шаг инициализации обёрнут в
+    // try/catch. Если любой из них бросит исключение (повреждённый localStorage, сбой темы,
+    // i18n, профиля и т.п.), мы НЕ должны прерывать функцию — иначе обработчики кнопок ниже
+    // (send, new chat, sidebar, login, profile…) не навесятся и клики будут игнорироваться.
+    const safeInit = (label, fn) => { try { fn(); } catch (e) { console.error(`[Solf.ai] init step "${label}" failed (продолжаем навеску кнопок):`, e); } };
+
+    safeInit('migrate', () => migrateRemoveStaleUsageKeysOnce());
     // КРИТИЧНО: НЕ ждём `await syncAppData()`. Раньше тут было `await`, и если Cloudflare
     // Workers не отвечал (юзер без VPN — workers.dev часто режется ТСПУ), весь initApp
     // висел до таймаута, а значит ВСЕ обработчики кнопок ниже не успевали навеситься.
@@ -2498,20 +2504,22 @@ async function initApp() {
     // Теперь sync запускается параллельно: UI сразу инициализируется с данными из
     // localStorage-кэша (logged-in, имя, тариф уже там), а БД догонит в фоне и обновит.
     syncAppData().catch((err) => console.warn('[Solf.ai] syncAppData (background) failed:', err));
-    initTheme();
-    initColor();
-    initFontSize();
+    safeInit('theme', () => initTheme());
+    safeInit('color', () => initColor());
+    safeInit('fontSize', () => initFontSize());
 
-    if (typeof setLanguage === 'function' && typeof currentLang !== 'undefined') {
-        setLanguage(currentLang); 
-    }
-    
+    safeInit('language', () => {
+        if (typeof setLanguage === 'function' && typeof currentLang !== 'undefined') {
+            setLanguage(currentLang);
+        }
+    });
+
     // ВСЕГДА вызываем updateUIForUser, не только для гостей. Раньше тут было
     // `if (!currentUser) updateUIForUser()` — и если юзер залогинен, аватарка/имя/email
     // ставились ТОЛЬКО внутри syncAppData() после ответа БД. А если БД не отвечает
     // (Cloudflare без VPN) — профиль так и оставался пустым ("есть buttn 'M' и всё").
     // Теперь рисуем профиль СРАЗУ из localStorage-кэша, БД лишь освежит позже.
-    updateUIForUser();
+    safeInit('updateUIForUser', () => updateUIForUser());
     
     // --- ПРАВИЛЬНАЯ РАБОТА ВИЗУАЛЬНЫХ КНОПОК ПРИКРЕПЛЕНИЯ ---
     const attachBtns = document.querySelectorAll('#chatAttachBtn, .attach-btn');
