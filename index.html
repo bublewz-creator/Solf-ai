@@ -263,6 +263,15 @@
     </style>
 </head>
 <body class="preload">
+    <script>
+        /* Fallback: if app.js fails to load, still reveal UI after 4s (body.preload = opacity 0). */
+        setTimeout(function () {
+            try {
+                document.body.classList.remove('preload', 'no-transition');
+                document.body.classList.add('app-ready');
+            } catch (_) {}
+        }, 4000);
+    </script>
     <svg style="display: none;">
       <symbol id="icon-brain" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9.5 2A2.5 2.5 0 0 1 12 4.5v15a2.5 2.5 0 0 1-4.96.44 2.5 2.5 0 0 1-2.96-3.08 3 3 0 0 1-.34-5.58 2.5 2.5 0 0 1 1.32-4.24 2.5 2.5 0 0 1 1.98-3A2.5 2.5 0 0 1 9.5 2Z"/>
@@ -529,6 +538,6 @@
     <script src="i18n.js?v=2"></script>
     <script src="quiz.js?v=2"></script>
     <script src="theory.js?v=9"></script>
-    <script src="app.js?v=16"></script>
+    <script src="app.js?v=17"></script>
 </body>
 </html>
