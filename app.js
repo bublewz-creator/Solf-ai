@@ -26,29 +26,6 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
     }
 }
 
-async function syncUserWithDB(user) {
-    try {
-        const res = await fetchWithTimeout(`${WORKER_URL}/save-user`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                picture: user.picture
-            })
-        }, 12000);
-
-        if (!res.ok) {
-            console.error('Ошибка синхронизации пользователя с БД');
-        } else {
-            console.log('Пользователь успешно синхронизирован с БД');
-        }
-    } catch (error) {
-        console.error('Сетевая ошибка при синхронизации пользователя:', error);
-    }
-}
-
 async function syncAppData() {
     if (!currentUser?.id) return;
 
@@ -101,58 +78,74 @@ const PLAN_LIMITS = {
     unlimited: { requests: Infinity, images: Infinity }
 };
 
-const GOOGLE_CLIENT_ID = '691304539168-iaouqdnkd73iprkcs6cou2i93t11qiak.apps.googleusercontent.com';
-
-// #region agent log
-const __agentDebug = {
-    runId: 'pre-fix',
-    send(payload) {
-        try {
-            const isLocalhost =
-                location.hostname === 'localhost' ||
-                location.hostname === '127.0.0.1' ||
-                location.hostname === '[::1]';
-            if (!isLocalhost) return;
-
-            fetch('http://127.0.0.1:7506/ingest/9a7aba86-9003-45f5-81ab-51ebecfce514', { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': 'd42321' }, body: JSON.stringify({ sessionId: 'd42321', ...payload, timestamp: Date.now() }) }).catch(() => { });
-        } catch (_) { }
-    }
-};
-
-window.addEventListener('error', (e) => {
-    __agentDebug.send({
-        hypothesisId: 'E',
-        location: 'app.js:global',
-        message: 'window.error',
-        data: {
-            message: e?.message,
-            filename: e?.filename,
-            lineno: e?.lineno,
-            colno: e?.colno
-        }
-    });
-});
-
-window.addEventListener('unhandledrejection', (e) => {
-    __agentDebug.send({
-        hypothesisId: 'E',
-        location: 'app.js:global',
-        message: 'unhandledrejection',
-        data: { reason: String(e?.reason?.message || e?.reason) }
-    });
-});
-// #endregion
-
 // ===== СТРОГИЙ ПРОМПТ =====
 const SYSTEM_PROMPT = `You are Solf.ai, an AI assistant for music theory and solfeggio.
 Your tasks: explain music theory in simple terms, analyze images with musical notes.
 CRITICAL INSTRUCTION: DO NOT mention the built-in site tools (Piano, Metronome, Quiz) in your regular answers! Only mention them IF the user explicitly asks how to practice or train their ear. Answer directly and concisely.
-IMPORTANT: ALWAYS answer in the SAME language the user is speaking.`;
+IMPORTANT: ALWAYS answer in the SAME language the user is speaking. Never default to Russian when the user writes in English (or any other language).`;
 
 const TYPING_SPEED = 20;
 
+/** Язык ответа: из текущего сообщения, недавней истории пользователя, затем язык UI. */
+function detectResponseLanguage(userText, chatMessages = []) {
+    const parts = [String(userText || '')];
+    (chatMessages || [])
+        .filter(m => m.role === 'user')
+        .slice(-5)
+        .forEach(m => parts.push(String(m.content || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '')));
+    const combined = parts.join('\n');
+
+    if (/[\u0400-\u04FF]/.test(combined)) return 'ru';
+    if (/[\u4e00-\u9fff]/.test(combined)) return 'zh';
+    if (/[\u3040-\u30ff]/.test(combined)) return 'ja';
+    if (/\b(der|die|das|und|ich|nicht|wie|was|akkord|tonleiter|dur|moll)\b/i.test(combined)) return 'de';
+    if (/\b(el|la|los|cómo|qué|acorde|escala|mayor|menor)\b/i.test(combined)) return 'es';
+    if (/\b(the|what|how|build|chord|hello|hi|want|please|scale|interval|major|minor)\b/i.test(combined)) return 'en';
+    // Латиница без кириллицы (D7, C major, Hi…) — английский, даже если UI на русском
+    if (/[a-zA-Z]/.test(combined)) return 'en';
+
+    const uiLang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('solfai_lang') || 'en';
+    return uiLang;
+}
+
+function getLanguageInstruction(lang) {
+    const map = {
+        en: 'RESPONSE LANGUAGE: English. Every word of your answer — prose, note names (C, D, E…), theory terms, and JSON "label" fields — MUST be in English. Never use Russian note names (до, ре, ми…) or Cyrillic labels (ув4, Б53) when the user writes in English.',
+        ru: 'ЯЗЫК ОТВЕТА: русский. Весь текст, названия нот (до, ре, ми…) и подписи на стане (ув4, Б53…) — по-русски. Не переходи на английский, если пользователь пишет по-русски.',
+        de: 'ANTWORTSPRACHE: Deutsch. Die gesamte Antwort auf Deutsch.',
+        es: 'IDIOMA DE RESPUESTA: español. Toda la respuesta en español.',
+        zh: '回答语言：中文。请用中文作答。',
+        ja: '回答言語：日本語。日本語で答えてください。'
+    };
+    return `\n\n${map[lang] || map.en}`;
+}
+
+function getAppLang() {
+    return (typeof currentLang === 'string' && currentLang)
+        || localStorage.getItem('solfai_lang')
+        || 'en';
+}
+
+function getChatLang() {
+    return window.__solfaiResponseLang
+        || (typeof detectResponseLanguage === 'function' ? detectResponseLanguage('', []) : null)
+        || getAppLang();
+}
+
+function uiText(key, { chat = false, fallback = '' } = {}) {
+    const lang = chat ? getChatLang() : getAppLang();
+    if (typeof solfaiGetText === 'function') {
+        const text = solfaiGetText(key, lang);
+        if (text) return text;
+    }
+    return fallback || key;
+}
+
+function formatResetTimer(prefix, hours, minutes) {
+    return `${prefix} ${hours}h ${minutes}m`;
+}
+
 // Элементы
-const chatPage = document.getElementById('chatPage');
 const chatMessages = document.getElementById('chatMessages');
 const chatInput = document.getElementById('chatInput');
 const chatSendBtn = document.getElementById('chatSendBtn');
@@ -176,13 +169,8 @@ function syncMobileSidebarDrawerState() {
 }
 
 function resetSidebarExpandedMenus() {
-    document.querySelectorAll('#toolsAccordion, #settingsAccordion').forEach(el => el.classList.remove('open'));
+    document.querySelectorAll('#toolsAccordion').forEach(el => el.classList.remove('open'));
     document.querySelectorAll('.sidebar-header-btn').forEach(btn => btn.classList.remove('open'));
-    document.querySelectorAll('#langDropdown, #colorDropdown').forEach(el => el?.classList.remove('active'));
-    const langArrow = document.getElementById('langArrow');
-    if (langArrow) langArrow.style.transform = 'rotate(0deg)';
-    const colorArrow = document.getElementById('colorArrow');
-    if (colorArrow) colorArrow.style.transform = 'rotate(0deg)';
 }
 
 /** Сайдбар на мобилке имеет z-index выше модалок; при открытии инструмента закрываем drawer и сбрасываем аккордеоны */
@@ -197,9 +185,7 @@ function closeSidebarWhenOpeningTool() {
 }
 const chatsList = document.getElementById('chatsList');
 const chatTitle = document.getElementById('chatTitle');
-const loginModal = document.getElementById('loginModal');
 const limitModal = document.getElementById('limitModal');
-const sidebarUser = document.getElementById('sidebarUser');
 const chatFileInput = document.getElementById('chatFileInput');
 const chatAttachedFiles = document.getElementById('chatAttachedFiles');
 
@@ -308,6 +294,15 @@ const NOTATION_PROMPT_INSTRUCTION = `
 
 NOTATION MODE IS ON. These rules OVERRIDE every other instruction (including any “long”, “verbose”, or “berserk” style). You MUST always draw notes in the answer.
 
+LANGUAGE RULE (ABSOLUTE — beats every Russian example below):
+- Match the user's language in ALL visible text: prose, note names, chord names, interval names, and JSON "label" fields.
+- English user → English only: "D7 = D, F#, A, C"; labels like "A4","d5","M3","P5","D7","T53".
+- Russian user → Russian: "D7 = ре, фа♯, ля, до"; labels like "ув4","ум5","б3","D7" (chord symbol D7 stays Latin).
+- German / Spanish / Chinese / Japanese user → same language throughout.
+- The Russian terminology in this prompt is INTERNAL theory reference only — NEVER copy its language into the answer unless the user writes in that language.
+- WRONG: user writes "D7" in English → "Доминантсептаккорд от ноты Ре…"
+- RIGHT: user writes "D7" → "D7 is D, F#, A, and C — a dominant seventh chord."
+
 LENGTH RULES (HARD LIMIT — be strict):
 - DEFAULT for any normal question (definitions, theory, simple examples, off-topic) →
   1–2 SHORT sentences (≤ ~30 words) before the notation. NO numbered lists, NO multiple paragraphs, NO headings, NO restatement of the question. Text only frames the staff. The staff IS the answer.
@@ -343,6 +338,8 @@ EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAU
 - «Главные трезвучия лада» = T, S, D (3 трезвучия), при просьбе «с обращениями» — все обращения по порядку.
 - «Обращения T5/3» = T5/3, T6, T6/4 (3 аккорда).
 - «Доминантсептаккорд с обращениями» = D7, D6/5, D4/3, D2 (4 аккорда).
+- «D7 с разрешениями» / «D7, обращения и разрешения» = каждое созвучие D7 + тоническое трезвучие (D7→T53, D6/5→T6, D4/3→T6/4, D2→T6), всего 8 аккордов; barlines:"manual" + barAfter после каждой пары.
+- Подписи доминантсептаккорда — ТОЛЬКО латиницей: "D7","D6/5","D4/3","D2" (НЕ кириллическая «Д»).
 - «Все виды трезвучий от ноты N» = мажорное, минорное, увеличенное, уменьшенное (4 аккорда).
 - «Все виды септаккордов от N» = малый мажорный, малый минорный, малый ум., ум.7 и т.д. — выводи столько, сколько корректно для запроса, не один.
 
@@ -393,12 +390,14 @@ Block format rules (CRITICAL — follow exactly):
   - "keys" pitches "letter[#|b]/octave" e.g. "c/4","f#/4","bb/3". Multiple keys in one entry = a stacked chord.
   - "duration": "w","h","q","8","16". Append "r" for rests ("qr","hr"…).
   - "barAfter": true — ставится ТОЛЬКО при barlines:"manual" и означает «после этой ноты — тактовая черта». В других режимах флаг игнорируется.
-  - "label": КОРОТКАЯ подпись над созвучием (рисуется над нотой). Подписывай КАЖДЫЙ интервал/аккорд:
-    • интервалы — русское качество+величина БЕЗ точки: "ув4","ум5","б3","м6","ч5" и т.п.;
-    • трезвучия по функции латиницей БЕЗ слэша: "T53","T6","T64","S53","D53" (или по структуре "Б53","М53","Ув53","Ум53");
-    • доминантсептаккорд и обращения латиницей БЕЗ слэша: "D7","D65","D43","D2";
-    • ступени гаммы — римские цифры "I"…"VIII".
-    Если не уверен в функции — давай структурную подпись. Подпись — это ТЕКСТ внутри JSON, не отдельная нота.
+  - "label": short label above each chord/interval — SAME language as the user:
+    • English intervals: "A4","d5","M3","m6","P5","A2","d7" (no dots);
+    • Russian intervals: "ув4","ум5","б3","м6","ч5" (no dots);
+    • functional triads (any language): "T53","T6","T64","S53","D53";
+    • structural triads EN: "M5/3","m5/3","A5/3","d5/3"; RU: "Б53","М53","Ув53","Ум53";
+    • dominant seventh (Latin D always): "D7","D65","D43","D2";
+    • scale degrees: Roman numerals "I"…"VIII".
+    If unsure of function — use structural labels in the user's language.
   - Октава 4 = middle octave on treble clef, octave 3 for bass clef low notes.
 
 Block placement rules:
@@ -412,8 +411,6 @@ Block placement rules:
 ###  MUSIC THEORY ENGINE — STRICT RULES   ###
 ############################################
 Эти правила применяются ВСЕГДА, когда пользователь просит «построить» что-либо: интервалы, тритоны, характерные интервалы, аккорды, гаммы, цепочки. Сначала ВЫЧИСЛЯЙ по правилам, затем выводи ноты. Не «угадывай» — считай.
-
-ТОНАЛЬНОСТЬ ПО УМОЛЧАНИЮ: если в запросе НЕ указана тональность (например «build a D7», «построй трезвучие с обращениями»), ВСЕГДА строй в ДО МАЖОРЕ (C-dur) и в тексте упоминай именно до мажор. Не выдумывай другую тональность.
 
 ИНТЕРВАЛЫ — двухслойное название = (ступеневая величина) + (качество).
 - Ступеневая величина = число буквенных названий от нижней до верхней включительно. c→d = секунда, c→e = терция, c→fb = кварта (а НЕ терция!). ВСЕГДА сохраняй буквенное написание; нельзя заменять f# на gb внутри одного интервала.
@@ -479,9 +476,17 @@ Block placement rules:
 2) Альтерации — чтобы и буквы шли подряд (a-b-c-d-...), и интервалы соответствовали формуле.
 3) Вывод нотами в barlines:"none", без размера. Подряд, четвертями. Если две октавы — просто продолжай ноты без разрывов.
 
+CORRECT EXAMPLE (user: "D7"):
+D7 is a dominant seventh chord: D, F#, A, and C.
+[[NOTATION:{"clef":"treble","keySignature":"D","barlines":"none","notes":[{"keys":["d/4","f#/4","a/4","c/5"],"duration":"w","label":"D7"}]}]]
+
+CORRECT EXAMPLE (user: "build the tonic triad in C major"):
+The tonic triad T53 in C major is C, E, and G:
+[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w","label":"T53"}]}]]
+
 CORRECT EXAMPLE (user: "построй тоническое трезвучие в до мажоре"):
 Тоническое трезвучие T5/3 в до мажоре строится из I, III и V ступеней — нот до, ми и соль:
-[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w"}]}]]
+[[NOTATION:{"clef":"treble","keySignature":"C","barlines":"none","notes":[{"keys":["c/4","e/4","g/4"],"duration":"w","label":"Т53"}]}]]
 
 CORRECT EXAMPLE (user: "что такое доминанта"):
 Доминанта — это V ступень лада. В до мажоре это нота соль, а доминантовое трезвучие D5/3 — соль-си-ре:
@@ -508,6 +513,7 @@ CORRECT EXAMPLE (user: "построй характерные интервалы
 [[NOTATION:{"clef":"treble","keySignature":"Am","barlines":"manual","notes":[{"keys":["f/4","g#/4"],"duration":"h"},{"keys":["e/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","f/5"],"duration":"h"},{"keys":["a/4","e/5"],"duration":"h","barAfter":true},{"keys":["c/4","g#/4"],"duration":"h"},{"keys":["c/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","c/5"],"duration":"h"},{"keys":["a/4","c/5"],"duration":"h"}]}]]
 
 WRONG EXAMPLES (do NOT do this):
+- User writes in English but you answer in Russian (or use Russian note names / Cyrillic labels).
 - Replying with text only and no [[NOTATION:...]] block.
 - Putting the block in the middle of the answer instead of at the end.
 - Wrapping the block in \`\`\` or quotes.
@@ -518,6 +524,8 @@ WRONG EXAMPLES (do NOT do this):
 - Построить «тритоны» → нарисовать только одну пару (ув.4 ИЛИ ум.5) и остановиться. ВСЕГДА обе пары.
 - Построить «характерные интервалы» → нарисовать 1–2 из 4 и остановиться. ВСЕГДА все 4 пары (8 созвучий).
 - Построить «обращения трезвучия» → нарисовать только основной вид. ВСЕГДА все 3 (T5/3, T6, T6/4).
+- Построить «D7 с разрешениями» → нарисовать только D7 без тоники. ВСЕГДА каждое обращение + разрешение (8 аккордов).
+- Подписывать доминантсептаккорд кириллицей «Д7» вместо латинской "D7".
 
 REMEMBER:
 - Easy / normal questions → 1–3 short sentences + ONE small notation block. Stop.
@@ -525,14 +533,17 @@ REMEMBER:
 - The very last line is always a valid [[NOTATION:{...}]] block. Never send prose with no notation.
 - Гамма / одиночный интервал / одиночный аккорд → barlines:"none", без timeSignature.
 - Тритоны и характерные интервалы с разрешениями → barlines:"manual" с "barAfter":true после каждой пары.
+- D7 с разрешениями → barlines:"manual" с "barAfter":true после каждой пары D7→T.
 - Метрическая музыка (диктант, гармонизация, кадансы) → barlines:"auto" с реальным timeSignature.
 - «Тритоны» = ВСЕГДА обе пары (ув.4+разр., ум.5+разр.). «Характерные» = ВСЕГДА все 4 пары. Никогда не урезай комплект до одного примера.`;
 
-function getSystemInstruction() {
-    let prompt = SYSTEM_PROMPT;
+function getSystemInstruction(responseLang) {
+    const lang = responseLang || detectResponseLanguage('', []);
+    let prompt = SYSTEM_PROMPT + getLanguageInstruction(lang);
     if (currentAiMode === 'berserk' && !notationModeEnabled) {
-        // Без оскорблений/брани: максимально прямолинейный, “жесткий” стиль с фокусом на полезность
-        prompt += `\n\nStyle: Be максимально прямолинейным и резким по тону, но без мата, унижений и личных оскорблений. Коротко, по делу, с сарказмом допускается, но всегда давай корректный и полезный ответ.`;
+        prompt += lang === 'ru'
+            ? `\n\nStyle: Be максимально прямолинейным и резким по тону, но без мата, унижений и личных оскорблений. Коротко, по делу, с сарказмом допускается, но всегда давай корректный и полезный ответ.`
+            : `\n\nStyle: Be blunt and direct, but no slurs or personal insults. Short, useful answers; light sarcasm is fine.`;
     }
     if (notationModeEnabled) {
         prompt += NOTATION_PROMPT_INSTRUCTION;
@@ -545,17 +556,20 @@ function getSystemInstruction() {
  * Дублирует ключевое требование на уровне user-сообщения — модели легко "забывают"
  * системный промпт после нескольких ходов, а вот свежее user-сообщение всегда соблюдают.
  */
-const NOTATION_USER_REMINDER =
-    '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
-    'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
-    'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
-    'JSON PRIORITY: полный закрытый JSON-блок важнее длинного текста — если кажется, что ответ длинный, сокращай ТЕКСТ, не обрывай JSON. Блок обязан заканчиваться на ]}]]. ' +
-    'EXERCISE COMPLETENESS: «тритоны лада X» (без слова «натуральные») = ГАРМОНИЧЕСКАЯ форма = 2 пары = 8 созвучий (натуральная пара + дополнительная пара из-за VII# в миноре или bVI в мажоре), barAfter после каждой разрешённой пары. «Натуральные тритоны» / «тритоны натурального X» = 1 пара = 4 созвучия. «Две пары тритонов» / «обе пары» = ВСЕГДА 8 созвучий (даже если кажется, что натуральный лад «достаточен»). «Характерные интервалы» = ВСЕГДА все 4 пары (ув.2/ум.7/ув.5/ум.4 + разрешения, 8 созвучий). «Обращения» / «все виды» = полный комплект, не один пример. Гаммы и одиночные созвучия — barlines:"none" без timeSignature. ' +
-    'РАЗРЕШЕНИЯ ТРИТОНОВ: ув.4 → СЕКСТА (м.6/б.6, 8–9 полутонов), ум.5 → ТЕРЦИЯ (м.3/б.3, 3–4 полутона). НИКОГДА не разрешай тритон в кварту или квинту — это математически невозможно. Перед выводом созвучия посчитай полутоны.';
+function buildNotationUserReminder(responseLang) {
+    const langName = { en: 'English', ru: 'Russian', de: 'German', es: 'Spanish', zh: 'Chinese', ja: 'Japanese' }[responseLang] || 'the user\'s language';
+    return '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
+        `LANGUAGE: reply in ${langName} only — match the user, NOT the Russian theory examples in the system prompt.\n` +
+        'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
+        'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
+        'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
+        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. Scales and single chords — barlines:"none" without timeSignature. ' +
+        'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth.';
+}
 
 /** Жёсткий повторный промпт, если первый ответ всё-таки пришёл без блока. */
 const NOTATION_RETRY_PROMPT =
-    'NOTATION MODE: твой прошлый ответ был НЕДОПУСТИМ — в нём не было строки [[NOTATION:{...}]]. Перепиши ответ заново: тот же смысл и язык, но КОРОТКО (2–5 предложений), и ОБЯЗАТЕЛЬНО последней строкой добавь РОВНО ОДИН валидный блок [[NOTATION:{"clef":"...","keySignature":"...","timeSignature":"...","notes":[...]}]]. После блока — ничего. Без markdown и без пояснений про формат.';
+    'NOTATION MODE: your last answer was INVALID — no [[NOTATION:{...}]] line. Rewrite: same meaning and the USER\'S language, SHORT (2–5 sentences), and end with exactly ONE valid [[NOTATION:{"clef":"...","keySignature":"...","timeSignature":"...","notes":[...]}]] block. Nothing after the block. No markdown.';
 
 /** Второй ретрай — ещё короче инструкция, максимально прямой императив. */
 const NOTATION_RETRY_PROMPT_2 =
@@ -566,7 +580,7 @@ const NOTATION_RETRY_PROMPT_2 =
  * это гарантированно влезает в любой токен-лимит и закрывается на `]}]]`.
  */
 const NOTATION_RETRY_PROMPT_3 =
-    'Твой прошлый JSON-блок был ОБРЕЗАН (нет закрывающего ]}]]). Сейчас выведи РОВНО один полный валидный блок [[NOTATION:{...}]] и БОЛЬШЕ НИЧЕГО — ни одного слова до и после, никакого markdown, никаких пояснений. Закрой блок последовательностью ]}]] на той же строке.';
+    'Your JSON block was TRUNCATED (missing closing ]}]]). Output EXACTLY one complete valid [[NOTATION:{...}]] block and NOTHING else — no words before or after, no markdown. Close with ]}]] on the same line.';
 
 function hasNotationBlock(text) {
     return /\[\[NOTATION:\s*\{[\s\S]*?\}\s*\]\]/.test(String(text || ''));
@@ -609,8 +623,7 @@ function showNoRequestsToast() {
     const now = Date.now();
     if (now - __lastNoRequestsToastAt < 700) return;
     __lastNoRequestsToastAt = now;
-    const lang = localStorage.getItem('solfai_lang') || 'en';
-    showToast(lang === 'ru' ? 'У вас 0 запросов' : 'You have 0 requests', 'error', { dedupeKey: 'no-requests', dismissOnClick: true });
+    showToast(uiText('noRequests', { fallback: 'You have 0 requests' }), 'error', { dedupeKey: 'no-requests', dismissOnClick: true });
 }
 
 function refreshSendButtonState() {
@@ -644,22 +657,8 @@ function closeAllOverlays(exceptElement = null) {
             if (dropdown.contains(exceptElement) || triggerButton?.contains(exceptElement)) return;
             dropdown.classList.remove('active');
             dropdown.classList.remove('open');
-            const arrow = document.getElementById('langArrow');
-            if(arrow && dropdown.id === 'langDropdown') arrow.style.transform = 'rotate(0deg)';
         });
     });
-
-    const langSubmenuPage = document.getElementById('langSubmenu');
-    const langMenuBtnPage = document.getElementById('langMenuBtn');
-    if (langSubmenuPage?.classList.contains('active')) {
-        const keep =
-            exceptElement &&
-            (langSubmenuPage.contains(exceptElement) || langMenuBtnPage?.contains(exceptElement));
-        if (!keep) {
-            langSubmenuPage.classList.remove('active');
-            langMenuBtnPage?.classList.remove('active');
-        }
-    }
 
     if (isMobileLayout() && sidebar && !sidebar.classList.contains('collapsed')) {
         const el = exceptElement;
@@ -700,11 +699,9 @@ function handleOutsideTapDismiss(el) {
     }
 }
 
-function openModal(modalId) {
-    closeAllOverlays();
-    document.querySelectorAll('.login-modal, .limit-modal, .name-modal, .tool-modal, .quiz-modal').forEach(m => m.classList.remove('active'));
-    document.getElementById(modalId)?.classList.add('active');
-}
+window.navigateToLogin = function () {
+    window.location.href = 'login.html';
+};
 
 // ===== УПРАВЛЕНИЕ ЧАТАМИ И ГРУППИРОВКА =====
 const TOP_VISIBLE_CHATS = 3;
@@ -776,8 +773,7 @@ window.togglePinChat = function(id, e) {
 
 window.deleteChatFromSidebar = function(id, e) {
     e.stopPropagation();
-    const msg = localStorage.getItem('solfai_lang') === 'ru' ? 'Удалить этот чат?' : 'Are you sure you want to delete this chat?';
-    if(confirm(msg)) {
+    if (confirm(uiText('deleteChatConfirm', { fallback: 'Are you sure you want to delete this chat?' }))) {
         chats = chats.filter(c => c.id !== id);
         saveChatToStorage();
         
@@ -881,32 +877,6 @@ function setColor(color) {
 
 function initColor() {
     setColor(currentColor);
-
-    const colorBtn = document.getElementById('colorBtn');
-    const colorDropdown = document.getElementById('colorDropdown');
-    const colorArrow = document.getElementById('colorArrow');
-    if (colorBtn && colorDropdown) {
-        colorBtn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            const isActive = colorDropdown.classList.contains('active');
-            closeAllOverlays(colorBtn);
-            if (isActive) {
-                colorDropdown.classList.remove('active');
-                if (colorArrow) colorArrow.style.transform = 'rotate(0deg)';
-            } else {
-                colorDropdown.classList.add('active');
-                if (colorArrow) colorArrow.style.transform = 'rotate(180deg)';
-            }
-        });
-    }
-
-    document.querySelectorAll('.color-btn').forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.stopPropagation();
-            setColor(btn.dataset.color);
-        });
-    });
-
 }
 
 function setFontSize(size) {
@@ -1000,12 +970,7 @@ function useRequest() {
 function updateRequestsCounter() {
     const remaining = getRemainingRequests();
     const limit = PLAN_LIMITS[currentPlan?.type || 'free'].requests;
-    document.querySelectorAll('#chatRequestsCount').forEach(el => el.textContent = (limit === Infinity) ? '∞' : remaining);
-    document.querySelectorAll('#chatRequestsCounter').forEach(c => {
-        c.classList.remove('warning', 'exhausted');
-        if (limit !== Infinity) { if (remaining === 0) c.classList.add('exhausted'); else if (remaining === 1) c.classList.add('warning'); }
-    });
-    // Новый компактный бейдж в шапке сайдбара: "молния X/Y" (запросы / картинки).
+    // Компактный бейдж в шапке сайдбара: "молния X/Y" (запросы / картинки).
     // Логика: ∞-тариф — показываем ∞; тариф без картинок — только число запросов;
     // иначе — "X/Y". Окрашиваем в warning/exhausted по тем же правилам, что и старый счётчик.
     updateSidebarQuotaBadge();
@@ -1025,7 +990,7 @@ function updateSidebarQuotaBadge() {
             if (!isUserLoggedIn()) {
                 e.preventDefault();
                 // Вместо перехода на pricing предлагаем сначала войти.
-                try { ensureGoogleSignInLoaded?.(); openModal?.('loginModal'); } catch (_) {}
+                try { navigateToLogin?.(); } catch (_) {}
             }
         });
     }
@@ -1063,13 +1028,13 @@ function updateSidebarQuotaBadge() {
         badge.removeAttribute('tabindex');
         // Подробный title — на десктопе появится при ховере: "Запросов: 49 · Картинок: 5".
         const titleParts = [];
-        titleParts.push(`Requests: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
-        if (imgLimit > 0) titleParts.push(`Images: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
+        titleParts.push(`${uiText('quotaRequests', { fallback: 'Requests' })}: ${(reqLimit === Infinity) ? '∞' : `${reqRemain}/${reqLimit}`}`);
+        if (imgLimit > 0) titleParts.push(`${uiText('quotaImages', { fallback: 'Images' })}: ${(imgLimit === Infinity) ? '∞' : `${imgRemain}/${imgLimit}`}`);
         badge.title = titleParts.join(' · ');
     } else {
         badge.removeAttribute('href');
         badge.setAttribute('tabindex', '-1');
-        badge.title = 'Войдите в аккаунт, чтобы изменить тариф';
+        badge.title = uiText('signInToChangePlan', { fallback: 'Sign in to change your plan' });
     }
 }
 
@@ -1129,8 +1094,10 @@ function updateLimitTimer() {
     const data = JSON.parse(localStorage.getItem(getUsageKey()) || '{}');
     if (data.timestamp) {
         const remaining = (12 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
-        timerEl.textContent = remaining > 0 ? `Reset in: ${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m` : `Reset in: 0h`;
-    } else timerEl.textContent = `Reset in: 12h`;
+        timerEl.textContent = remaining > 0
+            ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
+            : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
+    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 12, 0);
 }
 function updateImageLimitTimer() {
     const timerEl = document.getElementById('imageLimitTimer');
@@ -1138,8 +1105,10 @@ function updateImageLimitTimer() {
     const data = JSON.parse(localStorage.getItem(getImageUsageKey()) || '{}');
     if (data.timestamp) {
         const remaining = (24 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
-        timerEl.textContent = remaining > 0 ? `Reset in: ${Math.floor(remaining / 3600000)}h ${Math.floor((remaining % 3600000) / 60000)}m` : `Reset in: 0h`;
-    } else timerEl.textContent = `Reset in: 24h`;
+        timerEl.textContent = remaining > 0
+            ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
+            : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
+    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 24, 0);
 }
 
 function showToast(message, type = 'success', options = {}) {
@@ -1206,6 +1175,10 @@ function loadChat(chatId) {
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
     currentChatId = chatId; chatTitle.textContent = chat.title; chatMessages.innerHTML = '';
+    window.__solfaiResponseLang = detectResponseLanguage('', chat.messages);
+    if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
+        window.SolfTheory.setLabelLocale(window.__solfaiResponseLang);
+    }
     chat.messages.forEach(msg => addMessageToUI(msg.role, msg.content, msg.attachments, false, msg.id));
     renderChatsList();
 }
@@ -1402,8 +1375,12 @@ function formatMessage(text) {
 
     // Уведомление вместо обрезанного нотного блока, который не удалось восстановить.
     if (truncatedNotice) {
+        const msg = uiText('notationTruncated', {
+            chat: true,
+            fallback: 'The notation example did not finish loading (response was cut off). Try asking again.'
+        });
         html = html.replace(/(?:<br>\s*)*\u0001SOLF_NOT_TRUNC\u0001(?:\s*<br>)*/g,
-            '<div class="notation-error">⚠️ Нотный пример не догрузился (ответ оборвался). Попробуйте переспросить.</div>');
+            `<div class="notation-error">⚠️ ${msg}</div>`);
     }
 
     return html;
@@ -1413,7 +1390,6 @@ function formatMessage(text) {
 function renderAllNotations(root) {
     if (!root || !root.querySelectorAll) return;
     const containers = root.querySelectorAll('.solf-notation[data-notation]:not([data-rendered])');
-    console.log('[Solf.ai/render] containers found=', containers.length, 'VexFlow=', !!getVexFlowNamespace());
     if (!containers.length) return;
 
     // Если VexFlow ещё не догрузился — пробуем чуть позже (CDN, deferred script)
@@ -1424,7 +1400,7 @@ function renderAllNotations(root) {
             setTimeout(() => renderAllNotations(root), 150);
         } else {
             containers.forEach(c => {
-                c.innerHTML = '<div class="notation-error">⚠️ Music engine failed to load</div>';
+                c.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineFailed', { chat: true, fallback: 'Music engine failed to load' })}</div>`;
                 c.setAttribute('data-rendered', '1');
             });
         }
@@ -1436,7 +1412,7 @@ function renderAllNotations(root) {
         try {
             data = JSON.parse(container.getAttribute('data-notation'));
         } catch (e) {
-            container.innerHTML = '<div class="notation-error">⚠️ Invalid notation data</div>';
+            container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationInvalidData', { chat: true, fallback: 'Invalid notation data' })}</div>`;
             container.setAttribute('data-rendered', '1');
             return;
         }
@@ -1598,7 +1574,7 @@ function getBarlineNoneType(VF) {
 function renderNotationCard(container, data) {
     const VF = getVexFlowNamespace();
     if (!VF) {
-        container.innerHTML = '<div class="notation-error">⚠️ Music engine not loaded</div>';
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineNotLoaded', { chat: true, fallback: 'Music engine not loaded' })}</div>`;
         return;
     }
     container.innerHTML = '';
@@ -1610,7 +1586,16 @@ function renderNotationCard(container, data) {
         // Авто-подписи: проставляем label каждому интервалу/аккорду, у которого его ещё нет
         // (например, блок сгенерировала сама модель). Готовые подписи не трогаем.
         if (window.SolfTheory && typeof window.SolfTheory.autoLabelNotation === 'function') {
-            try { window.SolfTheory.autoLabelNotation(data); } catch (_) {}
+            try {
+                const labelLang = window.__solfaiResponseLang
+                    || (typeof currentLang === 'string' && currentLang)
+                    || localStorage.getItem('solfai_lang')
+                    || 'en';
+                if (typeof window.SolfTheory.setLabelLocale === 'function') {
+                    window.SolfTheory.setLabelLocale(labelLang);
+                }
+                window.SolfTheory.autoLabelNotation(data);
+            } catch (_) {}
         }
 
         const clef = (data.clef === 'bass') ? 'bass' : 'treble';
@@ -1736,7 +1721,7 @@ function renderNotationCard(container, data) {
         }
     } catch (err) {
         console.error('[Solf.ai] VexFlow render error:', err);
-        container.innerHTML = `<div class="notation-error">⚠️ Could not render notation: ${err.message || err}</div>`;
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationRenderFailed', { chat: true, fallback: 'Could not render notation' })}: ${err.message || err}</div>`;
     }
 }
 
@@ -1748,7 +1733,7 @@ window.copyAiMessage = async function(button) {
         button.classList.add('copied');
         setTimeout(() => button.classList.remove('copied'), 1000);
     } catch (_) {
-        showToast('Copy failed', 'error');
+        showToast(uiText('copyFailed', { fallback: 'Copy failed' }), 'error');
     }
 };
 
@@ -1759,20 +1744,6 @@ function showTypingIndicator() {
 }
 
 async function generateResponse(query, imageData = null) {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'C',
-        location: 'app.js:generateResponse:start',
-        message: 'generateResponse called',
-        data: {
-            hasQuery: Boolean(query && String(query).trim()),
-            hasImage: Boolean(imageData),
-            remainingRequests: getRemainingRequests(),
-            remainingImages: getRemainingImages(),
-            isGenerating
-        }
-    });
-    // #endregion
     if (getRemainingRequests() <= 0) { showNoRequestsToast(); refreshSendButtonState(); return; }
     if (imageData && getRemainingImages() <= 0) { 
         refreshImageAttachVisibility();
@@ -1790,8 +1761,14 @@ async function generateResponse(query, imageData = null) {
     showTypingIndicator(); useRequest(); if(imageData) useImage();
     
     try {
-        const messages = [{ role: 'system', content: getSystemInstruction() }];
         const chat = chats.find(c => c.id === currentChatId);
+        const responseLang = detectResponseLanguage(query, chat?.messages);
+        window.__solfaiResponseLang = responseLang;
+        if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
+            window.SolfTheory.setLabelLocale(responseLang);
+        }
+
+        const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
         
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -1812,7 +1789,7 @@ async function generateResponse(query, imageData = null) {
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
         const baseUserContent = query || 'Analyze image';
         const apiUserContent = notationModeEnabled
-            ? `${baseUserContent}${NOTATION_USER_REMINDER}`
+            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}`
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
@@ -1834,15 +1811,6 @@ async function generateResponse(query, imageData = null) {
             body: JSON.stringify(payload), 
             signal: currentAbortController.signal 
         });
-
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'C',
-            location: 'app.js:generateResponse:fetch',
-            message: 'WORKER fetch resolved',
-            data: { ok: res.ok, status: res.status, contentType: res.headers?.get?.('content-type') }
-        });
-        // #endregion
 
         const data = await res.json();
         if (!res.ok || data.error) {
@@ -1869,9 +1837,6 @@ async function generateResponse(query, imageData = null) {
         if (notationModeEnabled && typeof window !== 'undefined' && window.SolfTheory) {
             try {
                 const det = window.SolfTheory.buildNotationForQuery(baseUserContent);
-                console.log('[Solf.ai/theory] query=', JSON.stringify(baseUserContent),
-                            'engine_result=', det ? 'OK' : 'NULL',
-                            det && det.blockString ? '\nblock=' + det.blockString.slice(0, 220) + '...' : '');
                 if (det && det.blockString) deterministicBlock = det.blockString;
             } catch (theoryErr) {
                 console.warn('[Solf.ai] Theory engine skipped:', theoryErr);
@@ -1946,9 +1911,7 @@ async function generateResponse(query, imageData = null) {
         // Текст-объяснение модели при этом сохраняется — меняется только сам нотный блок.
         if (deterministicBlock) {
             try {
-                const before = aiText.slice(-200);
                 aiText = window.SolfTheory.applyBlock(aiText, deterministicBlock);
-                console.log('[Solf.ai/apply] tail BEFORE=', before, '\ntail AFTER=', aiText.slice(-300));
             } catch (applyErr) {
                 console.warn('[Solf.ai] Theory block apply skipped:', applyErr);
             }
@@ -2000,18 +1963,10 @@ async function generateResponse(query, imageData = null) {
         
     } catch (e) {
         document.getElementById('typingIndicator')?.remove();
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'C',
-            location: 'app.js:generateResponse:catch',
-            message: 'generateResponse error',
-            data: { name: e?.name, message: e?.message }
-        });
-        // #endregion
         if (e.name === 'AbortError') {
-            addMessageToUI('ai', '🛑 Stopped.', [], false); 
+            addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
         } else {
-            addMessageToUI('ai', '❌ Error: ' + e.message, [], false); 
+            addMessageToUI('ai', `❌ ${uiText('chatError', { chat: true, fallback: 'Error' })}: ${e.message}`, [], false);
         }
     } finally {
         isGenerating = false; currentAbortController = null;
@@ -2020,8 +1975,25 @@ async function generateResponse(query, imageData = null) {
         refreshSendButtonState();
     }
 }
-function showLoginPrompt() { document.getElementById('loginPromptModal').classList.add('active'); }
-function hideLoginPrompt() { document.getElementById('loginPromptModal').classList.remove('active'); pendingQuery = null; }
+function showLoginPrompt() {
+    if (pendingQuery) {
+        try {
+            sessionStorage.setItem('solfai_pending_query', JSON.stringify(pendingQuery));
+        } catch (_) {}
+    }
+    navigateToLogin();
+}
+
+function restorePendingQueryAfterLogin() {
+    if (!currentUser) return;
+    try {
+        const raw = sessionStorage.getItem('solfai_pending_query');
+        if (!raw) return;
+        const pq = JSON.parse(raw);
+        sessionStorage.removeItem('solfai_pending_query');
+        if (pq?.query) proceedWithQuery(pq.query, pq.imageData);
+    } catch (_) {}
+}
 
 function startNewChat() {
     closeAllOverlays();
@@ -2105,11 +2077,12 @@ function scheduleSkipChatInputFocusCleanup() {
 
 function proceedWithQuery(query, imageData) {
     if (!currentChatId) { createNewChat(query || 'Image'); chatTitle.textContent = (query || 'Image').slice(0, 30); }
-    chatAttachedFiles.innerHTML = ''; chatInput.value = ''; chatInput.style.height = 'auto';
     const chat = chats.find(c => c.id === currentChatId);
+    window.__solfaiResponseLang = detectResponseLanguage(query, chat?.messages);
+    chatAttachedFiles.innerHTML = ''; chatInput.value = ''; chatInput.style.height = 'auto';
     chat.messages.push({ role: 'user', content: query || 'Analyze', attachments: imageData ? [{ type: 'image/png', data: imageData }] : [], time: new Date().toISOString(), id: Date.now().toString() });
     saveChatToStorage();
-    addMessageToUI('user', query || 'Analyze image', imageData ? [{ type: 'image/png', data: imageData }] : []);
+    addMessageToUI('user', query || uiText('analyzeImage', { chat: true, fallback: 'Analyze image' }), imageData ? [{ type: 'image/png', data: imageData }] : []);
     generateResponse(query, imageData); attachedFiles = [];
 }
 
@@ -2122,87 +2095,7 @@ function sendChatMessage() {
     proceedWithQuery(query, imageData);
 }
 
-// Ленивый загрузчик Google Sign-In скрипта.
-//
-// Раньше скрипт `accounts.google.com/gsi/client` стоял в <head> с async/defer и грузился
-// при каждом открытии страницы. У пользователей без VPN запрос к accounts.google.com мог
-// подвисать на 3-10 секунд (домен периодически режут провайдеры), и за счёт async это не
-// блокировало парсинг, НО initGoogleAuth дёргал setTimeout каждые 500 мс пока скрипт не
-// придёт — это держало event loop busy и тормозило UI.
-//
-// Теперь скрипт грузится только когда юзер реально открывает окно входа.
-// Откат: вернуть `<script src="https://accounts.google.com/gsi/client" async defer>` в head
-// и удалить функцию ниже + её вызовы в обработчиках login-кнопок.
-function ensureGoogleSignInLoaded() {
-    if (typeof google !== 'undefined' && google.accounts) return; // уже загружен
-    if (window.__solfGsiLoading) return; // уже грузится
-    window.__solfGsiLoading = true;
-    const s = document.createElement('script');
-    s.src = 'https://accounts.google.com/gsi/client';
-    s.async = true;
-    s.defer = true;
-    s.onload = () => { try { initGoogleAuth(); } catch (_) {} };
-    s.onerror = () => {
-        window.__solfGsiLoading = false;
-        console.warn('[Solf.ai] Google Sign-In заблокирован — вход через Google недоступен, но остальной интерфейс работает.');
-    };
-    document.head.appendChild(s);
-}
-
-function initGoogleAuth() {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'B',
-        location: 'app.js:initGoogleAuth',
-        message: 'initGoogleAuth tick',
-        data: { hasGoogle: typeof google !== 'undefined', hasAccounts: Boolean(globalThis?.google?.accounts) }
-    });
-    // #endregion
-    if (typeof google === 'undefined' || !google.accounts) {
-        // Скрипт gsi/client теперь грузится ЛЕНИВО (см. ensureGoogleSignInLoaded). Если его
-        // ещё нет в DOM (никто не открывал login-модалку), просто ждём — НЕ дёргаем повторно
-        // setTimeout бесконечно. Если скрипт не загружен И не подгружается — выходим тихо.
-        if (!window.__solfGsiLoading) return;
-        setTimeout(initGoogleAuth, 500);
-        return;
-    }
-    google.accounts.id.initialize({ client_id: GOOGLE_CLIENT_ID, callback: r => {
-        // #region agent log
-        __agentDebug.send({
-            hypothesisId: 'B',
-            location: 'app.js:initGoogleAuth:callback',
-            message: 'google callback received',
-            data: { hasCredential: Boolean(r?.credential), credParts: Array.isArray(r?.credential?.split?.('.')) ? r.credential.split('.').length : null }
-        });
-        // #endregion
-        const payload = JSON.parse(atob(r.credential.split('.')[1]));
-        currentUser = { id: payload.sub, email: payload.email, name: payload.name, picture: payload.picture };
-
-        localStorage.setItem('solfai_user', JSON.stringify(currentUser));
-        syncUserWithDB(currentUser);
-
-        loginModal.classList.remove('active');
-        document.getElementById('loginPromptModal').classList.remove('active');
-        updateUIForUser();
-
-        if(pendingQuery){ proceedWithQuery(pendingQuery.query, pendingQuery.imageData); pendingQuery = null; }
-    }});
-    document.querySelectorAll('#googleSignInButton, #googleSignInButtonPrompt').forEach(b => google.accounts.id.renderButton(b, { theme: 'filled_blue', size: 'large', shape: 'pill', text: 'signin_with', locale: 'en' }));
-}
-
 function updateUIForUser() {
-    // #region agent log
-    const __requiredIds = ['profileMenuChat', 'profileImgChat', 'profileNameChat', 'profileFullNameChat', 'profileEmailChat', 'userAvatarSidebar', 'userNameSidebar'];
-    __agentDebug.send({
-        hypothesisId: 'A',
-        location: 'app.js:updateUIForUser:entry',
-        message: 'updateUIForUser called',
-        data: {
-            hasUser: Boolean(currentUser),
-            missingRequired: __requiredIds.filter(id => !document.getElementById(id))
-        }
-    });
-    // #endregion
     if (currentUser) {
         document.documentElement.classList.add('is-logged-in');
 
@@ -2277,7 +2170,7 @@ function handleFileSelect(files, container) {
     
     // Мягкая проверка: либо тип начинается на image/, либо расширение файла подходящее
     if (!file || (!file.type.startsWith('image/') && !file.name.match(/\.(jpg|jpeg|png|gif|webp)$/i))) {
-        showToast('Пожалуйста, выберите изображение', 'error');
+        showToast(uiText('imageOnly', { fallback: 'Please select an image file' }), 'error');
         return;
     }
 
@@ -2350,12 +2243,12 @@ function startMetronome() {
     if (!metronomeAudioContext) metronomeAudioContext = new (window.AudioContext || window.webkitAudioContext)();
     if (metronomeAudioContext.state === 'suspended') metronomeAudioContext.resume();
     isMetronomePlaying = true; currentBeat = 0;
-    document.getElementById('metronomePlayBtn').innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> <span>Stop</span>';
+    document.getElementById('metronomePlayBtn').innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><rect x="6" y="4" width="4" height="16"></rect><rect x="14" y="4" width="4" height="16"></rect></svg> <span>${uiText('metronomeStop', { fallback: 'Stop' })}</span>`;
     playMetronomeTick(); metronomeInterval = setInterval(playMetronomeTick, 60000 / metronomeBpm);
 }
 function stopMetronome() {
     isMetronomePlaying = false; clearInterval(metronomeInterval);
-    document.getElementById('metronomePlayBtn').innerHTML = '<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>Start</span>';
+    document.getElementById('metronomePlayBtn').innerHTML = `<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg> <span>${uiText('metronomeStart', { fallback: 'Start' })}</span>`;
 }
 function playMetronomeTick() {
     const isAccent = currentBeat === 0; const frequency = isAccent ? 1000 : 800; const duration = 0.05;
@@ -2476,27 +2369,7 @@ function migrateRemoveStaleUsageKeysOnce() {
 
 // ===== ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ =====
 async function initApp() {
-    // #region agent log
-    __agentDebug.send({
-        hypothesisId: 'A',
-        location: 'app.js:initApp',
-        message: 'initApp start',
-        data: {
-            readyState: document.readyState,
-            hasChatInput: Boolean(chatInput),
-            hasChatSendBtn: Boolean(chatSendBtn),
-            hasChatMessages: Boolean(chatMessages),
-            hasSidebar: Boolean(sidebar)
-        }
-    });
-    // #endregion
-    // ЗАЩИТА ОТ «ПОЛОВИНА КНОПОК НЕ РАБОТАЕТ»: каждый ранний шаг инициализации обёрнут в
-    // try/catch. Если любой из них бросит исключение (повреждённый localStorage, сбой темы,
-    // i18n, профиля и т.п.), мы НЕ должны прерывать функцию — иначе обработчики кнопок ниже
-    // (send, new chat, sidebar, login, profile…) не навесятся и клики будут игнорироваться.
-    const safeInit = (label, fn) => { try { fn(); } catch (e) { console.error(`[Solf.ai] init step "${label}" failed (продолжаем навеску кнопок):`, e); } };
-
-    safeInit('migrate', () => migrateRemoveStaleUsageKeysOnce());
+    migrateRemoveStaleUsageKeysOnce();
     // КРИТИЧНО: НЕ ждём `await syncAppData()`. Раньше тут было `await`, и если Cloudflare
     // Workers не отвечал (юзер без VPN — workers.dev часто режется ТСПУ), весь initApp
     // висел до таймаута, а значит ВСЕ обработчики кнопок ниже не успевали навеситься.
@@ -2504,22 +2377,21 @@ async function initApp() {
     // Теперь sync запускается параллельно: UI сразу инициализируется с данными из
     // localStorage-кэша (logged-in, имя, тариф уже там), а БД догонит в фоне и обновит.
     syncAppData().catch((err) => console.warn('[Solf.ai] syncAppData (background) failed:', err));
-    safeInit('theme', () => initTheme());
-    safeInit('color', () => initColor());
-    safeInit('fontSize', () => initFontSize());
+    initTheme();
+    initColor();
+    initFontSize();
 
-    safeInit('language', () => {
-        if (typeof setLanguage === 'function' && typeof currentLang !== 'undefined') {
-            setLanguage(currentLang);
-        }
-    });
-
+    if (typeof setLanguage === 'function' && typeof currentLang !== 'undefined') {
+        setLanguage(currentLang); 
+    }
+    
     // ВСЕГДА вызываем updateUIForUser, не только для гостей. Раньше тут было
     // `if (!currentUser) updateUIForUser()` — и если юзер залогинен, аватарка/имя/email
     // ставились ТОЛЬКО внутри syncAppData() после ответа БД. А если БД не отвечает
     // (Cloudflare без VPN) — профиль так и оставался пустым ("есть buttn 'M' и всё").
     // Теперь рисуем профиль СРАЗУ из localStorage-кэша, БД лишь освежит позже.
-    safeInit('updateUIForUser', () => updateUIForUser());
+    updateUIForUser();
+    restorePendingQueryAfterLogin();
     
     // --- ПРАВИЛЬНАЯ РАБОТА ВИЗУАЛЬНЫХ КНОПОК ПРИКРЕПЛЕНИЯ ---
     const attachBtns = document.querySelectorAll('#chatAttachBtn, .attach-btn');
@@ -2535,32 +2407,10 @@ async function initApp() {
         });
     });
 
-    const landingAttachBtns = document.querySelectorAll('#landingAttachBtn');
-    landingAttachBtns.forEach(btn => {
-        btn.addEventListener('click', (e) => {
-            e.preventDefault();
-            if (getRemainingImages() <= 0) {
-                showImageLimitModal();
-            } else {
-                const lfi = document.getElementById('landingFileInput');
-                if (lfi) lfi.click();
-            }
-        });
-    });
-
-    // Обработка скрытых инпутов
     if (chatFileInput) {
         chatFileInput.addEventListener('change', e => { 
             handleFileSelect(e.target.files, chatAttachedFiles); 
             // Задержка нужна, чтобы FileReader успел загрузить файл в память
-            setTimeout(() => { e.target.value = ''; }, 100);
-        });
-    }
-
-    const landingFileInput = document.getElementById('landingFileInput');
-    if (landingFileInput) {
-        landingFileInput.addEventListener('change', e => { 
-            handleFileSelect(e.target.files, document.getElementById('landingAttachedFiles')); 
             setTimeout(() => { e.target.value = ''; }, 100);
         });
     }
@@ -2624,18 +2474,12 @@ async function initApp() {
         true
     );
     
-    document.getElementById('loginCloseBtn')?.addEventListener('click', () => loginModal.classList.remove('active'));
     document.getElementById('limitCloseBtn')?.addEventListener('click', () => limitModal.classList.remove('active'));
     document.getElementById('subscribeBtn')?.addEventListener('click', () => {
         window.location.href = 'pricing.html';
     });
     document.getElementById('imageLimitCloseBtn')?.addEventListener('click', () => document.getElementById('imageLimitModal').classList.remove('active'));
-    document.getElementById('skipLoginBtn')?.addEventListener('click', hideLoginPrompt);
-    document.getElementById('openLoginBtn')?.addEventListener('click', () => { ensureGoogleSignInLoaded(); openModal('loginModal'); });
-    document.getElementById('sidebarLoginBtn')?.addEventListener('click', () => { ensureGoogleSignInLoaded(); openModal('loginModal'); });
-    // Прямая ссылка на login-кнопку в шапке чата (chatHeaderLoginBtn) и в empty state —
-    // они дёргают openModal('loginModal') через inline onclick. Подцепим там же.
-    document.getElementById('chatHeaderLoginBtn')?.addEventListener('click', ensureGoogleSignInLoaded);
+    document.getElementById('sidebarLoginBtn')?.addEventListener('click', navigateToLogin);
     
     document.getElementById('profileBtnChat')?.addEventListener('click', e => { 
         e.stopPropagation(); 
@@ -2645,7 +2489,6 @@ async function initApp() {
         if (!isActive) dropdown.classList.add('active'); 
     });
     
-    if (document.readyState === 'complete') initGoogleAuth(); else window.addEventListener('load', initGoogleAuth);
     setInterval(() => { 
         updateLimitTimer(); 
         updateImageLimitTimer(); 
@@ -2706,7 +2549,7 @@ document.addEventListener('DOMContentLoaded', () => {
         syncViewportCssVar();
     }
     
-    const modals = document.querySelectorAll('.login-modal, .limit-modal, .name-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
+    const modals = document.querySelectorAll('.limit-modal, .quiz-modal, .tool-modal, .exit-modal-overlay');
     const obs = new MutationObserver(() => { document.body.style.overflow = Array.from(modals).some(m => m.classList.contains('active')) ? 'hidden' : ''; });
     modals.forEach(m => obs.observe(m, { attributes: true, attributeFilter: ['class'] }));
 
@@ -2729,38 +2572,6 @@ window.addEventListener('load', () => {
 
 window.addEventListener('pageshow', () => {
     scheduleSkipChatInputFocusCleanup();
-});
-
-// ===== COOKIE BANNER LOGIC =====
-window.acceptCookies = function() {
-    localStorage.setItem('solfai_cookies_accepted', 'true');
-    const banner = document.getElementById('cookieBanner');
-    if(banner) banner.style.display = 'none';
-};
-
-window.declineCookies = function() {
-    localStorage.setItem('solfai_cookies_accepted', 'false');
-    const banner = document.getElementById('cookieBanner');
-    if(banner) banner.style.display = 'none';
-};
-
-// Проверка при загрузке
-document.addEventListener('DOMContentLoaded', () => {
-    const banner = document.getElementById('cookieBanner');
-    
-    if (!localStorage.getItem('solfai_cookies_accepted')) {
-        if(banner) banner.style.display = 'flex';
-    }
-    
-    document.getElementById('cookieAcceptBtn')?.addEventListener('click', window.acceptCookies);
-    document.getElementById('cookieDeclineBtn')?.addEventListener('click', window.declineCookies);
-});
-// Закрытие сразу после выбора самого языка
-document.querySelectorAll('.lang-option').forEach(option => {
-    option.addEventListener('click', () => {
-        document.getElementById('langSubmenu')?.classList.remove('active');
-        document.getElementById('langMenuBtn')?.classList.remove('active');
-    });
 });
 
 function abortGeneration() {

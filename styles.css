@@ -108,8 +108,7 @@ html.is-logged-in #sidebarAuthContainer {
 /* Мгновенно скрываем профиль и инструменты, если юзер НЕ авторизован */
 html:not(.is-logged-in) #profileMenuChat,
 html:not(.is-logged-in) #sidebarUser,
-html:not(.is-logged-in) #sidebarToolsSection,
-html:not(.is-logged-in) #sidebarPricingLink {
+html:not(.is-logged-in) #sidebarToolsSection {
     display: none !important;
 }
 
@@ -182,7 +181,7 @@ html.has-history .chat-input-container {
 [data-theme="light"] .new-chat-btn:hover { background: rgba(0,0,0,0.05); }
 
 /* Светлая тема: Модалки и Карточки */
-[data-theme="light"] .login-modal-content, [data-theme="light"] .limit-modal-content, [data-theme="light"] .tool-modal-content, [data-theme="light"] .quiz-modal-content { background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+[data-theme="light"] .limit-modal-content, [data-theme="light"] .tool-modal-content, [data-theme="light"] .quiz-modal-content { background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
 [data-theme="light"] .profile-dropdown, [data-theme="light"] .lang-dropdown { background: var(--bg-secondary); border: 1px solid var(--border-color); box-shadow: var(--shadow-soft); }
 
 /* Светлая тема: Пианино */
@@ -201,9 +200,7 @@ body {
 }
 .gradient-text { background: linear-gradient(135deg, var(--purple-soft), var(--purple-glow), #c4b5fd); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
 
-/* Landing Page & Header */
-.landing-page { min-height: 100dvh; min-height: -webkit-fill-available; display: flex; flex-direction: column; position: relative; z-index: 1; }
-.landing-header { display: flex; justify-content: space-between; align-items: center; padding: 20px 40px; }
+/* Header */
 .header-left { display: flex; align-items: center; gap: 16px; }
 .upgrade-link { display: flex; align-items: center; gap: 8px; padding: 8px 16px; background: var(--bg-card); border: 1px solid var(--border-color); border-radius: 12px; color: var(--text-primary); text-decoration: none; font-size: 13px; font-weight: 500; transition: all 0.3s; }
 .upgrade-link:hover { border-color: var(--purple-soft); transform: translateY(-2px); box-shadow: var(--shadow-glow); }
@@ -314,7 +311,6 @@ body {
     flex-direction: column;
     min-height: 0;
 }
-.landing-page.hidden { display: none; }
 /* Сайдбар в DOM после #chatPage — прячем, когда чат скрыт */
 #chatPage.chat-page:not(.active) ~ #sidebar {
     visibility: hidden !important;
@@ -570,16 +566,17 @@ body {
 .chat-subtitle { font-size: 1.1rem; color: var(--text-secondary); margin-top: 10px; max-width: 80%; text-align: center; }
 
 /* Modals General */
-.login-modal, .limit-modal, .name-modal, .quiz-modal, .tool-modal, .referral-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
-.login-modal.active, .limit-modal.active, .name-modal.active, .quiz-modal.active, .tool-modal.active, .referral-modal.active { display: flex; }
+.limit-modal, .quiz-modal, .tool-modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); backdrop-filter: blur(8px); z-index: 1000; align-items: center; justify-content: center; padding: 20px; }
+.limit-modal.active, .quiz-modal.active, .tool-modal.active { display: flex; }
 .modal.active { display: flex !important; }
-.login-modal-content, .limit-modal-content, .name-modal-content, .quiz-modal-content { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; text-align: center; animation: modalIn 0.3s ease; box-shadow: var(--shadow-soft); position: relative; }
+.limit-modal-content, .quiz-modal-content { background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 24px; padding: 40px; max-width: 400px; width: 100%; text-align: center; animation: modalIn 0.3s ease; box-shadow: var(--shadow-soft); position: relative; }
 @keyframes modalIn { from { opacity: 0; transform: scale(0.9) translateY(20px); } to { opacity: 1; transform: scale(1) translateY(0); } }
-.login-modal-logo { font-size: 2rem; font-weight: 700; margin-bottom: 8px; }
-.login-modal-subtitle { color: var(--text-secondary); margin-bottom: 32px; }
-.google-btn-wrapper { display: flex; justify-content: center; align-items: center; padding: 20px 0; margin-bottom: 10px; }
+.auth-providers { display: flex; flex-direction: column; align-items: center; gap: 12px; width: 100%; margin-bottom: 10px; }
+.google-btn-wrapper { display: flex; justify-content: center; align-items: center; padding: 20px 0 0; }
 .google-btn-wrapper > div { transform: scale(1.1); transition: transform 0.3s ease; }
 .google-btn-wrapper > div:hover { transform: scale(1.15); }
+.vk-btn-wrapper { display: flex; justify-content: center; align-items: center; width: 100%; max-width: 320px; min-height: 50px; overflow: hidden; }
+.vk-btn-wrapper > div { width: 100% !important; max-width: 320px; }
 .login-close-btn, .limit-close-btn { margin-top: 20px; background: none; border: none; color: var(--text-secondary); cursor: pointer; font-size: 0.9rem; transition: color 0.2s; }
 .login-close-btn:hover, .limit-close-btn:hover { color: var(--text-primary); }
 
@@ -855,9 +852,6 @@ body {
 /* Mobile-only profile menu items */
 .mobile-only { display: none; }
 .mobile-divider { display: none; height: 1px; background: var(--border-color); margin: 8px 0; }
-.mobile-lang-submenu { display: none; padding-left: 20px; }
-.mobile-lang-submenu.active { display: block; }
-.mobile-lang-submenu .lang-option { padding: 10px 16px; font-size: 13px; }
 .has-submenu { position: relative; }
 .submenu-arrow { margin-left: auto; font-size: 10px; color: var(--text-secondary); transition: transform 0.3s; }
 .has-submenu.active .submenu-arrow { transform: rotate(90deg); }
@@ -869,15 +863,13 @@ body {
     .sidebar.collapsed { width: 280px !important; min-width: 280px !important; }
     .sidebar.collapsed * { opacity: 1; visibility: visible; }
     .header-right > .theme-toggle, .header-right > .lang-selector, .header-left > .upgrade-link { display: none; }
-    .landing-header { padding: 16px; }
     .main-title { font-size: 2.5rem; }
     .subtitle { font-size: 1rem; padding: 0 10px; }
     .hero-section { padding: 30px 16px; }
     .search-container { padding: 6px; gap: 6px; }
     .attach-btn, .search-btn, .voice-btn { width: 42px; height: 42px; min-width: 42px; }
     /* fixed привязан к viewport: у предка #chatPage не должно быть transform (даже translateX(0)), иначе обрез и смещение панели */
-    #chatPage,
-    #landingPage {
+    #chatPage {
         transform: none !important;
     }
     .sidebar {
@@ -944,7 +936,7 @@ body {
         opacity: 0.75;
         background: var(--accent-bg-08);
     }
-    .login-modal-content, .limit-modal-content { padding: 30px 24px; margin: 16px; }
+    .limit-modal-content { padding: 30px 24px; margin: 16px; }
     .lang-btn, .theme-toggle { width: 40px; height: 40px; font-size: 18px; }
     .profile-btn { padding: 4px 8px 4px 4px; }
     .profile-btn span { display: none; }
@@ -991,9 +983,9 @@ body {
         z-index: 800;
     }
 }
-.lang-dropdown, .profile-dropdown, .tools-expanded, .mobile-lang-submenu { z-index: 960 !important; }
-.chat-header, .landing-header { position: relative; z-index: 950; }
-.login-modal, .limit-modal, .name-modal, .quiz-modal, .tool-modal, .referral-modal { z-index: 1000; }
+.lang-dropdown, .profile-dropdown, .tools-expanded { z-index: 960 !important; }
+.chat-header { position: relative; z-index: 950; }
+.limit-modal, .quiz-modal, .tool-modal { z-index: 1000; }
 .toast-container { z-index: 2000; }
 
 /* Grouping Sidebar */
@@ -1008,7 +1000,6 @@ body {
 
 /* Safe Area Support */
 @supports (padding: max(0px)) {
-    .landing-header { padding-top: max(20px, env(safe-area-inset-top)); }
     .chat-header { padding-top: max(12px, env(safe-area-inset-top)); }
 }
 
@@ -1194,11 +1185,6 @@ body {
     display: flex;
     flex-direction: column;
     gap: 0px;
-}
-
-/* Промежуток между Tools и Settings — тоже компактный */
-.sidebar-content-wrapper#settingsAccordion {
-    margin-top: 4px !important;
 }
 
 .sidebar-settings-link {
