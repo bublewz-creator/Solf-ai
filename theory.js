@@ -107,7 +107,8 @@
     }
 
     // Качественное имя интервала по ступеневой величине + количеству полутонов.
-    const INTERVAL_QUALITY_RU = {
+    // Используется для автоматических подписей (ув.4, ум.5, м.6, б.3 и т.п.).
+    const INTERVAL_QUALITY = {
         1: { 0: 'ч1', 1: 'ув1' },
         2: { 0: 'ум2', 1: 'м2', 2: 'б2', 3: 'ув2' },
         3: { 2: 'ум3', 3: 'м3', 4: 'б3', 5: 'ув3' },
@@ -117,28 +118,10 @@
         7: { 9: 'ум7', 10: 'м7', 11: 'б7', 12: 'ув7' },
         8: { 11: 'ум8', 12: 'ч8', 13: 'ув8' }
     };
-    const INTERVAL_QUALITY_EN = {
-        1: { 0: 'P1', 1: 'A1' },
-        2: { 0: 'd2', 1: 'm2', 2: 'M2', 3: 'A2' },
-        3: { 2: 'd3', 3: 'm3', 4: 'M3', 5: 'A3' },
-        4: { 4: 'd4', 5: 'P4', 6: 'A4' },
-        5: { 6: 'd5', 7: 'P5', 8: 'A5' },
-        6: { 7: 'd6', 8: 'm6', 9: 'M6', 10: 'A6' },
-        7: { 9: 'd7', 10: 'm7', 11: 'M7', 12: 'A7' },
-        8: { 11: 'd8', 12: 'P8', 13: 'A8' }
-    };
-    let labelLocale = 'en';
-    function setLabelLocale(lang) {
-        labelLocale = lang === 'ru' ? 'ru' : 'en';
-    }
-    function intervalQualityTable() {
-        return labelLocale === 'ru' ? INTERVAL_QUALITY_RU : INTERVAL_QUALITY_EN;
-    }
     function intervalLabel(lo, hi) {
         const deg = intervalDegree(lo, hi);
         const sem = intervalSemis(lo, hi);
-        const table = intervalQualityTable();
-        return (table[deg] && table[deg][sem]) || '';
+        return (INTERVAL_QUALITY[deg] && INTERVAL_QUALITY[deg][sem]) || '';
     }
 
     // ---------- Авто-подписи ЛЮБОГО созвучия (интервал / трезвучие / септаккорд) ----------
@@ -167,17 +150,15 @@
     }
 
     // Качество трезвучия по полутонам от примы до терции/квинты.
-    const TRIAD_QUALITY_RU = { '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' };
-    const TRIAD_QUALITY_EN = { '4,7': 'M', '3,7': 'm', '3,6': 'd', '4,8': 'A' };
+    const TRIAD_QUALITY = { '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' };
     function classifyTriad(tones, bass) {
-        const qualityMap = labelLocale === 'ru' ? TRIAD_QUALITY_RU : TRIAD_QUALITY_EN;
         for (const root of tones) {
             const ti = (letterIdx(root.letter) + 2) % 7;
             const fi = (letterIdx(root.letter) + 4) % 7;
             const third = tones.find(n => letterIdx(n.letter) === ti);
             const fifth = tones.find(n => letterIdx(n.letter) === fi);
             if (!third || !fifth) continue;
-            const q = qualityMap[`${semiUp(root, third)},${semiUp(root, fifth)}`];
+            const q = TRIAD_QUALITY[`${semiUp(root, third)},${semiUp(root, fifth)}`];
             if (!q) continue;
             const fig = samePc(bass, root) ? '53' : samePc(bass, third) ? '6' : '64';
             return q + fig;
@@ -185,10 +166,10 @@
         return '';
     }
 
-    const SEVENTH_TYPE_RU = { '4,7,10': 'D', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
-    const SEVENTH_TYPE_EN = { '4,7,10': 'D', '3,6,9': 'd', '3,6,10': 'd', '4,7,11': 'M', '3,7,10': 'm' };
+    // Тип септаккорда по полутонам от примы до терции/квинты/септимы.
+    // D = малый мажорный (доминантовый), Ум = уменьшённый, Б/М — большие/малые.
+    const SEVENTH_TYPE = { '4,7,10': 'D', '3,6,9': 'Ум', '3,6,10': 'Ум', '4,7,11': 'Б', '3,7,10': 'М' };
     function classifySeventh(tones, bass) {
-        const typeMap = labelLocale === 'ru' ? SEVENTH_TYPE_RU : SEVENTH_TYPE_EN;
         for (const root of tones) {
             const ti = (letterIdx(root.letter) + 2) % 7;
             const fi = (letterIdx(root.letter) + 4) % 7;
@@ -198,7 +179,7 @@
             const seventh = tones.find(n => letterIdx(n.letter) === si);
             if (!third || !fifth || !seventh) continue;
             const sig = `${semiUp(root, third)},${semiUp(root, fifth)},${semiUp(root, seventh)}`;
-            const q = typeMap[sig];
+            const q = SEVENTH_TYPE[sig];
             if (!q) continue;
             const fig = samePc(bass, root) ? '7' : samePc(bass, third) ? '65' : samePc(bass, fifth) ? '43' : '2';
             return q + fig;
@@ -273,7 +254,7 @@
             const uv4hi = buildIntervalUp(uv4lo, 4, 6);
             if (!checkInterval(uv4lo, uv4hi, 4, 6)) return;
             const r1 = resolveInterval(uv4lo, uv4hi, 'aug', triad);
-            notes.push(chord(uv4lo, uv4hi, false, labelLocale === 'ru' ? 'ув4' : 'A4'));
+            notes.push(chord(uv4lo, uv4hi, false, 'ув4'));
             notes.push(chord(r1[0], r1[1], true, intervalLabel(r1[0], r1[1])));
 
             // ум.5: lb -> квинта вверх
@@ -281,7 +262,7 @@
             const um5hi = buildIntervalUp(um5lo, 5, 6);
             if (!checkInterval(um5lo, um5hi, 5, 6)) return;
             const r2 = resolveInterval(um5lo, um5hi, 'dim', triad);
-            notes.push(chord(um5lo, um5hi, false, labelLocale === 'ru' ? 'ум5' : 'd5'));
+            notes.push(chord(um5lo, um5hi, false, 'ум5'));
             notes.push(chord(r2[0], r2[1], true, intervalLabel(r2[0], r2[1])));
         });
         if (notes.length < 4) return null;
@@ -352,7 +333,8 @@
         minor: [0, 2, 3, 5, 7, 8, 10],
         harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
         melodicMinor: [0, 2, 3, 5, 7, 9, 11],
-        harmonicMajor: [0, 2, 4, 5, 7, 8, 11]
+        harmonicMajor: [0, 2, 4, 5, 7, 8, 11],
+        naturalMajor: [0, 2, 4, 5, 7, 9, 11]
     };
 
     // Римские цифры ступеней — для подписи нот гаммы (I … VIII).
@@ -377,14 +359,9 @@
     }
 
     function buildScaleExercise(tonic, mode, form) {
-        if (form === 'melodic') {
-            return mode === 'minor'
-                ? buildMelodicMinorBothWays(tonic)
-                : buildMelodicMajorBothWays(tonic);
-        }
         let key;
         if (mode === 'minor') {
-            key = form === 'harmonic' ? 'harmonicMinor' : 'minor';
+            key = form === 'harmonic' ? 'harmonicMinor' : form === 'melodic' ? 'melodicMinor' : 'minor';
         } else {
             key = form === 'harmonic' ? 'harmonicMajor' : 'major';
         }
@@ -418,31 +395,6 @@
         };
     }
 
-    /**
-     * Мелодический мажор: ВВЕРХ — натуральный мажор, ВНИЗ — с пониженными VI и VII.
-     * Возвращает один блок из 15 нот (8 вверх + 7 вниз без повтора верхней).
-     */
-    function buildMelodicMajorBothWays(tonic) {
-        const ascFormula  = [0, 2, 4, 5, 7, 9, 11, 12]; // e f# g# a b c# d# e
-        const descFormula = [10, 8, 7, 5, 4, 2, 0];     // d  c  b a g# f# e  (от верхней e вниз)
-        const notes = [];
-        ascFormula.forEach((s, idx) => {
-            const deg = idx + 1;
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
-        });
-        const descDegs = [7, 6, 5, 4, 3, 2, 1];
-        descDegs.forEach((deg, idx) => {
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
-        });
-        return {
-            clef: 'treble',
-            keySignature: keySigFor(tonic, 'major'),
-            timeSignature: '',
-            barlines: 'none',
-            notes
-        };
-    }
-
     /** Все виды гаммы: натуральная, гармоническая, мелодическая — каждая отдельным блоком. */
     function buildAllScaleForms(tonic, mode, isRu) {
         const L = isRu
@@ -458,7 +410,7 @@
         return [
             { label: L.nat,  data: buildScaleData(tonic, 'major', 'major') },
             { label: L.harm, data: buildScaleData(tonic, 'major', 'harmonicMajor') },
-            { label: L.mel,  data: buildMelodicMajorBothWays(tonic) }
+            { label: L.mel,  data: buildScaleData(tonic, 'major', 'major') }
         ];
     }
 
@@ -471,14 +423,11 @@
         const I8 = buildIntervalUp(I, 8, 12);
         const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
 
-        const tonicLabels = labelLocale === 'ru'
-            ? ['Т53', 'Т6', 'Т64']
-            : ['T53', 'T6', 'T64'];
         const notes = [];
-        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: tonicLabels[0] });
+        notes.push({ keys: [noteKey(I), noteKey(III), noteKey(V)], duration: 'w', label: 'T53' });
         if (withInversions) {
-            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: tonicLabels[1] });
-            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: tonicLabels[2] });
+            notes.push({ keys: [noteKey(III), noteKey(V), noteKey(I8)], duration: 'w', label: 'T6' });
+            notes.push({ keys: [noteKey(V), noteKey(I8), noteKey(III8)], duration: 'w', label: 'T64' });
         }
         return {
             clef: 'treble',
@@ -492,9 +441,12 @@
     /** Все четыре вида трезвучий от ноты: маж., мин., ув., ум. */
     function buildAllTriadsFromNote(root) {
         const r = { ...root, octave: 4 };
-        const defs = labelLocale === 'ru'
-            ? [[4, 7, 'Б53'], [3, 7, 'М53'], [4, 8, 'Ув53'], [3, 6, 'Ум53']]
-            : [[4, 7, 'M53'], [3, 7, 'm53'], [4, 8, 'A53'], [3, 6, 'd53']];
+        const defs = [
+            [4, 7, 'Б53'],   // мажорное (Большое)
+            [3, 7, 'М53'],   // минорное (Малое)
+            [4, 8, 'Ув53'],  // увеличенное
+            [3, 6, 'Ум53']   // уменьшенное
+        ];
         const notes = defs.map(([t, f, label]) => ({
             keys: [noteKey(r), noteKey(buildIntervalUp(r, 3, t)), noteKey(buildIntervalUp(r, 5, f))],
             duration: 'w',
@@ -503,61 +455,55 @@
         return { clef: 'treble', keySignature: 'C', timeSignature: '', barlines: 'none', notes };
     }
 
-    // ---------- Доминантсептаккорд D7 + обращения + разрешения ----------
-    /** Голоса D7 и обращений + целевые тонические трезвучия для разрешения. */
-    function getD7Voicings(tonic, mode) {
-        const V = { ...buildScale(tonic, mode)[4], octave: 4 };
-        const third = buildIntervalUp(V, 3, 4);
+    // ---------- Доминантсептаккорд D7 + обращения (+ разрешения в тонику) ----------
+    function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
+        const scale = buildScale(tonic, mode);
+        const V = { ...scale[4], octave: 4 }; // доминанта
+        const third = buildIntervalUp(V, 3, 4);   // большая терция (вводный тон)
         const fifth = buildIntervalUp(V, 5, 7);
-        const seventh = buildIntervalUp(V, 7, 10);
+        const seventh = buildIntervalUp(V, 7, 10); // малая септима
         const V8 = buildIntervalUp(V, 8, 12);
         const third8 = buildIntervalUp(V8, 3, 4);
         const fifth8 = buildIntervalUp(V8, 5, 7);
-        return [
-            { label: 'D7',   notes: [V, third, fifth, seventh], roles: ['root', 'third', 'fifth', 'seventh'], target: 'T53' },
-            { label: 'D6/5', notes: [third, fifth, seventh, V8], roles: ['third', 'fifth', 'seventh', 'root'], target: 'T6' },
-            { label: 'D4/3', notes: [fifth, seventh, V8, third8], roles: ['fifth', 'seventh', 'root', 'third'], target: 'T6/4' },
-            { label: 'D2',   notes: [seventh, V8, third8, fifth8], roles: ['seventh', 'root', 'third', 'fifth'], target: 'T6' }
-        ];
-    }
 
-    function getTonicVoicing(tonic, mode, fig) {
-        const I = { ...tonic, octave: 4 };
-        const III = buildIntervalUp(I, 3, mode === 'major' ? 4 : 3);
-        const V = buildIntervalUp(I, 5, 7);
-        const I8 = buildIntervalUp(I, 8, 12);
-        const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
-        const map = {
-            T53:   { keys: [I, III, V], label: 'T53' },
-            T6:    { keys: [III, V, I8], label: 'T6' },
-            'T6/4': { keys: [V, I8, III8], label: 'T6/4' }
-        };
-        return map[fig] || map.T53;
-    }
+        // Тоника для разрешений: I (тоника), III (терция лада), V (квинта) в разных октавах.
+        const T1 = { ...tonic, octave: 4 };
+        const thirdSemis = mode === 'major' ? 4 : 3;
+        const t1 = T1;                                 // I
+        const t1up = buildIntervalUp(T1, 8, 12);       // I октавой выше
+        const t1up2 = buildIntervalUp(t1up, 8, 12);    // I двумя октавами выше
+        const med = buildIntervalUp(T1, 3, thirdSemis);      // III
+        const medUp = buildIntervalUp(t1up, 3, thirdSemis);  // III октавой выше
+        const dom = buildIntervalUp(T1, 5, 7);         // V
+        const domUp = buildIntervalUp(t1up, 5, 7);     // V октавой выше
 
-    function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
-        const voicings = getD7Voicings(tonic, mode);
-        const selected = withInversions ? voicings : [voicings[0]];
+        const dur = withResolutions ? 'h' : 'w';
         const notes = [];
+        const push = (keys, label, barAfter) => {
+            const c = { keys, duration: dur, label };
+            if (barAfter) c.barAfter = true;
+            notes.push(c);
+        };
 
-        selected.forEach((v, idx) => {
-            notes.push({
-                keys: v.notes.map(noteKey),
-                duration: 'w',
-                label: v.label
-            });
-            if (withResolutions) {
-                const target = getTonicVoicing(tonic, mode, v.target);
-                const isLast = idx === selected.length - 1;
-                notes.push({
-                    keys: target.keys.map(noteKey),
-                    duration: 'w',
-                    label: target.label,
-                    barAfter: !isLast
-                });
-            }
-        });
+        // D7 → T (неполное трезвучие: основной тон утроен, без квинты)
+        push([noteKey(V), noteKey(third), noteKey(fifth), noteKey(seventh)], 'D7', false);
+        if (withResolutions) push([noteKey(t1), noteKey(t1up), noteKey(medUp)], 'T53', true);
 
+        if (withInversions) {
+            // D65 → T53 (полное трезвучие)
+            push([noteKey(third), noteKey(fifth), noteKey(seventh), noteKey(V8)], 'D65', false);
+            if (withResolutions) push([noteKey(t1up), noteKey(medUp), noteKey(domUp)], 'T53', true);
+
+            // D43 → T53 (с удвоенным основным тоном)
+            push([noteKey(fifth), noteKey(seventh), noteKey(V8), noteKey(third8)], 'D43', false);
+            if (withResolutions) push([noteKey(t1up), noteKey(medUp), noteKey(domUp), noteKey(t1up2)], 'T53', true);
+
+            // D2 → T6 (тоника в первом обращении)
+            push([noteKey(seventh), noteKey(V8), noteKey(third8), noteKey(fifth8)], 'D2', false);
+            if (withResolutions) push([noteKey(med), noteKey(dom), noteKey(t1up)], 'T6', true);
+        }
+
+        // Хвостовую тактовую черту убираем.
         if (withResolutions && notes.length) delete notes[notes.length - 1].barAfter;
 
         return {
@@ -570,6 +516,9 @@
     }
 
     // ---------- Ключевые знаки для VexFlow ----------
+    const VEX_MAJOR = new Set(['C', 'G', 'D', 'A', 'E', 'B', 'F#', 'C#', 'F', 'Bb', 'Eb', 'Ab', 'Db', 'Gb', 'Cb']);
+    const VEX_MINOR = new Set(['Am', 'Em', 'Bm', 'F#m', 'C#m', 'G#m', 'D#m', 'A#m', 'Dm', 'Gm', 'Cm', 'Fm', 'Bbm', 'Ebm', 'Abm']);
+
     function keySigFor(tonic, mode) {
         // ВАЖНО: возвращаем 'C' (без ключевых знаков) НАМЕРЕННО.
         // Рендерер (buildStaveNote) рисует диезы/бемоли явно, но НЕ ставит бекары
@@ -693,7 +642,8 @@
     }
 
     function wantsInversions(t) {
-        return /обращени|inversion/.test(t);
+        // «appeal» — частый машинный перевод слова «обращения» (Google Translate и т.п.).
+        return /обращени|inversion|appeal/.test(t);
     }
 
     /** «все виды / все гаммы / три вида / all types of scales» → строим сразу несколько форм. */
@@ -702,7 +652,8 @@
     }
 
     function wantsResolution(t) {
-        return /разрешени|resolution|resolv/.test(t);
+        // «permission» — частый машинный перевод слова «разрешения».
+        return /разрешени|resolution|resolv|permission/.test(t);
     }
 
     // ---------- Сборка блока по запросу ----------
@@ -720,8 +671,10 @@
             return finalize(buildAllTriadsFromNote(note));
         }
 
-        const key = parseKey(t);
-        if (!key) return null;
+        // Тональность не указана (например «build me a D7» без ключа) → по умолчанию C-dur.
+        // Так движок всегда построит корректный пример, а не отдаёт null (из-за чего раньше
+        // при включённом режиме нотации могло ничего не нарисоваться).
+        const key = parseKey(t) || { tonic: { letter: 'c', acc: 0, octave: 4 }, mode: 'major' };
         const form = detectForm(t);
 
         let data = null;
@@ -746,7 +699,8 @@
             case 'scale':
                 // «все виды гамм» → несколько блоков (натуральная/гармоническая/мелодическая)
                 if (wantsAllForms(t) && !form) {
-                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
+                    const isRu = /[а-яё]/.test(t);
+                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, isRu));
                 }
                 data = buildScaleExercise(key.tonic, key.mode, form);
                 break;
@@ -754,9 +708,7 @@
                 data = buildTonicTriadExercise(key.tonic, key.mode, wantsInversions(t));
                 break;
             case 'dominant7':
-                data = buildDominantSeventh(
-                    key.tonic, key.mode, wantsInversions(t), wantsResolution(t)
-                );
+                data = buildDominantSeventh(key.tonic, key.mode, wantsInversions(t), wantsResolution(t));
                 break;
         }
         return finalize(data);
@@ -833,6 +785,8 @@
         buildNotationForQuery,
         applyBlock,
         autoLabelNotation,
-        setLabelLocale
+        describeKeys,
+        // экспонируем для отладки/тестов
+        _internal: { buildScale, buildIntervalUp, noteKey, buildTritones, buildCharacteristic, parseKey, parseExercise, classifyTriad, classifySeventh }
     };
 })();
