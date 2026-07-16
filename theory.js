@@ -504,41 +504,105 @@
     }
 
     // ---------- Доминантсептаккорд D7 + обращения + разрешения ----------
-    /** Голоса D7 и обращений + целевые тонические трезвучия для разрешения. */
+    /** Голоса D7 и обращений + целевые тонические аккорды (4-голосные разрешения). */
     function getD7Voicings(tonic, mode) {
-        const V = { ...buildScale(tonic, mode)[4], octave: 4 };
-        const third = buildIntervalUp(V, 3, 4);
-        const fifth = buildIntervalUp(V, 5, 7);
-        const seventh = buildIntervalUp(V, 7, 10);
-        const V8 = buildIntervalUp(V, 8, 12);
-        const third8 = buildIntervalUp(V8, 3, 4);
-        const fifth8 = buildIntervalUp(V8, 5, 7);
-        return [
-            { label: 'D7',   notes: [V, third, fifth, seventh], roles: ['root', 'third', 'fifth', 'seventh'], target: 'T53' },
-            { label: 'D6/5', notes: [third, fifth, seventh, V8], roles: ['third', 'fifth', 'seventh', 'root'], target: 'T6' },
-            { label: 'D4/3', notes: [fifth, seventh, V8, third8], roles: ['fifth', 'seventh', 'root', 'third'], target: 'T6/4' },
-            { label: 'D2',   notes: [seventh, V8, third8, fifth8], roles: ['seventh', 'root', 'third', 'fifth'], target: 'T6' }
-        ];
-    }
+        const scale = buildScale(tonic, mode);
+        
+        // В миноре для D7 берётся гармонический вид (VII#)
+        let VII = { ...scale[6] };
+        if (mode === 'minor') VII.acc += 1;
+        
+        const V_note = { ...scale[4], octave: 4 };
+        const root = V_note;
+        const third = buildIntervalUp(root, 3, 4);
+        const fifth = buildIntervalUp(root, 5, 7);
+        const seventh = buildIntervalUp(root, 7, 10);
+        
+        const root8 = buildIntervalUp(root, 8, 12);
+        const third8 = buildIntervalUp(third, 8, 12);
+        const fifth8 = buildIntervalUp(fifth, 8, 12);
+        
+        const I_letter = scale[0].letter;
+        const I_acc = scale[0].acc;
+        const III_letter = scale[2].letter;
+        const III_acc = scale[2].acc;
+        const V_letter = scale[4].letter;
+        const V_acc = scale[4].acc;
+        
+        function closest(note, targetLetter, targetAcc) {
+            const target = { letter: targetLetter, acc: targetAcc, octave: note.octave };
+            const opts = [
+                { ...target, octave: note.octave - 1 },
+                { ...target, octave: note.octave },
+                { ...target, octave: note.octave + 1 }
+            ];
+            opts.sort((a, b) => Math.abs(noteAbs(a) - noteAbs(note)) - Math.abs(noteAbs(b) - noteAbs(note)));
+            return opts[0];
+        }
 
-    function getTonicVoicing(tonic, mode, fig) {
-        const I = { ...tonic, octave: 4 };
-        const III = buildIntervalUp(I, 3, mode === 'major' ? 4 : 3);
-        const V = buildIntervalUp(I, 5, 7);
-        const I8 = buildIntervalUp(I, 8, 12);
-        const III8 = buildIntervalUp(I8, 3, mode === 'major' ? 4 : 3);
-        const map = {
-            T53:   { keys: [I, III, V], label: 'T53' },
-            T6:    { keys: [III, V, I8], label: 'T6' },
-            'T6/4': { keys: [V, I8, III8], label: 'T6/4' }
-        };
-        return map[fig] || map.T53;
+        // D7: root, third, fifth, seventh
+        // root (V) прыгает в I (вниз на квинту для баса)
+        const res_D7_root = { letter: I_letter, acc: I_acc, octave: root.octave };
+        if (noteAbs(res_D7_root) > noteAbs(root)) res_D7_root.octave--;
+        
+        const res_D7_third = closest(third, I_letter, I_acc);
+        const res_D7_fifth = closest(fifth, I_letter, I_acc);
+        const res_D7_seventh = closest(seventh, III_letter, III_acc);
+        
+        // D6/5: third, fifth, seventh, root8
+        const res_D65_third = closest(third, I_letter, I_acc);
+        const res_D65_fifth = closest(fifth, I_letter, I_acc);
+        const res_D65_seventh = closest(seventh, III_letter, III_acc);
+        const res_D65_root8 = closest(root8, V_letter, V_acc); // остаётся на месте
+        
+        // D4/3: fifth, seventh, root8, third8
+        const res_D43_fifth = closest(fifth, I_letter, I_acc);
+        const res_D43_seventh = closest(seventh, III_letter, III_acc);
+        const res_D43_root8 = closest(root8, V_letter, V_acc);
+        const res_D43_third8 = closest(third8, I_letter, I_acc);
+        
+        // D2: seventh, root8, third8, fifth8
+        const res_D2_seventh = closest(seventh, III_letter, III_acc);
+        const res_D2_root8 = closest(root8, V_letter, V_acc);
+        const res_D2_third8 = closest(third8, I_letter, I_acc);
+        const res_D2_fifth8 = closest(fifth8, I_letter, I_acc);
+        
+        return [
+            { 
+                label: 'D7',   
+                notes: [root, third, fifth, seventh], 
+                resNotes: [res_D7_root, res_D7_third, res_D7_fifth, res_D7_seventh],
+                target: 'T53' 
+            },
+            { 
+                label: 'D6/5', 
+                notes: [third, fifth, seventh, root8], 
+                resNotes: [res_D65_third, res_D65_fifth, res_D65_seventh, res_D65_root8],
+                target: 'T53' 
+            },
+            { 
+                label: 'D4/3', 
+                notes: [fifth, seventh, root8, third8], 
+                resNotes: [res_D43_fifth, res_D43_seventh, res_D43_root8, res_D43_third8],
+                target: 'T53' 
+            },
+            { 
+                label: 'D2',   
+                notes: [seventh, root8, third8, fifth8], 
+                resNotes: [res_D2_seventh, res_D2_root8, res_D2_third8, res_D2_fifth8],
+                target: 'T6' 
+            }
+        ];
     }
 
     function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
         const voicings = getD7Voicings(tonic, mode);
         const selected = withInversions ? voicings : [voicings[0]];
         const notes = [];
+
+        const tonicLabels = labelLocale === 'ru'
+            ? { 'T53': 'Т53', 'T6': 'Т6', 'T6/4': 'Т64' }
+            : { 'T53': 'T53', 'T6': 'T6', 'T6/4': 'T6/4' };
 
         selected.forEach((v, idx) => {
             notes.push({
@@ -547,12 +611,11 @@
                 label: v.label
             });
             if (withResolutions) {
-                const target = getTonicVoicing(tonic, mode, v.target);
                 const isLast = idx === selected.length - 1;
                 notes.push({
-                    keys: target.keys.map(noteKey),
+                    keys: v.resNotes.map(noteKey),
                     duration: 'w',
-                    label: target.label,
+                    label: tonicLabels[v.target] || v.target,
                     barAfter: !isLast
                 });
             }
