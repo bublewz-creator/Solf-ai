@@ -348,7 +348,6 @@ EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAU
 - «Доминантсептаккорд с обращениями» = D7, D6/5, D4/3, D2 (4 аккорда).
 - «D7 с разрешениями» / «D7, обращения и разрешения» = каждое созвучие D7 + тоническое трезвучие (D7→T53, D6/5→T6, D4/3→T6/4, D2→T6), всего 8 аккордов; barlines:"manual" + barAfter после каждой пары.
 - Подписи доминантсептаккорда — ТОЛЬКО латиницей: "D7","D6/5","D4/3","D2" (НЕ кириллическая «Д»).
-- D7 УДВОЕНИЯ (4 голоса): идеал — прима+терция+квинта+септима по одному разу. НЕ удваивать 7-ю ступень (септиму) и ведущий тон (3-ю ступень D7). Если нужно удвоение — только приму или квинту. В 3 голоса: опускай 5-ю, оставляй приму+3+7.
 - «Все виды трезвучий от ноты N» = мажорное, минорное, увеличенное, уменьшенное (4 аккорда).
 - «Все виды септаккордов от N» = малый мажорный, малый минорный, малый ум., ум.7 и т.д. — выводи столько, сколько корректно для запроса, не один.
 
@@ -546,7 +545,7 @@ REMEMBER:
 - Метрическая музыка (диктант, гармонизация, кадансы) → barlines:"auto" с реальным timeSignature.
 - «Тритоны» = ВСЕГДА обе пары (ув.4+разр., ум.5+разр.). «Характерные» = ВСЕГДА все 4 пары. Никогда не урезай комплект до одного примера.`;
 
-function getSystemInstruction(responseLang, userQuery) {
+function getSystemInstruction(responseLang) {
     const lang = responseLang || detectResponseLanguage('', []);
     let prompt = SYSTEM_PROMPT + getLanguageInstruction(lang);
     if (currentAiMode === 'berserk' && !notationModeEnabled) {
@@ -556,14 +555,6 @@ function getSystemInstruction(responseLang, userQuery) {
     }
     if (notationModeEnabled) {
         prompt += NOTATION_PROMPT_INSTRUCTION;
-        if (typeof window !== 'undefined' && window.SolfKnowledge && userQuery) {
-            try {
-                const extra = window.SolfKnowledge.getRulesForQuery(userQuery, lang);
-                if (extra) prompt += extra;
-            } catch (kErr) {
-                console.warn('[Solf.ai] Knowledge injection skipped:', kErr);
-            }
-        }
     }
     return prompt;
 }
@@ -1785,9 +1776,7 @@ async function generateResponse(query, imageData = null) {
             window.SolfTheory.setLabelLocale(responseLang);
         }
 
-        const baseUserContent = query || 'Analyze image';
-
-        const messages = [{ role: 'system', content: getSystemInstruction(responseLang, baseUserContent) }];
+        const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
         
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -1806,6 +1795,7 @@ async function generateResponse(query, imageData = null) {
         
         // Базовое содержимое user-сообщения. При включённом режиме нотации — добавляем
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
+        const baseUserContent = query || 'Analyze image';
         const apiUserContent = notationModeEnabled
             ? `${baseUserContent}${buildNotationUserReminder(responseLang)}`
             : baseUserContent;
