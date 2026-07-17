@@ -504,95 +504,60 @@
     }
 
     // ---------- Доминантсептаккорд D7 + обращения + разрешения ----------
-    /** Голоса D7 и обращений + целевые тонические аккорды (4-голосные разрешения). */
+    /**
+     * Голоса D7 и обращений + их 4-ГОЛОСНЫЕ разрешения в тонику.
+     *
+     * Каждый голос задаётся парой [ступеневый номер от тоники (окт.3), полутоны от тоники].
+     * Ступени: 1=I(окт3) … 8=I(окт4) … 15=I(окт5). Это гарантирует правильное буквенное
+     * написание и одинаковый регистр в ЛЮБОЙ тональности.
+     *
+     * Правила голосоведения (соблюдены во всех формах):
+     *  • вводный тон (VII#, терция D7) → I вверх на полутон;
+     *  • септима D7 (IV) → III вниз на секунду;
+     *  • квинта D7 (II) → I вниз; прима (V) в басу → I;
+     *  • общий тон (V) остаётся на месте.
+     * Результат удвоений (как в учебнике, ВИДИМО через октаву):
+     *  • D7 → t3   — неполная тоника: утроенная прима + терция (без квинты);
+     *  • D6/5 → t53 — полная тоника, удвоенная прима;
+     *  • D4/3 → t53 — полная тоника, удвоенная прима;
+     *  • D2 → t6   — тонический секстаккорд (терция в басу), удвоенная прима.
+     */
     function getD7Voicings(tonic, mode) {
-        const scale = buildScale(tonic, mode);
-        
-        // В миноре для D7 берётся гармонический вид (VII#)
-        let VII = { ...scale[6] };
-        if (mode === 'minor') VII.acc += 1;
-        
-        const V_note = { ...scale[4], octave: 4 };
-        const root = V_note;
-        const third = buildIntervalUp(root, 3, 4);
-        const fifth = buildIntervalUp(root, 5, 7);
-        const seventh = buildIntervalUp(root, 7, 10);
-        
-        const root8 = buildIntervalUp(root, 8, 12);
-        const third8 = buildIntervalUp(third, 8, 12);
-        const fifth8 = buildIntervalUp(fifth, 8, 12);
-        
-        const I_letter = scale[0].letter;
-        const I_acc = scale[0].acc;
-        const III_letter = scale[2].letter;
-        const III_acc = scale[2].acc;
-        const V_letter = scale[4].letter;
-        const V_acc = scale[4].acc;
-        
-        function closest(note, targetLetter, targetAcc) {
-            const target = { letter: targetLetter, acc: targetAcc, octave: note.octave };
-            const opts = [
-                { ...target, octave: note.octave - 1 },
-                { ...target, octave: note.octave },
-                { ...target, octave: note.octave + 1 }
-            ];
-            opts.sort((a, b) => Math.abs(noteAbs(a) - noteAbs(note)) - Math.abs(noteAbs(b) - noteAbs(note)));
-            return opts[0];
-        }
+        const T3 = { ...tonic, octave: 3 };
+        const S3 = mode === 'major' ? 4 : 3;      // полутоны до III ступени
+        const v = (deg, semis) => buildIntervalUp(T3, deg, semis);
 
-        // D7: root, third, fifth, seventh
-        // root (V) прыгает в I (вниз на квинту для баса)
-        const res_D7_root = { letter: I_letter, acc: I_acc, octave: root.octave };
-        if (noteAbs(res_D7_root) > noteAbs(root)) res_D7_root.octave--;
-        
-        const res_D7_third = closest(third, I_letter, I_acc);
-        const res_D7_fifth = closest(fifth, I_letter, I_acc);
-        const res_D7_seventh = closest(seventh, III_letter, III_acc);
-        
-        // D6/5: third, fifth, seventh, root8
-        const res_D65_third = closest(third, I_letter, I_acc);
-        const res_D65_fifth = closest(fifth, I_letter, I_acc);
-        const res_D65_seventh = closest(seventh, III_letter, III_acc);
-        const res_D65_root8 = closest(root8, V_letter, V_acc); // остаётся на месте
-        
-        // D4/3: fifth, seventh, root8, third8
-        const res_D43_fifth = closest(fifth, I_letter, I_acc);
-        const res_D43_seventh = closest(seventh, III_letter, III_acc);
-        const res_D43_root8 = closest(root8, V_letter, V_acc);
-        const res_D43_third8 = closest(third8, I_letter, I_acc);
-        
-        // D2: seventh, root8, third8, fifth8
-        const res_D2_seventh = closest(seventh, III_letter, III_acc);
-        const res_D2_root8 = closest(root8, V_letter, V_acc);
-        const res_D2_third8 = closest(third8, I_letter, I_acc);
-        const res_D2_fifth8 = closest(fifth8, I_letter, I_acc);
-        
-        return [
-            { 
-                label: 'D7',   
-                notes: [root, third, fifth, seventh], 
-                resNotes: [res_D7_root, res_D7_third, res_D7_fifth, res_D7_seventh],
-                target: 'T53' 
+        // [ступень, полутоны] для каждого голоса, снизу вверх.
+        // Тоны D7: V=прима, VII#(=11 п/т)=терция, II=квинта, IV=септима.
+        const forms = [
+            {
+                label: 'D7', target: 'T3',
+                chord: [[5, 7], [9, 14], [11, 17], [14, 23]],          // C4  G4  Bb4 E5
+                res:   [[1, 0], [8, 12], [10, 12 + S3], [15, 24]]      // F3  F4  Ab4 F5  (утроенная прима + терция)
             },
-            { 
-                label: 'D6/5', 
-                notes: [third, fifth, seventh, root8], 
-                resNotes: [res_D65_third, res_D65_fifth, res_D65_seventh, res_D65_root8],
-                target: 'T53' 
+            {
+                label: 'D6/5', target: 'T53',
+                chord: [[7, 11], [11, 17], [12, 19], [16, 26]],        // E4  Bb4 C5  G5
+                res:   [[8, 12], [10, 12 + S3], [12, 19], [15, 24]]    // F4  Ab4 C5  F5  (полная, удвоенная прима)
             },
-            { 
-                label: 'D4/3', 
-                notes: [fifth, seventh, root8, third8], 
-                resNotes: [res_D43_fifth, res_D43_seventh, res_D43_root8, res_D43_third8],
-                target: 'T53' 
+            {
+                label: 'D4/3', target: 'T53',
+                chord: [[2, 2], [11, 17], [12, 19], [14, 23]],         // G3  Bb4 C5  E5
+                res:   [[1, 0], [10, 12 + S3], [12, 19], [15, 24]]     // F3  Ab4 C5  F5  (полная, удвоенная прима)
             },
-            { 
-                label: 'D2',   
-                notes: [seventh, root8, third8, fifth8], 
-                resNotes: [res_D2_seventh, res_D2_root8, res_D2_third8, res_D2_fifth8],
-                target: 'T6' 
+            {
+                label: 'D2', target: 'T6',
+                chord: [[4, 5], [7, 11], [12, 19], [16, 26]],          // Bb3 E4  C5  G5
+                res:   [[3, S3], [8, 12], [12, 19], [15, 24]]          // Ab3 F4  C5  F5  (секстаккорд, удвоенная прима)
             }
         ];
+
+        return forms.map(f => ({
+            label: f.label,
+            target: f.target,
+            notes: f.chord.map(([d, s]) => v(d, s)),
+            resNotes: f.res.map(([d, s]) => v(d, s))
+        }));
     }
 
     function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
@@ -600,9 +565,11 @@
         const selected = withInversions ? voicings : [voicings[0]];
         const notes = [];
 
-        const tonicLabels = labelLocale === 'ru'
-            ? { 'T53': 'Т53', 'T6': 'Т6', 'T6/4': 'Т64' }
-            : { 'T53': 'T53', 'T6': 'T6', 'T6/4': 'T6/4' };
+        // Мажор → заглавная T, минор → строчная t (русская традиция функций).
+        const Tl = labelLocale === 'ru'
+            ? (mode === 'minor' ? 'т' : 'Т')
+            : (mode === 'minor' ? 't' : 'T');
+        const tonicLabels = { 'T3': Tl + '3', 'T53': Tl + '53', 'T6': Tl + '6' };
 
         selected.forEach((v, idx) => {
             notes.push({
@@ -748,7 +715,7 @@
     function parseExercise(t) {
         if (/тритон|tritone/.test(t)) return 'tritone';
         if (/характерн\w*\s*интервал|характерные\b|characteristic\s*interval|\bх\.\s*и\./.test(t)) return 'characteristic';
-        if (/доминантсепт|доминантов\w*\s*септ|\bd7\b|dominant\s*seventh/.test(t)) return 'dominant7';
+        if (/доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t)) return 'dominant7';
         if (/(все\s*)?виды\s*трезвучи\w*\s*от|types?\s*of\s*triads?\s*from/.test(t)) return 'allTriadsFromNote';
         if (/гамм|звукоряд\b|\bscale\b/.test(t)) return 'scale';
         if (/трезвучи|triad/.test(t)) return 'triad';
