@@ -1629,9 +1629,16 @@ function buildStaveNote(VF, clef, n) {
         duration
     });
     if (!isRest) {
+        // Для унисонных удвоений (одна и та же нота встречается дважды — напр. утроенная
+        // прима в разрешении D7) знак альтерации ставим только на ПЕРВУЮ головку, иначе
+        // VexFlow нарисует два диеза/бемоля на паре head-to-head нот.
+        const seenAccKey = new Set();
         keys.forEach((k, i) => {
             const m = String(k).match(/^[a-g]([#b]{1,2})\//i);
             if (!m || !m[1] || !VF.Accidental) return;
+            const dedupeKey = String(k).toLowerCase();
+            if (seenAccKey.has(dedupeKey)) return;
+            seenAccKey.add(dedupeKey);
             const acc = new VF.Accidental(m[1]);
             // VexFlow 4+: addModifier(modifier, index). VexFlow 3.x: addAccidental(index, acc).
             // Иногда один из методов молча падает (try/catch ниже глотает ошибку), поэтому
