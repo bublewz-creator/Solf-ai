@@ -1388,7 +1388,8 @@ body {
     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
 }
 .solf-notation svg {
-    max-width: 100%;
+    max-width: none;
+    width: auto;
     height: auto;
     display: inline-block;
 }

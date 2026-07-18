@@ -1644,6 +1644,93 @@ function getVexFlowNamespace() {
 
 const NOTATION_DURATION_FRACTION = { w: 1, h: 0.5, q: 0.25, '8': 0.125, '16': 0.0625, '32': 0.03125 };
 
+const KEY_FLAT_COUNT = {
+    C: 0, G: 0, D: 0, A: 0, E: 0, B: 0, 'F#': 0, 'C#': 0,
+    F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7,
+    Am: 0, Em: 0, Bm: 0, 'F#m': 0, 'C#m': 0, 'G#m': 0, 'D#m': 0, 'A#m': 0,
+    Dm: 1, Gm: 2, Cm: 3, Fm: 4, Bbm: 5, Ebm: 6, Abm: 7
+};
+const KEY_SHARP_COUNT = {
+    C: 0, F: 0, Bb: 0, Eb: 0, Ab: 0, Db: 0, Gb: 0, Cb: 0,
+    G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7,
+    Am: 0, Dm: 0, Gm: 0, Cm: 0, Fm: 0, Bbm: 0, Ebm: 0, Abm: 0,
+    Em: 1, Bm: 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, 'A#m': 7
+};
+const FLAT_ORDER = ['b', 'e', 'a', 'd', 'g', 'c', 'f'];
+const SHARP_ORDER = ['f', 'c', 'g', 'd', 'a', 'e', 'b'];
+
+function getKeyFlats(keySig) {
+    const n = KEY_FLAT_COUNT[keySig] ?? 0;
+    return FLAT_ORDER.slice(0, n);
+}
+
+function getDefaultAccForLetter(letter, keySig) {
+    const sc = KEY_SHARP_COUNT[keySig] ?? 0;
+    if (sc > 0) {
+        return SHARP_ORDER.slice(0, sc).includes(letter) ? 1 : 0;
+    }
+    return getKeyFlats(keySig).includes(letter) ? -1 : 0;
+}
+
+function parseVfKey(k) {
+    const m = String(k).trim().match(/^([a-g])(bb|b|##|#)?\/(-?\d+)$/i);
+    if (!m) return null;
+    let acc = 0;
+    if (m[2] === '#') acc = 1;
+    else if (m[2] === '##') acc = 2;
+    else if (m[2] === 'b') acc = -1;
+    else if (m[2] === 'bb') acc = -2;
+    return { letter: m[1].toLowerCase(), acc, octave: parseInt(m[3], 10) };
+}
+
+function accToVfSuffix(acc) {
+    if (acc === 0) return '';
+    if (acc > 0) return '#'.repeat(acc);
+    return 'b'.repeat(-acc);
+}
+
+/** Убирает лишние ♭/♯, которые уже даёт ключ; оставляет только бекары и отклонения. */
+function prepareKeyForKeySig(key, keySig) {
+    const p = parseVfKey(key);
+    if (!p) return { key, modifier: null };
+    const defaultAcc = getDefaultAccForLetter(p.letter, keySig);
+    if (p.acc === defaultAcc) {
+        return { key: `${p.letter}/${p.octave}`, modifier: null };
+    }
+    if (p.acc === 0 && defaultAcc !== 0) {
+        return { key: `${p.letter}/${p.octave}`, modifier: 'n' };
+    }
+    return { key: `${p.letter}${accToVfSuffix(p.acc)}/${p.octave}`, modifier: null };
+}
+
+function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
+    if (!svg || !staveNotes || !notesData) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    let labelY = (stave.y || 0) + 98;
+    try {
+        if (typeof stave.getBottomY === 'function') labelY = stave.getBottomY() + 20;
+    } catch (_) {}
+    staveNotes.forEach((sn, i) => {
+        const lbl = notesData[i]?.label;
+        if (!lbl) return;
+        let bb;
+        try { bb = sn.getBoundingBox(); } catch (_) { return; }
+        if (!bb) return;
+        const w = bb.w ?? bb.width ?? 0;
+        const x = (bb.x ?? 0) + w / 2;
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', String(x));
+        t.setAttribute('y', String(labelY));
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('dominant-baseline', 'hanging');
+        t.setAttribute('font-family', 'Arial, sans-serif');
+        t.setAttribute('font-size', '13');
+        t.setAttribute('fill', color);
+        t.textContent = lbl;
+        svg.appendChild(t);
+    });
+}
+
 function vfKeyLine(VF, key, clef) {
     try {
         const p = VF.keyProperties(key, clef);
@@ -1717,58 +1804,40 @@ function expandUnisonHeads(staveNotes, notesData, clef, svg, color) {
     });
 }
 
-function buildStaveNote(VF, clef, n) {
+function buildStaveNote(VF, clef, n, keySig) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
-    const keys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
+    const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
+    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, keySig || 'C').key);
     const note = new VF.StaveNote({
         clef,
         keys: isRest ? [clef === 'bass' ? 'd/3' : 'b/4'] : keys,
         duration
     });
     if (!isRest) {
-        const seenAccKey = new Set();
-        keys.forEach((k, i) => {
-            const m = String(k).match(/^[a-g]([#b]{1,2})\//i);
-            if (!m || !m[1] || !VF.Accidental) return;
-            const dedupeKey = String(k).toLowerCase();
-            if (seenAccKey.has(dedupeKey)) return;
-            seenAccKey.add(dedupeKey);
-            const acc = new VF.Accidental(m[1]);
-            let ok = false;
-            try { note.addModifier(acc, i); ok = true; } catch (_) {}
-            if (!ok) {
-                try { note.addModifier(acc); ok = true; } catch (_) {}
+        const seenMod = new Set();
+        rawKeys.forEach((rawK, i) => {
+            const prep = prepareKeyForKeySig(rawK, keySig || 'C');
+            if (prep.modifier && VF.Accidental) {
+                const modKey = `${i}:${prep.modifier}`;
+                if (seenMod.has(modKey)) return;
+                seenMod.add(modKey);
+                const acc = new VF.Accidental(prep.modifier);
+                try { note.addModifier(acc, i); } catch (_) {
+                    try { note.addModifier(acc); } catch (__) {}
+                }
+                return;
             }
-            if (!ok && typeof note.addAccidental === 'function') {
-                try { note.addAccidental(i, acc); } catch (_) {}
+            const m = String(prep.key).match(/^[a-g]([#b]{1,2})\//i);
+            if (!m || !m[1] || !VF.Accidental) return;
+            const dedupeKey = `${i}:${String(prep.key).toLowerCase()}`;
+            if (seenMod.has(dedupeKey)) return;
+            seenMod.add(dedupeKey);
+            const acc = new VF.Accidental(m[1]);
+            try { note.addModifier(acc, i); } catch (_) {
+                try { note.addModifier(acc); } catch (__) {}
             }
         });
-    }
-
-    if (n && typeof n.label === 'string' && n.label && VF.Annotation) {
-        try {
-            const ann = new VF.Annotation(n.label);
-            if (typeof ann.setFont === 'function') {
-                try { ann.setFont('Arial', 12, 'normal'); } catch (_) {
-                    try { ann.setFont('Arial', 12); } catch (__) {}
-                }
-            }
-            const VJ = VF.Annotation && VF.Annotation.VerticalJustify;
-            const VJ2 = VF.AnnotationVerticalJustify;
-            const bottom = (VJ && VJ.BOTTOM) ?? (VJ2 && VJ2.BOTTOM) ?? 3;
-            if (typeof ann.setVerticalJustification === 'function') {
-                try { ann.setVerticalJustification(bottom); } catch (_) {}
-            }
-            let ok = false;
-            try { note.addModifier(ann, 0); ok = true; } catch (_) {}
-            if (!ok) {
-                try { note.addModifier(ann); ok = true; } catch (_) {}
-            }
-            if (!ok && typeof note.addAnnotation === 'function') {
-                try { note.addAnnotation(0, ann); } catch (_) {}
-            }
-        } catch (_) {}
     }
 
     return note;
@@ -1898,32 +1967,43 @@ function renderNotationCard(container, data) {
         const barlineNone = getBarlineNoneType(VF);
 
         const containerW = container.clientWidth || container.parentElement?.clientWidth || 600;
-        const maxW = Math.min(Math.max(containerW - 16, 280), 760);
+        const preferSingleLine = barlinesMode === 'manual' && measures.length <= 6;
+        const maxW = preferSingleLine
+            ? Math.max(containerW - 16, 520)
+            : Math.min(Math.max(containerW - 16, 280), 960);
 
         const FIRST_OVERHEAD = 100;
         const NEXT_OVERHEAD = 14;
-        const PER_NOTE = 32;
-        const MIN_MEASURE = 96;
-        const measureBaseW = m => Math.max(MIN_MEASURE, m.length * PER_NOTE + 26);
+        const PER_NOTE = 28;
+        const MIN_MEASURE = 88;
+        const measureBaseW = m => Math.max(MIN_MEASURE, m.length * PER_NOTE + 22);
 
         // Раскладка тактов по строкам с переносом
-        const rows = [];
-        let row = [];
-        let rowW = 0;
-        measures.forEach(m => {
-            const isFirstOfRow = row.length === 0;
-            const overhead = isFirstOfRow ? FIRST_OVERHEAD : NEXT_OVERHEAD;
-            const w = measureBaseW(m) + overhead;
-            if (!isFirstOfRow && rowW + w > maxW) {
-                rows.push(row);
-                row = [{ notes: m, width: FIRST_OVERHEAD + measureBaseW(m), isFirstOfRow: true }];
-                rowW = FIRST_OVERHEAD + measureBaseW(m);
-            } else {
-                row.push({ notes: m, width: w, isFirstOfRow });
-                rowW += w;
-            }
-        });
-        if (row.length) rows.push(row);
+        let rows = [];
+        if (preferSingleLine && measures.length) {
+            rows = [measures.map((m, i) => ({
+                notes: m,
+                width: (i === 0 ? FIRST_OVERHEAD : NEXT_OVERHEAD) + measureBaseW(m),
+                isFirstOfRow: i === 0
+            }))];
+        } else {
+            let row = [];
+            let rowW = 0;
+            measures.forEach(m => {
+                const isFirstOfRow = row.length === 0;
+                const overhead = isFirstOfRow ? FIRST_OVERHEAD : NEXT_OVERHEAD;
+                const w = measureBaseW(m) + overhead;
+                if (!isFirstOfRow && rowW + w > maxW) {
+                    rows.push(row);
+                    row = [{ notes: m, width: FIRST_OVERHEAD + measureBaseW(m), isFirstOfRow: true }];
+                    rowW = FIRST_OVERHEAD + measureBaseW(m);
+                } else {
+                    row.push({ notes: m, width: w, isFirstOfRow });
+                    rowW += w;
+                }
+            });
+            if (row.length) rows.push(row);
+        }
 
         // Растягиваем строки до всей доступной ширины
         rows.forEach(r => {
@@ -1938,10 +2018,11 @@ function renderNotationCard(container, data) {
             }
         });
 
-        const ROW_HEIGHT = 120;
+        const ROW_HEIGHT = 132;
         const TOP_PAD = 12;
-        const totalHeight = rows.length * ROW_HEIGHT + TOP_PAD + 28;
-        const totalWidth = maxW + 16;
+        const totalHeight = rows.length * ROW_HEIGHT + TOP_PAD + 32;
+        const rowPixelW = rows.reduce((mx, r) => Math.max(mx, r.reduce((s, mm) => s + mm.width, 0)), 0);
+        const totalWidth = Math.max(maxW + 16, rowPixelW + 16);
 
         const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
         renderer.resize(totalWidth, totalHeight);
@@ -1971,7 +2052,7 @@ function renderNotationCard(container, data) {
                 stave.setContext(ctx).draw();
 
                 if (mm.notes.length) {
-                    const staveNotes = mm.notes.map(n => buildStaveNote(VF, clef, n));
+                    const staveNotes = mm.notes.map(n => buildStaveNote(VF, clef, n, keySig));
                     const voiceBeats = barlinesMode === 'auto'
                         ? numBeats
                         : Math.max(
@@ -1985,14 +2066,15 @@ function renderNotationCard(container, data) {
                     const formatWidth = Math.max(mm.width - overhead, 50);
                     new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
                     voice.draw(ctx, stave);
-                    unisonBatch.push({ staveNotes, notesData: mm.notes });
+                    unisonBatch.push({ staveNotes, notesData: mm.notes, stave });
                 }
 
                 x += mm.width;
             });
             const svg = container.querySelector('svg');
-            unisonBatch.forEach(({ staveNotes, notesData }) => {
+            unisonBatch.forEach(({ staveNotes, notesData, stave }) => {
                 expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor);
+                drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor);
             });
         });
 
