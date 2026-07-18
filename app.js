@@ -1689,31 +1689,25 @@ function accToVfSuffix(acc) {
     return 'b'.repeat(-acc);
 }
 
-/** Убирает лишние ♭/♯ из ключа; отклонения — через modifier (не в строке key). */
+/** Нормализует написание ноты под ключ; VexFlow сам ставит знаки из строки key. */
 function prepareKeyForKeySig(key, keySig) {
     const p = parseVfKey(key);
-    if (!p) return { key, modifier: null };
+    if (!p) return key;
     const defaultAcc = getDefaultAccForLetter(p.letter, keySig);
-    const base = `${p.letter}/${p.octave}`;
-    if (p.acc === defaultAcc) return { key: base, modifier: null };
-    if (p.acc === 0 && defaultAcc !== 0) return { key: base, modifier: 'n' };
-    const mod = p.acc === 1 ? '#' : p.acc === 2 ? '##' : p.acc === -1 ? 'b' : p.acc === -2 ? 'bb' : null;
-    return { key: base, modifier: mod };
+    if (p.acc === defaultAcc) return `${p.letter}/${p.octave}`;
+    return `${p.letter}${accToVfSuffix(p.acc)}/${p.octave}`;
 }
 
-function applyPendingAccidentals(note, VF) {
-    const pending = note._pendingAcc;
-    if (!pending?.length || !VF.Accidental) return;
-    pending.forEach(({ modifier, origIdx }) => {
-        if (!modifier) return;
-        let idx = origIdx;
-        if (note.sortedKeyProps?.length) {
-            const pos = note.sortedKeyProps.findIndex(s => s.index === origIdx);
-            if (pos >= 0) idx = pos;
-        }
-        try { note.addModifier(new VF.Accidental(modifier), idx); } catch (_) {}
-    });
-    delete note._pendingAcc;
+function noteCenterX(sn) {
+    try {
+        if (sn.preFormatted === false) return null;
+        const x = typeof sn.getAbsoluteX === 'function' ? sn.getAbsoluteX() : null;
+        if (x == null || !Number.isFinite(x)) return null;
+        const w = typeof sn.getWidth === 'function' ? sn.getWidth() : 36;
+        return x + w / 2;
+    } catch (_) {
+        return null;
+    }
 }
 
 function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
@@ -1726,11 +1720,8 @@ function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
     staveNotes.forEach((sn, i) => {
         const lbl = notesData[i]?.label;
         if (!lbl) return;
-        let bb;
-        try { bb = sn.getBoundingBox(); } catch (_) { return; }
-        if (!bb) return;
-        const w = bb.w ?? bb.width ?? 0;
-        const x = (bb.x ?? 0) + w / 2;
+        const x = noteCenterX(sn);
+        if (x == null) return;
         const t = document.createElementNS(NS, 'text');
         t.setAttribute('x', String(x));
         t.setAttribute('y', String(labelY));
@@ -1822,19 +1813,12 @@ function buildStaveNote(VF, clef, n, keySig) {
     const isRest = duration.includes('r');
     const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
     const ks = keySig || 'C';
-    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, ks).key);
-    const note = new VF.StaveNote({
+    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, ks));
+    return new VF.StaveNote({
         clef,
         keys: isRest ? [clef === 'bass' ? 'd/3' : 'b/4'] : keys,
         duration
     });
-    if (!isRest) {
-        note._pendingAcc = rawKeys.map((rawK, origIdx) => {
-            const prep = prepareKeyForKeySig(rawK, ks);
-            return prep.modifier ? { modifier: prep.modifier, origIdx } : null;
-        }).filter(Boolean);
-    }
-    return note;
 }
 
 function noteDurationBeats(durationStr, beatValue) {
@@ -2056,10 +2040,10 @@ function renderNotationCard(container, data) {
                     const voice = new VF.Voice({ num_beats: voiceBeats, beat_value: beatValue });
                     if (typeof voice.setStrict === 'function') voice.setStrict(false);
                     voice.addTickables(staveNotes);
+                    staveNotes.forEach(sn => { try { sn.setStave(stave); } catch (_) {} });
                     const overhead = mm.isFirstOfRow ? FIRST_OVERHEAD : 30;
                     const formatWidth = Math.max(mm.width - overhead, 50);
                     new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
-                    staveNotes.forEach(sn => applyPendingAccidentals(sn, VF));
                     voice.draw(ctx, stave);
                     unisonBatch.push({ staveNotes, notesData: mm.notes, stave });
                 }
@@ -2068,8 +2052,8 @@ function renderNotationCard(container, data) {
             });
             const svg = container.querySelector('svg');
             unisonBatch.forEach(({ staveNotes, notesData, stave }) => {
-                expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor);
-                drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor);
+                try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor); } catch (_) {}
+                try { drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor); } catch (_) {}
             });
         });
 
