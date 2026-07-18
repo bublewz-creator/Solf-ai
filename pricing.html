@@ -1034,8 +1034,19 @@
             };
 
             if (currentUser) {
-                alert(`${planName} plan selected. Contact @vwirex on Telegram to complete payment. Your plan will be activated after confirmation.`);
-                goToApp();
+                let redirected = false;
+                const fire = () => { if (!redirected) { redirected = true; goToApp(); } };
+                const failsafe = setTimeout(fire, 6000);
+                let ctrl = null;
+                try { ctrl = (typeof AbortController !== 'undefined') ? new AbortController() : null; } catch (_) {}
+                fetch(`${WORKER_URL}/save-user`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ id: currentUser.id, plan_type: planType }),
+                    signal: ctrl ? ctrl.signal : undefined
+                })
+                    .then(() => { clearTimeout(failsafe); fire(); })
+                    .catch(() => { clearTimeout(failsafe); fire(); });
             } else {
                 goToApp();
             }
