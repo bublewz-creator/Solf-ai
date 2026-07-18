@@ -1805,7 +1805,8 @@ function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'hanging');
         t.setAttribute('font-family', 'Arial, sans-serif');
-        t.setAttribute('font-size', '13');
+        t.setAttribute('font-size', '18');
+        t.setAttribute('font-weight', '700');
         t.setAttribute('fill', color);
         t.textContent = lbl;
         svg.appendChild(t);
