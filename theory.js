@@ -669,8 +669,14 @@
         return null;
     }
 
+    function isD7Query(t) {
+        return /доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t);
+    }
+
     function wantsInversions(t) {
-        return /обращени|inversion/.test(t);
+        if (/без\s*обращ|without\s*inversion|only\s*root|только\s*(d7|д7)\b/i.test(t)) return false;
+        if (/обращени|inversion/.test(t)) return true;
+        return isD7Query(t);
     }
 
     /** «все виды / все гаммы / три вида / all types of scales» → строим сразу несколько форм. */
@@ -679,7 +685,9 @@
     }
 
     function wantsResolution(t) {
-        return /разрешени|resolution|resolv/.test(t);
+        if (/без\s*разреш|without\s*resolv/i.test(t)) return false;
+        if (/разрешени|resolution|resolv/.test(t)) return true;
+        return isD7Query(t);
     }
 
     // ---------- Сборка блока по запросу ----------

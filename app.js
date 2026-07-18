@@ -715,11 +715,27 @@ function getSystemInstruction(responseLang) {
     return prompt;
 }
 
-/**
- * Невидимый для пользователя постфикс к КАЖДОМУ запросу при включённом режиме нотации.
- * Дублирует ключевое требование на уровне user-сообщения — модели легко "забывают"
- * системный промпт после нескольких ходов, а вот свежее user-сообщение всегда соблюдают.
- */
+/** Убирает служебный постфикс режима нотации из текста user-сообщения. */
+function stripNotationReminder(text) {
+    return String(text || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '').trim();
+}
+
+/** Подставляет готовый нотный блок из theory.js (solfeggio-online.ru), если запрос распознан. */
+function patchAiWithTheory(userQuery, aiText) {
+    if (!window.SolfTheory || typeof window.SolfTheory.buildNotationForQuery !== 'function') return aiText;
+    const q = stripNotationReminder(userQuery);
+    if (!q) return aiText;
+    try {
+        const det = window.SolfTheory.buildNotationForQuery(q);
+        if (det && det.blockString && typeof window.SolfTheory.applyBlock === 'function') {
+            return window.SolfTheory.applyBlock(aiText, det.blockString);
+        }
+    } catch (err) {
+        console.warn('[Solf.ai] Theory patch skipped:', err);
+    }
+    return aiText;
+}
+
 function buildNotationUserReminder(responseLang) {
     const langName = { en: 'English', ru: 'Russian', de: 'German', es: 'Spanish', zh: 'Chinese', ja: 'Japanese' }[responseLang] || 'the user\'s language';
     return '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
@@ -1367,7 +1383,16 @@ function loadChat(chatId) {
     if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
         window.SolfTheory.setLabelLocale(window.__solfaiResponseLang);
     }
-    chat.messages.forEach(msg => addMessageToUI(msg.role, msg.content, msg.attachments, false, msg.id));
+    chat.messages.forEach((msg, i) => {
+        let content = msg.content;
+        if (msg.role === 'ai' && i > 0) {
+            const prev = chat.messages[i - 1];
+            if (prev && prev.role === 'user') {
+                content = patchAiWithTheory(prev.content, content);
+            }
+        }
+        addMessageToUI(msg.role, content, msg.attachments, false, msg.id);
+    });
     renderChatsList();
 }
 
@@ -2034,7 +2059,7 @@ async function generateResponse(query, imageData = null) {
         // трезвучия+обращения, D7). Если задание распознано — мы получим гарантированно
         // корректный блок, поэтому можем пропустить дорогие авто-ретраи к модели.
         let deterministicBlock = null;
-        if (notationModeEnabled && typeof window !== 'undefined' && window.SolfTheory) {
+        if (typeof window !== 'undefined' && window.SolfTheory) {
             try {
                 const det = window.SolfTheory.buildNotationForQuery(baseUserContent);
                 if (det && det.blockString) deterministicBlock = det.blockString;
@@ -2106,16 +2131,8 @@ async function generateResponse(query, imageData = null) {
             }
         }
 
-        // Подставляем корректный нотный блок: заменяем блок модели на вычисленный нами
-        // (или добавляем последней строкой, если модель блок не вывела вовсе).
-        // Текст-объяснение модели при этом сохраняется — меняется только сам нотный блок.
-        if (deterministicBlock) {
-            try {
-                aiText = window.SolfTheory.applyBlock(aiText, deterministicBlock);
-            } catch (applyErr) {
-                console.warn('[Solf.ai] Theory block apply skipped:', applyErr);
-            }
-        }
+        // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
+        aiText = patchAiWithTheory(baseUserContent, aiText);
 
         document.getElementById('typingIndicator')?.remove();
         if (currentUser?.id) {
