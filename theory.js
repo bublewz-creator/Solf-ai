@@ -526,10 +526,11 @@
         const tonicSuffix = ['3', '53', '53', '6'];
         const notes = [];
         for (let i = 0; i < forms; i++) {
-            notes.push({ keys: preset[i * 2], duration: 'w', label: D7_FORM_LABELS[i][0] });
+            const d7Keys = preset[i * 2].map(k => shiftVexKeyOctave(k, -1));
+            notes.push({ keys: d7Keys, duration: 'w', label: D7_FORM_LABELS[i][0] });
             if (withResolutions) {
                 notes.push({
-                    keys: preset[i * 2 + 1],
+                    keys: preset[i * 2 + 1].map(k => shiftVexKeyOctave(k, -1)),
                     duration: 'w',
                     label: Tl + tonicSuffix[i],
                     barAfter: i < forms - 1
@@ -573,16 +574,16 @@
 
     // ---------- Парсер запроса ----------
     const RU_NOTES = [
-        ['до-диез', { letter: 'c', acc: 1 }], ['до диез', { letter: 'c', acc: 1 }],
-        ['ре-бемоль', { letter: 'd', acc: -1 }], ['ре бемоль', { letter: 'd', acc: -1 }],
-        ['ре-диез', { letter: 'd', acc: 1 }], ['ре диез', { letter: 'd', acc: 1 }],
-        ['ми-бемоль', { letter: 'e', acc: -1 }], ['ми бемоль', { letter: 'e', acc: -1 }],
-        ['фа-диез', { letter: 'f', acc: 1 }], ['фа диез', { letter: 'f', acc: 1 }],
-        ['соль-бемоль', { letter: 'g', acc: -1 }], ['соль бемоль', { letter: 'g', acc: -1 }],
-        ['соль-диез', { letter: 'g', acc: 1 }], ['соль диез', { letter: 'g', acc: 1 }],
-        ['ля-бемоль', { letter: 'a', acc: -1 }], ['ля бемоль', { letter: 'a', acc: -1 }],
-        ['ля-диез', { letter: 'a', acc: 1 }], ['ля диез', { letter: 'a', acc: 1 }],
-        ['си-бемоль', { letter: 'b', acc: -1 }], ['си бемоль', { letter: 'b', acc: -1 }],
+        ['до-диез', { letter: 'c', acc: 1 }], ['до диез', { letter: 'c', acc: 1 }], ['до д', { letter: 'c', acc: 1 }],
+        ['ре-бемоль', { letter: 'd', acc: -1 }], ['ре бемоль', { letter: 'd', acc: -1 }], ['ре б', { letter: 'd', acc: -1 }],
+        ['ре-диез', { letter: 'd', acc: 1 }], ['ре диез', { letter: 'd', acc: 1 }], ['ре д', { letter: 'd', acc: 1 }],
+        ['ми-бемоль', { letter: 'e', acc: -1 }], ['ми бемоль', { letter: 'e', acc: -1 }], ['ми бе', { letter: 'e', acc: -1 }], ['ми-бе', { letter: 'e', acc: -1 }], ['ми б', { letter: 'e', acc: -1 }],
+        ['фа-диез', { letter: 'f', acc: 1 }], ['фа диез', { letter: 'f', acc: 1 }], ['фа д', { letter: 'f', acc: 1 }],
+        ['соль-бемоль', { letter: 'g', acc: -1 }], ['соль бемоль', { letter: 'g', acc: -1 }], ['соль б', { letter: 'g', acc: -1 }],
+        ['соль-диез', { letter: 'g', acc: 1 }], ['соль диез', { letter: 'g', acc: 1 }], ['соль д', { letter: 'g', acc: 1 }],
+        ['ля-бемоль', { letter: 'a', acc: -1 }], ['ля бемоль', { letter: 'a', acc: -1 }], ['ля б', { letter: 'a', acc: -1 }],
+        ['ля-диез', { letter: 'a', acc: 1 }], ['ля диез', { letter: 'a', acc: 1 }], ['ля д', { letter: 'a', acc: 1 }],
+        ['си-бемоль', { letter: 'b', acc: -1 }], ['си бемоль', { letter: 'b', acc: -1 }], ['си бе', { letter: 'b', acc: -1 }], ['си-бе', { letter: 'b', acc: -1 }], ['си б', { letter: 'b', acc: -1 }],
         ['до', { letter: 'c', acc: 0 }], ['ре', { letter: 'd', acc: 0 }], ['ми', { letter: 'e', acc: 0 }],
         ['фа', { letter: 'f', acc: 0 }], ['соль', { letter: 'g', acc: 0 }], ['ля', { letter: 'a', acc: 0 }],
         ['си', { letter: 'b', acc: 0 }]
@@ -666,6 +667,9 @@
                 if (mode === null) mode = /min/.test(m[3]) ? 'minor' : 'major';
             }
         }
+
+        // «ми бе», «в до» без «минор» — по умолчанию мажор
+        if (tonic && mode === null && !/минор|minor|moll\b|mol\b/.test(t)) mode = 'major';
 
         if (!tonic || mode === null) return null;
         return { tonic: { ...tonic, octave: 4 }, mode };
@@ -778,9 +782,9 @@
         return noteKey({ letter: p.letter, acc: p.acc, octave: oct });
     }
 
-    /** Скрипичный ключ: от C4 до G5 (как в школьных аппликатурах). */
+    /** Скрипичный ключ: C4–F5. */
     const OCTAVE_LIMITS = {
-        treble: { top: 67, bottom: 48 },
+        treble: { top: 65, bottom: 48 },
         bass: { top: 55, bottom: 36 }
     };
 

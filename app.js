@@ -1696,6 +1696,52 @@ function accToVfSuffix(acc) {
     return 'b'.repeat(-acc);
 }
 
+const NOTATION_OCTAVE_LIMITS = {
+    treble: { top: 65, bottom: 48 },
+    bass: { top: 55, bottom: 36 }
+};
+
+function noteAbsFromVfKey(k) {
+    const p = parseVfKey(k);
+    if (!p) return null;
+    const LS = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+    return p.octave * 12 + LS[p.letter] + p.acc;
+}
+
+function shiftVfKeyOctaveLocal(k, delta) {
+    const m = String(k).trim().match(/^([a-g](?:bb|b|##|#)?)\/(-?\d+)$/i);
+    if (!m) return k;
+    const oct = Math.max(1, Math.min(8, parseInt(m[2], 10) + delta));
+    return `${m[1].toLowerCase()}/${oct}`;
+}
+
+/** Опускает всё упражнение, если ноты выше F5 (скрипичный ключ). */
+function normalizeNotationOctavesLocal(notes, clef) {
+    if (!Array.isArray(notes) || !notes.length) return notes;
+    const lim = NOTATION_OCTAVE_LIMITS[clef === 'bass' ? 'bass' : 'treble'];
+    let maxA = -Infinity;
+    let minA = Infinity;
+    notes.forEach(n => {
+        (n.keys || []).forEach(k => {
+            const a = noteAbsFromVfKey(k);
+            if (a == null) return;
+            maxA = Math.max(maxA, a);
+            minA = Math.min(minA, a);
+        });
+    });
+    if (!Number.isFinite(maxA)) return notes;
+    let shift = 0;
+    if (maxA > lim.top) shift = -Math.ceil((maxA - lim.top) / 12);
+    if (shift && minA + shift * 12 < lim.bottom) {
+        while (shift < 0 && minA + shift * 12 < lim.bottom) shift += 1;
+    }
+    if (!shift) return notes;
+    return notes.map(n => ({
+        ...n,
+        keys: (n.keys || []).map(k => shiftVfKeyOctaveLocal(k, shift))
+    }));
+}
+
 /** Нормализует key + modifier под ключ (бекары, ♭/♯ только где нужно). */
 function prepareKeyForKeySig(key, keySig) {
     const p = parseVfKey(key);
@@ -1968,6 +2014,7 @@ function renderNotationCard(container, data) {
         const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
         const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
         let rawNotes = Array.isArray(data.notes) ? data.notes : [];
+        rawNotes = normalizeNotationOctavesLocal(rawNotes, clef);
         if (window.SolfTheory && typeof window.SolfTheory.normalizeNotationOctaves === 'function') {
             try { rawNotes = window.SolfTheory.normalizeNotationOctaves(rawNotes, clef); } catch (_) {}
         }
