@@ -778,35 +778,37 @@
         return noteKey({ letter: p.letter, acc: p.acc, octave: oct });
     }
 
-    /** Удобный диапазон: treble ≈ A3–G5, без 6-й октавы и лишних добавочных. */
+    /** Скрипичный ключ: от C4 до G5 (как в школьных аппликатурах). */
     const OCTAVE_LIMITS = {
-        treble: { top: 79, bottom: 57 },
-        bass: { top: 67, bottom: 40 }
+        treble: { top: 67, bottom: 48 },
+        bass: { top: 55, bottom: 36 }
     };
 
-    function normalizeChordOctaves(note, clef) {
-        if (!note || !Array.isArray(note.keys) || !note.keys.length) return note;
+    function normalizeNotationOctaves(notes, clef) {
+        if (!Array.isArray(notes) || !notes.length) return notes;
         const lim = OCTAVE_LIMITS[clef === 'bass' ? 'bass' : 'treble'];
-        const pitches = note.keys.map(k => {
-            const p = parseVexKey(k);
-            return p ? noteAbs(p) : null;
-        }).filter(v => v != null);
-        if (!pitches.length) return note;
-        const maxA = Math.max(...pitches);
-        const minA = Math.min(...pitches);
+        let maxA = -Infinity;
+        let minA = Infinity;
+        notes.forEach(n => {
+            (n.keys || []).forEach(k => {
+                const p = parseVexKey(k);
+                if (!p) return;
+                const a = noteAbs(p);
+                maxA = Math.max(maxA, a);
+                minA = Math.min(minA, a);
+            });
+        });
+        if (!Number.isFinite(maxA)) return notes;
         let shift = 0;
         if (maxA > lim.top) shift = -Math.ceil((maxA - lim.top) / 12);
         if (shift && minA + shift * 12 < lim.bottom) {
             while (shift < 0 && minA + shift * 12 < lim.bottom) shift += 1;
         }
-        if (!shift) return note;
-        return { ...note, keys: note.keys.map(k => shiftVexKeyOctave(k, shift)) };
-    }
-
-    function normalizeNotationOctaves(notes, clef) {
-        if (!Array.isArray(notes)) return notes;
-        const c = clef === 'bass' ? 'bass' : 'treble';
-        return notes.map(n => normalizeChordOctaves(n, c));
+        if (!shift) return notes;
+        return notes.map(n => ({
+            ...n,
+            keys: (n.keys || []).map(k => shiftVexKeyOctave(k, shift))
+        }));
     }
 
     function finalize(data) {
