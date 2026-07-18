@@ -53,7 +53,10 @@ async function syncAppData() {
             plan_type: planType,
             requests_count: requestsCount,
             images_count: imagesCount,
-            quiz_count: quizCount
+            quiz_count: quizCount,
+            requests_window_start: Number(data.requests_window_start) || 0,
+            images_window_start: Number(data.images_window_start) || 0,
+            quiz_window_start: Number(data.quiz_window_start) || 0,
         };
         currentPlan = syncedPlan;
 
@@ -67,7 +70,7 @@ async function syncAppData() {
         updatePlanDisplay();
         if (typeof updateQuizCounter === 'function') updateQuizCounter();
     } catch (error) {
-        console.error('Ошибка синхронизации данных приложения:', error);
+        console.error('App data sync failed:', error);
     }
 }
 
@@ -76,6 +79,13 @@ const PLAN_LIMITS = {
     basic:     { requests: 10, images: 0 },
     pro:       { requests: 50, images: 5 },
     unlimited: { requests: Infinity, images: Infinity }
+};
+
+/** Sliding-window durations (must match worker.js USAGE_WINDOWS_MS). */
+const USAGE_WINDOWS = {
+    request: 24 * 60 * 60 * 1000,
+    image:   24 * 60 * 60 * 1000,
+    quiz:    12 * 60 * 60 * 1000,
 };
 
 // ===== СТРОГИЙ ПРОМПТ =====
@@ -135,7 +145,7 @@ function getChatLang() {
 }
 
 function uiText(key, { chat = false, fallback = '' } = {}) {
-    const lang = chat ? getChatLang() : getAppLang();
+    const lang = chat ? getChatLang() : 'en';
     if (typeof solfaiGetText === 'function') {
         const text = solfaiGetText(key, lang);
         if (text) return text;
@@ -264,7 +274,7 @@ function getNotationLocaleStrings() {
     const lang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('solfai_lang') || 'en';
     const map = {
         en: { on: 'Notation mode enabled', off: 'Notation mode disabled', tooltip: 'Notation mode' },
-        ru: { on: 'Режим нотации включён', off: 'Режим нотации выключен', tooltip: 'Режим нотации' },
+        ru: { on: 'Notation mode enabled', off: 'Notation mode disabled', tooltip: 'Notation mode' },
         de: { on: 'Notenmodus aktiviert', off: 'Notenmodus deaktiviert', tooltip: 'Notenmodus' },
         es: { on: 'Modo notación activado', off: 'Modo notación desactivado', tooltip: 'Modo notación' },
         zh: { on: '已启用乐谱模式', off: '已关闭乐谱模式', tooltip: '乐谱模式' },
@@ -1098,7 +1108,16 @@ function getPlanStorageKey() { return `solfai_plan_${currentUser ? currentUser.i
 function getStoredPlan() { return JSON.parse(localStorage.getItem(getPlanStorageKey())) || { type: "free", emoji: PLAN_ICONS.free, name: "Free" }; }
 
 function updatePlanDisplay() {
-    currentPlan = getStoredPlan();
+    if (isUserLoggedIn() && currentUser?.plan_type && PLAN_LIMITS[currentUser.plan_type]) {
+        const planType = currentUser.plan_type;
+        currentPlan = {
+            type: planType,
+            emoji: PLAN_ICONS[planType] || PLAN_ICONS.free,
+            name: planType.charAt(0).toUpperCase() + planType.slice(1),
+        };
+    } else {
+        currentPlan = getStoredPlan();
+    }
     document.documentElement.classList.toggle('show-upgrade',
         !!currentUser && currentPlan.type !== 'pro' && currentPlan.type !== 'unlimited');
     const sidebarPlanIcon = document.getElementById('sidebarPlanIcon');
@@ -1130,7 +1149,7 @@ function isUserLoggedIn() { return Boolean(currentUser?.id); }
 function getUsageKey() { return `solfai_usage_${currentUser?.id || 'guest'}`; }
 function getUsageData() {
     const data = JSON.parse(localStorage.getItem(getUsageKey()) || '{}');
-    if (!data.timestamp || (Date.now() - data.timestamp) > 12 * 60 * 60 * 1000) return { timestamp: Date.now(), count: 0 };
+    if (!data.timestamp || (Date.now() - data.timestamp) > USAGE_WINDOWS.request) return { timestamp: Date.now(), count: 0 };
     return data;
 }
 function saveUsageData(data) { localStorage.setItem(getUsageKey(), JSON.stringify(data)); }
@@ -1245,7 +1264,7 @@ function updateSidebarQuotaBadge() {
 function getImageUsageKey() { return `solfai_img_${currentUser?.id || 'guest'}`; }
 function getImageUsageData() {
     const data = JSON.parse(localStorage.getItem(getImageUsageKey()) || '{}');
-    if (!data.timestamp || (Date.now() - data.timestamp) > 24 * 60 * 60 * 1000) return { timestamp: Date.now(), count: 0 };
+    if (!data.timestamp || (Date.now() - data.timestamp) > USAGE_WINDOWS.image) return { timestamp: Date.now(), count: 0 };
     return data;
 }
 function getRemainingImages() {
@@ -1292,23 +1311,77 @@ function showImageLimitModal() {
     refreshImageAttachVisibility();
 }
 
+function rollbackRequestUsage() {
+    if (isUserLoggedIn()) {
+        currentUser.requests_count = Math.max(0, (Number(currentUser.requests_count) || 0) - 1);
+    } else {
+        const usage = getUsageData();
+        usage.count = Math.max(0, (usage.count || 0) - 1);
+        saveUsageData(usage);
+    }
+    updateRequestsCounter();
+}
+
+function rollbackImageUsage() {
+    if (isUserLoggedIn()) {
+        currentUser.images_count = Math.max(0, (Number(currentUser.images_count) || 0) - 1);
+    } else {
+        const usage = getImageUsageData();
+        usage.count = Math.max(0, (usage.count || 0) - 1);
+        localStorage.setItem(getImageUsageKey(), JSON.stringify(usage));
+    }
+    refreshImageAttachVisibility();
+}
+
+function applyUsageFromServer(usage) {
+    if (!usage || !currentUser?.id) return;
+    if (Number.isFinite(Number(usage.requests_count))) currentUser.requests_count = Number(usage.requests_count);
+    if (Number.isFinite(Number(usage.images_count))) currentUser.images_count = Number(usage.images_count);
+    if (Number.isFinite(Number(usage.quiz_count))) currentUser.quiz_count = Number(usage.quiz_count);
+    if (Number.isFinite(Number(usage.requests_window_start))) currentUser.requests_window_start = Number(usage.requests_window_start);
+    if (Number.isFinite(Number(usage.images_window_start))) currentUser.images_window_start = Number(usage.images_window_start);
+    if (Number.isFinite(Number(usage.quiz_window_start))) currentUser.quiz_window_start = Number(usage.quiz_window_start);
+    localStorage.setItem('solfai_user', JSON.stringify(currentUser));
+    updateRequestsCounter();
+    refreshImageAttachVisibility();
+    if (typeof updateQuizCounter === 'function') updateQuizCounter();
+}
+
+function getWindowRemainingMs(startMs, windowMs) {
+    const start = Number(startMs) || 0;
+    if (!start) return windowMs;
+    return Math.max(0, windowMs - (Date.now() - start));
+}
+
 function updateLimitTimer() {
     const timerEl = document.getElementById('limitTimer');
     if (!timerEl) return;
+    const windowMs = USAGE_WINDOWS.request;
+    if (isUserLoggedIn()) {
+        const remaining = getWindowRemainingMs(currentUser?.requests_window_start, windowMs);
+        timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000));
+        return;
+    }
     const data = JSON.parse(localStorage.getItem(getUsageKey()) || '{}');
     if (data.timestamp) {
-        const remaining = (12 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
+        const remaining = windowMs - (Date.now() - data.timestamp);
         timerEl.textContent = remaining > 0
             ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
             : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
-    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 12, 0);
+    } else timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 24, 0);
 }
 function updateImageLimitTimer() {
     const timerEl = document.getElementById('imageLimitTimer');
     if (!timerEl) return;
+    const windowMs = USAGE_WINDOWS.image;
+    if (isUserLoggedIn()) {
+        const remaining = getWindowRemainingMs(currentUser?.images_window_start, windowMs);
+        timerEl.textContent = formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000));
+        return;
+    }
     const data = JSON.parse(localStorage.getItem(getImageUsageKey()) || '{}');
     if (data.timestamp) {
-        const remaining = (24 * 60 * 60 * 1000) - (Date.now() - data.timestamp);
+        const remaining = windowMs - (Date.now() - data.timestamp);
         timerEl.textContent = remaining > 0
             ? formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), Math.floor(remaining / 3600000), Math.floor((remaining % 3600000) / 60000))
             : formatResetTimer(uiText('resetIn', { fallback: 'Reset in:' }), 0, 0);
@@ -2240,6 +2313,7 @@ async function generateResponse(query, imageData = null) {
         const bigTask = notationModeEnabled && isBigNotationTask(baseUserContent);
         const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : 1024;
         const payload = {
+            userId: currentUser?.id,
             messages,
             temperature: notationModeEnabled ? 0.45 : 0.7,
             max_tokens: tokenBudget,
@@ -2259,8 +2333,20 @@ async function generateResponse(query, imageData = null) {
 
         const data = await res.json();
         if (!res.ok || data.error) {
-            console.error("ПОЛНАЯ ОШИБКА ОТ СЕРВЕРА:", data);
-            const detailedError = data.message || data.error?.message || JSON.stringify(data.gemini_error) || data.error || 'API Error';
+            console.error('Server error:', data);
+            if (res.status === 429 || data.code === 'LIMIT_REQUESTS') {
+                rollbackRequestUsage();
+                if (imageData) rollbackImageUsage();
+                showNoRequestsToast();
+                return;
+            }
+            if (res.status === 429 && data.code === 'LIMIT_IMAGES') {
+                rollbackRequestUsage();
+                rollbackImageUsage();
+                showImageLimitModal();
+                return;
+            }
+            const detailedError = data.message || data.error?.message || data.error || 'API Error';
             throw new Error(detailedError);
         }
 
@@ -2317,6 +2403,8 @@ async function generateResponse(query, imageData = null) {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
+                            userId: currentUser?.id,
+                            usageAlreadyCounted: true,
                             messages: retryMessages,
                             temperature: notationRetryTemps[ri] ?? 0.15,
                             max_tokens: retryBudget,
@@ -2355,44 +2443,8 @@ async function generateResponse(query, imageData = null) {
         aiText = patchAiWithTheory(baseUserContent, aiText);
 
         document.getElementById('typingIndicator')?.remove();
-        if (currentUser?.id) {
-            try {
-                const usageType = imageData ? 'image' : 'text';
-                const usageRes = await fetchWithTimeout(`${WORKER_URL}/increment-usage`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ id: currentUser.id, type: usageType })
-                }, 12000);
-                const usageData = await usageRes.json().catch(() => ({}));
-                if (!usageRes.ok || usageData.error) {
-                    throw new Error(usageData.error || 'Failed to increment usage');
-                }
-
-                // Источник истины — БД. localStorage `solfai_usage_*` / `solfai_img_*` для
-                // залогиненных больше НЕ пишем (он только путал — см. migrateRemoveStaleUsageKeysOnce).
-                if (Number.isFinite(Number(usageData.requests_count))) {
-                    currentUser.requests_count = Number(usageData.requests_count);
-                } else {
-                    // Бэк не вернул значение (старая версия API?) — оставляем оптимистичный
-                    // инкремент, который уже сделал useRequest(). Не делаем повторный +1.
-                }
-
-                if (imageData) {
-                    if (Number.isFinite(Number(usageData.images_count))) {
-                        currentUser.images_count = Number(usageData.images_count);
-                    }
-                    // ТОТ ЖЕ принцип: оптимистичный инкремент уже сделал useImage(),
-                    // повторно не дублируем.
-                }
-
-                // Кэш `solfai_user` обновляем — он используется для восстановления при следующей
-                // загрузке (чтобы UI не ждал syncAppData чтобы показать имя/аватарку).
-                localStorage.setItem('solfai_user', JSON.stringify(currentUser));
-                updateRequestsCounter();
-                refreshImageAttachVisibility();
-            } catch (usageError) {
-                console.error('Ошибка обновления usage в БД:', usageError);
-            }
+        if (data.usage) {
+            applyUsageFromServer(data.usage);
         }
         chat.messages.push({ role: 'ai', content: aiText, time: new Date().toISOString(), id: Date.now().toString() }); 
         saveChatToStorage();
@@ -2400,6 +2452,10 @@ async function generateResponse(query, imageData = null) {
         
     } catch (e) {
         document.getElementById('typingIndicator')?.remove();
+        if (e.name !== 'AbortError') {
+            rollbackRequestUsage();
+            if (imageData) rollbackImageUsage();
+        }
         if (e.name === 'AbortError') {
             addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
         } else {

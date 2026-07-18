@@ -3,10 +3,12 @@
 // Лимиты для викторин согласно тарифам
 const QUIZ_LIMITS = {
     free:      3,
-    basic:     5,
-    pro:       Infinity, // Безлимит
-    unlimited: Infinity  // Безлимит
+    basic:     10,
+    pro:       Infinity,
+    unlimited: Infinity
 };
+
+const QUIZ_USAGE_WINDOW_MS = 12 * 60 * 60 * 1000;
 
 const QUESTIONS_PER_QUIZ = 10;
 
@@ -49,13 +51,21 @@ function getQuizUsageKey() {
     return `solfai_quiz_usage_${userId}`;
 }
 
+function isQuizUserLoggedIn() {
+    return typeof currentUser !== 'undefined' && Boolean(currentUser?.id);
+}
+
 function getQuizUsage() {
+    if (isQuizUserLoggedIn()) {
+        return {
+            timestamp: Number(currentUser?.quiz_window_start) || Date.now(),
+            count: Number(currentUser?.quiz_count) || 0,
+        };
+    }
     const key = getQuizUsageKey();
     const data = JSON.parse(localStorage.getItem(key) || '{}');
     const now = Date.now();
-    const twelveHours = 12 * 60 * 60 * 1000;
-    
-    if (!data.timestamp || (now - data.timestamp) > twelveHours) {
+    if (!data.timestamp || (now - data.timestamp) > QUIZ_USAGE_WINDOW_MS) {
         return { timestamp: now, count: 0 };
     }
     return data;
@@ -69,7 +79,12 @@ function getRemainingQuizzes() {
     const planType = (typeof currentPlan !== 'undefined' && currentPlan) ? currentPlan.type : 'free';
     const limit = QUIZ_LIMITS[planType] !== undefined ? QUIZ_LIMITS[planType] : 3;
 
-    if (limit === Infinity) return 999; 
+    if (limit === Infinity) return 999;
+
+    if (isQuizUserLoggedIn()) {
+        const dbUsage = Number(currentUser?.quiz_count);
+        return Math.max(0, limit - (Number.isFinite(dbUsage) ? dbUsage : 0));
+    }
 
     const usage = getQuizUsage();
     return Math.max(0, limit - usage.count);
@@ -81,12 +96,38 @@ function useQuiz() {
 
     if (limit === Infinity) return true;
 
+    if (isQuizUserLoggedIn()) {
+        const cur = Number(currentUser.quiz_count) || 0;
+        if (cur >= limit) return false;
+        currentUser.quiz_count = cur + 1;
+        updateQuizCounter();
+        const workerUrl = typeof WORKER_URL !== 'undefined' ? WORKER_URL : 'https://solf-ai-api.mlemonw.workers.dev';
+        fetch(`${workerUrl}/increment-usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentUser.id, type: 'quiz' }),
+        })
+            .then(r => r.json())
+            .then(data => {
+                if (data && Number.isFinite(Number(data.quiz_count))) {
+                    currentUser.quiz_count = Number(data.quiz_count);
+                    if (Number.isFinite(Number(data.quiz_window_start))) {
+                        currentUser.quiz_window_start = Number(data.quiz_window_start);
+                    }
+                    localStorage.setItem('solfai_user', JSON.stringify(currentUser));
+                    updateQuizCounter();
+                }
+            })
+            .catch(err => console.warn('[Quiz] usage sync failed:', err));
+        return true;
+    }
+
     const usage = getQuizUsage();
     if (usage.count < limit) {
         usage.count++;
-        if (!usage.timestamp) usage.timestamp = Date.now(); 
+        if (!usage.timestamp) usage.timestamp = Date.now();
         saveQuizUsage(usage);
-        updateQuizCounter(); 
+        updateQuizCounter();
         return true;
     }
     return false;
@@ -179,8 +220,7 @@ function startQuiz(mode) {
             document.getElementById('quizModal').classList.remove('active');
             showLimitModal();
         } else {
-            const lang = localStorage.getItem('solfai_lang') || 'en';
-            alert(lang === 'ru' ? "Достигнут дневной лимит! Пожалуйста, обновите тариф." : "Daily limit reached! Please upgrade.");
+            alert('Daily quiz limit reached. Please upgrade your plan or wait for the reset.');
         }
         return;
     }
