@@ -391,7 +391,7 @@ BARLINES MODE — выбор режима тактовых черт (КРИТИ�
 Block format rules (CRITICAL — follow exactly):
 - Single line. Valid JSON only: double quotes, no comments, no trailing commas, no line breaks INSIDE the JSON.
 - "clef": "treble" or "bass".
-- "keySignature": "C","G","D","A","E","B","F#","C#","F","Bb","Eb","Ab","Db","Gb","Cb","Am","Em","Bm","F#m","C#m","G#m","D#m","A#m","Dm","Gm","Cm","Fm","Bbm","Ebm","Abm".
+- "keySignature": major keys C,G,D,A,E,B,F#,C#,G#,D#,A#,F,Bb,Eb,Ab,Db,Gb,Cb. For MINOR use relative major: a-m→C, e-m→G, b-m→D, c-m→Eb, g-m→Bb, f-m→Ab, d-m→F, etc.
 - "timeSignature": "4/4","3/4","2/4","6/8","12/8", etc. Можно "" (пустая строка) или "none", чтобы НЕ показывать размер. В barlines:"none"/"manual" размер всё равно не рисуется.
 - "barlines": (необязательно) "auto" | "none" | "manual". Без поля = "auto".
 - "notes": non-empty array of {"keys":[...], "duration":"...", "barAfter": true (необязательно), "label": "…" (необязательно)}.
@@ -1646,18 +1646,25 @@ const NOTATION_DURATION_FRACTION = { w: 1, h: 0.5, q: 0.25, '8': 0.125, '16': 0.
 
 const KEY_FLAT_COUNT = {
     C: 0, G: 0, D: 0, A: 0, E: 0, B: 0, 'F#': 0, 'C#': 0,
-    F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7,
-    Am: 0, Em: 0, Bm: 0, 'F#m': 0, 'C#m': 0, 'G#m': 0, 'D#m': 0, 'A#m': 0,
-    Dm: 1, Gm: 2, Cm: 3, Fm: 4, Bbm: 5, Ebm: 6, Abm: 7
+    F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7
 };
 const KEY_SHARP_COUNT = {
     C: 0, F: 0, Bb: 0, Eb: 0, Ab: 0, Db: 0, Gb: 0, Cb: 0,
     G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7,
-    Am: 0, Dm: 0, Gm: 0, Cm: 0, Fm: 0, Bbm: 0, Ebm: 0, Abm: 0,
-    Em: 1, Bm: 2, 'F#m': 3, 'C#m': 4, 'G#m': 5, 'D#m': 6, 'A#m': 7
+    'G#': 8, 'D#': 9, 'A#': 10
 };
 const FLAT_ORDER = ['b', 'e', 'a', 'd', 'g', 'c', 'f'];
 const SHARP_ORDER = ['f', 'c', 'g', 'd', 'a', 'e', 'b'];
+
+/** AI/legacy: Cm, Gm… → Eb, Bb… (relative major). */
+function normalizeKeySignature(keySig) {
+    const k = String(keySig || 'C').trim();
+    const MAP = {
+        Am: 'C', Em: 'G', Bm: 'D', 'F#m': 'A', 'C#m': 'E', 'G#m': 'B', 'D#m': 'F#', 'A#m': 'C#',
+        Dm: 'F', Gm: 'Bb', Cm: 'Eb', Fm: 'Ab', Bbm: 'Db', Ebm: 'Gb', Abm: 'Cb'
+    };
+    return MAP[k] || k;
+}
 
 function getKeyFlats(keySig) {
     const n = KEY_FLAT_COUNT[keySig] ?? 0;
@@ -1689,13 +1696,37 @@ function accToVfSuffix(acc) {
     return 'b'.repeat(-acc);
 }
 
-/** Нормализует написание ноты под ключ; VexFlow сам ставит знаки из строки key. */
+/** Нормализует key + modifier под ключ (бекары, ♭/♯ только где нужно). */
 function prepareKeyForKeySig(key, keySig) {
     const p = parseVfKey(key);
-    if (!p) return key;
-    const defaultAcc = getDefaultAccForLetter(p.letter, keySig);
-    if (p.acc === defaultAcc) return `${p.letter}/${p.octave}`;
-    return `${p.letter}${accToVfSuffix(p.acc)}/${p.octave}`;
+    if (!p) return { key, modifier: null };
+    const ks = normalizeKeySignature(keySig);
+    const def = getDefaultAccForLetter(p.letter, ks);
+    const base = `${p.letter}/${p.octave}`;
+    if (p.acc === def) return { key: base, modifier: null };
+    if (p.acc === 0 && def !== 0) return { key: base, modifier: 'n' };
+    if (def === 0 && p.acc === -1) return { key: base, modifier: 'b' };
+    if (def === 0 && p.acc === -2) return { key: base, modifier: 'bb' };
+    if (def === 0 && p.acc === 1) return { key: base, modifier: '#' };
+    if (def === 0 && p.acc === 2) return { key: base, modifier: '##' };
+    if (def === -1 && p.acc === -2) return { key: base, modifier: 'b' };
+    if (def === 1 && p.acc === 0) return { key: base, modifier: 'n' };
+    return { key: `${p.letter}${accToVfSuffix(p.acc)}/${p.octave}`, modifier: null };
+}
+
+function applyNoteAccidentals(note, VF) {
+    const list = note._accList;
+    if (!list?.length || !VF.Accidental) return;
+    list.forEach(({ modifier, origIdx }) => {
+        if (!modifier) return;
+        let idx = origIdx;
+        if (note.sortedKeyProps?.length) {
+            const pos = note.sortedKeyProps.findIndex(s => s.index === origIdx);
+            if (pos >= 0) idx = pos;
+        }
+        try { note.addModifier(new VF.Accidental(modifier), idx); } catch (_) {}
+    });
+    delete note._accList;
 }
 
 function noteCenterX(sn) {
@@ -1812,13 +1843,18 @@ function buildStaveNote(VF, clef, n, keySig) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
     const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
-    const ks = keySig || 'C';
-    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, ks));
-    return new VF.StaveNote({
+    const ks = normalizeKeySignature(keySig || 'C');
+    const prepared = isRest ? rawKeys.map(k => ({ key: k, modifier: null })) : rawKeys.map(k => prepareKeyForKeySig(k, ks));
+    const keys = prepared.map(p => p.key);
+    const note = new VF.StaveNote({
         clef,
         keys: isRest ? [clef === 'bass' ? 'd/3' : 'b/4'] : keys,
         duration
     });
+    if (!isRest) {
+        note._accList = prepared.map((p, origIdx) => (p.modifier ? { modifier: p.modifier, origIdx } : null)).filter(Boolean);
+    }
+    return note;
 }
 
 function noteDurationBeats(durationStr, beatValue) {
@@ -1929,7 +1965,7 @@ function renderNotationCard(container, data) {
         }
 
         const clef = (data.clef === 'bass') ? 'bass' : 'treble';
-        const keySig = typeof data.keySignature === 'string' ? data.keySignature : 'C';
+        const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
         const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
         const rawNotes = Array.isArray(data.notes) ? data.notes : [];
 
@@ -2043,7 +2079,10 @@ function renderNotationCard(container, data) {
                     staveNotes.forEach(sn => { try { sn.setStave(stave); } catch (_) {} });
                     const overhead = mm.isFirstOfRow ? FIRST_OVERHEAD : 30;
                     const formatWidth = Math.max(mm.width - overhead, 50);
-                    new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
+                    const formatter = new VF.Formatter();
+                    formatter.joinVoices([voice]).format([voice], formatWidth);
+                    staveNotes.forEach(sn => applyNoteAccidentals(sn, VF));
+                    formatter.joinVoices([voice]).format([voice], formatWidth);
                     voice.draw(ctx, stave);
                     unisonBatch.push({ staveNotes, notesData: mm.notes, stave });
                 }

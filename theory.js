@@ -546,22 +546,29 @@
         };
     }
 
-    // ---------- Ключевые знаки для VexFlow ----------
-    /** Ключ параллельного мажора (f-moll → F, 1 ♭) — школьная сольфеджио-практика. */
-    function majorKeySigName(tonic) {
+    // ---------- Ключевые знаки для VexFlow (минор → relative major, как на solfeggio-online) ----------
+    function tonicId(tonic) {
         const a = tonic.acc;
         const acc = a === 0 ? '' : a > 0 ? '#'.repeat(a) : 'b'.repeat(-a);
-        const id = `${tonic.letter}${acc}`;
-        const MAP = {
-            c: 'C', g: 'G', d: 'D', a: 'A', e: 'E', b: 'B', 'f#': 'F#', 'c#': 'C#',
-            f: 'F', bb: 'Bb', eb: 'Eb', ab: 'Ab', db: 'Db', gb: 'Gb', cb: 'Cb'
-        };
-        return MAP[id] || 'C';
+        return `${tonic.letter}${acc}`;
     }
 
+    const MAJOR_KEY_SIG = {
+        c: 'C', g: 'G', d: 'D', a: 'A', e: 'E', b: 'B', 'f#': 'F#', 'c#': 'C#',
+        'g#': 'G#', 'd#': 'D#', 'a#': 'A#',
+        f: 'F', bb: 'Bb', eb: 'Eb', ab: 'Ab', db: 'Db', gb: 'Gb', cb: 'Cb'
+    };
+
+    /** Relative major для минора: c-moll → Eb, g-moll → Bb, f-moll → Ab … */
+    const MINOR_RELATIVE_MAJOR = {
+        a: 'C', e: 'G', b: 'D', 'f#': 'A', 'c#': 'E', 'g#': 'B', 'd#': 'F#', 'a#': 'C#',
+        d: 'F', g: 'Bb', c: 'Eb', f: 'Ab', bb: 'Db', eb: 'Gb', ab: 'Cb'
+    };
+
     function keySigFor(tonic, mode) {
-        void mode;
-        return majorKeySigName(tonic);
+        const id = tonicId(tonic);
+        if (mode === 'minor') return MINOR_RELATIVE_MAJOR[id] || MAJOR_KEY_SIG[id] || 'C';
+        return MAJOR_KEY_SIG[id] || 'C';
     }
 
     // ---------- Парсер запроса ----------
