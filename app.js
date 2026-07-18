@@ -1644,6 +1644,79 @@ function getVexFlowNamespace() {
 
 const NOTATION_DURATION_FRACTION = { w: 1, h: 0.5, q: 0.25, '8': 0.125, '16': 0.0625, '32': 0.03125 };
 
+function vfKeyLine(VF, key, clef) {
+    try {
+        const p = VF.keyProperties(key, clef);
+        return p ? p.line : null;
+    } catch (_) {
+        return null;
+    }
+}
+
+/** VexFlow даёт только 2 позиции на одной линии (обычная / смещённая); 3+ унисона накладываются. */
+function expandUnisonHeads(staveNotes, notesData, clef, svg, color) {
+    if (!svg || !staveNotes || !notesData) return;
+    const VF = getVexFlowNamespace();
+    if (!VF) return;
+    const SHIFT = 11;
+
+    staveNotes.forEach((sn, idx) => {
+        const rawKeys = notesData[idx]?.keys;
+        if (!Array.isArray(rawKeys)) return;
+
+        const lineWant = new Map();
+        rawKeys.forEach(k => {
+            const line = vfKeyLine(VF, k, clef);
+            if (line == null) return;
+            lineWant.set(line, (lineWant.get(line) || 0) + 1);
+        });
+
+        const heads = sn.note_heads || (typeof sn.getNoteHeads === 'function' ? sn.getNoteHeads() : null);
+        if (!heads || !heads.length) return;
+
+        const byLine = new Map();
+        heads.forEach(h => {
+            if (h.line == null) return;
+            if (!byLine.has(h.line)) byLine.set(h.line, []);
+            byLine.get(h.line).push(h);
+        });
+
+        lineWant.forEach((want, line) => {
+            if (want < 3) return;
+            const lineHeads = byLine.get(line) || [];
+            if (!lineHeads.length) return;
+
+            lineHeads.sort((a, b) => (a.getAbsoluteX?.() || 0) - (b.getAbsoluteX?.() || 0));
+            const xs = [];
+            lineHeads.forEach(h => {
+                const x = Math.round(h.getAbsoluteX?.() || 0);
+                if (!xs.includes(x)) xs.push(x);
+            });
+
+            let missing = want - xs.length;
+            if (missing <= 0 && want >= 3 && xs.length === 2) missing = 1;
+            if (missing <= 0) return;
+
+            const leftmost = lineHeads[0];
+            const svgEl = leftmost.getSVGElement?.();
+            if (!svgEl || !svgEl.parentNode) return;
+
+            for (let m = 0; m < missing; m++) {
+                const dx = -SHIFT * (m + 1);
+                const clone = svgEl.cloneNode(true);
+                clone.setAttribute('transform', `translate(${dx}, 0)`);
+                svgEl.parentNode.insertBefore(clone, svgEl);
+                clone.querySelectorAll('path, rect, ellipse, polygon').forEach(el => {
+                    const fill = el.getAttribute('fill');
+                    if (fill && fill !== 'none') el.setAttribute('fill', color);
+                    const stroke = el.getAttribute('stroke');
+                    if (stroke && stroke !== 'none') el.setAttribute('stroke', color);
+                });
+            }
+        });
+    });
+}
+
 function buildStaveNote(VF, clef, n) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
@@ -1879,6 +1952,7 @@ function renderNotationCard(container, data) {
         rows.forEach((r, rowIdx) => {
             let x = 8;
             const y = TOP_PAD + rowIdx * ROW_HEIGHT;
+            const unisonBatch = [];
             r.forEach((mm, mIdx) => {
                 const stave = new VF.Stave(x, y, mm.width);
                 if (mm.isFirstOfRow) {
@@ -1911,9 +1985,14 @@ function renderNotationCard(container, data) {
                     const formatWidth = Math.max(mm.width - overhead, 50);
                     new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
                     voice.draw(ctx, stave);
+                    unisonBatch.push({ staveNotes, notesData: mm.notes });
                 }
 
                 x += mm.width;
+            });
+            const svg = container.querySelector('svg');
+            unisonBatch.forEach(({ staveNotes, notesData }) => {
+                expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor);
             });
         });
 
