@@ -1644,30 +1644,108 @@ function getVexFlowNamespace() {
 
 const NOTATION_DURATION_FRACTION = { w: 1, h: 0.5, q: 0.25, '8': 0.125, '16': 0.0625, '32': 0.03125 };
 
+const VEX_LETTERS = ['c', 'd', 'e', 'f', 'g', 'a', 'b'];
+const VEX_LETTER_SEMI = { c: 0, d: 2, e: 4, f: 5, g: 7, a: 9, b: 11 };
+
+/** VexFlow схлопывает одинаковые keys — для унисона даём энгармоническое написание (f, e#, e##). */
+function parseVexFlowKey(k) {
+    const m = String(k).trim().match(/^([a-g])(##|#|bb|b)?\/(-?\d+)$/i);
+    if (!m) return null;
+    const letter = m[1].toLowerCase();
+    let acc = 0;
+    if (m[2] === '#') acc = 1;
+    else if (m[2] === '##') acc = 2;
+    else if (m[2] === 'b') acc = -1;
+    else if (m[2] === 'bb') acc = -2;
+    return { letter, acc, octave: parseInt(m[3], 10) };
+}
+
+function vexKeyFromNote(letter, acc, octave) {
+    const a = acc === 0 ? '' : acc > 0 ? '#'.repeat(acc) : 'b'.repeat(-acc);
+    return `${letter}${a}/${octave}`;
+}
+
+function noteAbsPitch(n) {
+    return n.octave * 12 + VEX_LETTER_SEMI[n.letter] + n.acc;
+}
+
+function spellSamePitch(note, letter) {
+    for (let o = note.octave - 1; o <= note.octave + 1; o++) {
+        const natural = o * 12 + VEX_LETTER_SEMI[letter];
+        const acc = noteAbsPitch(note) - natural;
+        if (acc >= -2 && acc <= 2) return vexKeyFromNote(letter, acc, o);
+    }
+    return null;
+}
+
+function enharmonicForDuplicate(origKey, dupIndex) {
+    if (dupIndex <= 0) return origKey;
+    const n = parseVexFlowKey(origKey);
+    if (!n) return origKey;
+    const li = VEX_LETTERS.indexOf(n.letter);
+    const prevL = VEX_LETTERS[(li + 6) % 7];
+    const alt = spellSamePitch(n, prevL);
+    if (dupIndex === 1 && alt) return alt;
+    if (dupIndex >= 2) {
+        const nAlt = parseVexFlowKey(alt || origKey);
+        if (nAlt) {
+            const prev2 = spellSamePitch(nAlt, VEX_LETTERS[(VEX_LETTERS.indexOf(nAlt.letter) + 6) % 7]);
+            if (prev2) return prev2;
+        }
+    }
+    const nextL = VEX_LETTERS[(li + 1) % 7];
+    return spellSamePitch(n, nextL) || origKey;
+}
+
+function displayKeysForVex(keys) {
+    const seen = new Map();
+    return keys.map(k => {
+        const lk = String(k).toLowerCase();
+        const idx = seen.get(lk) || 0;
+        seen.set(lk, idx + 1);
+        return enharmonicForDuplicate(k, idx);
+    });
+}
+
+function drawChordLabelsBelow(svg, staveNotes, notesData, staveY, color) {
+    if (!svg) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    staveNotes.forEach((sn, i) => {
+        const lbl = notesData[i]?.label;
+        if (!lbl) return;
+        let bb;
+        try { bb = sn.getBoundingBox(); } catch (_) { return; }
+        if (!bb) return;
+        const w = bb.w ?? bb.width ?? 0;
+        const x = (bb.x ?? bb.getX?.() ?? 0) + w / 2;
+        const y = staveY + 92;
+        const t = document.createElementNS(NS, 'text');
+        t.setAttribute('x', String(x));
+        t.setAttribute('y', String(y));
+        t.setAttribute('text-anchor', 'middle');
+        t.setAttribute('font-family', 'Arial, sans-serif');
+        t.setAttribute('font-size', '13');
+        t.setAttribute('fill', color);
+        t.textContent = lbl;
+        svg.appendChild(t);
+    });
+}
+
 function buildStaveNote(VF, clef, n) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
-    const keys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
+    const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
+    const keys = isRest ? rawKeys : displayKeysForVex(rawKeys);
     const note = new VF.StaveNote({
         clef,
         keys: isRest ? [clef === 'bass' ? 'd/3' : 'b/4'] : keys,
         duration
     });
     if (!isRest) {
-        // Для унисонных удвоений (одна и та же нота встречается дважды — напр. утроенная
-        // прима в разрешении D7) знак альтерации ставим только на ПЕРВУЮ головку, иначе
-        // VexFlow нарисует два диеза/бемоля на паре head-to-head нот.
-        const seenAccKey = new Set();
         keys.forEach((k, i) => {
             const m = String(k).match(/^[a-g]([#b]{1,2})\//i);
             if (!m || !m[1] || !VF.Accidental) return;
-            const dedupeKey = String(k).toLowerCase();
-            if (seenAccKey.has(dedupeKey)) return;
-            seenAccKey.add(dedupeKey);
             const acc = new VF.Accidental(m[1]);
-            // VexFlow 4+: addModifier(modifier, index). VexFlow 3.x: addAccidental(index, acc).
-            // Иногда один из методов молча падает (try/catch ниже глотает ошибку), поэтому
-            // пробуем оба варианта по очереди — какой-нибудь точно сработает.
             let ok = false;
             try { note.addModifier(acc, i); ok = true; } catch (_) {}
             if (!ok) {
@@ -1679,35 +1757,7 @@ function buildStaveNote(VF, clef, n) {
         });
     }
 
-    // Подпись над нотой/аккордом (например "T5/3", "D7", "D6/5"). Безопасно: если
-    // VF.Annotation недоступна или API упал — нота просто отрисуется без подписи.
-    // Чтобы откатить эту фичу — удалить ВЕСЬ блок ниже до `return note;`.
-    if (n && typeof n.label === 'string' && n.label && VF.Annotation) {
-        try {
-            const ann = new VF.Annotation(n.label);
-            if (typeof ann.setFont === 'function') {
-                try { ann.setFont('Arial', 11, 'normal'); } catch (_) {
-                    try { ann.setFont('Arial', 11); } catch (__) {}
-                }
-            }
-            // Поставить аннотацию НАД нотным станом (если API доступен).
-            const VJ = VF.Annotation && VF.Annotation.VerticalJustify;
-            const VJ2 = VF.AnnotationVerticalJustify;
-            const top = (VJ && VJ.TOP) ?? (VJ2 && VJ2.TOP) ?? 1;
-            if (typeof ann.setVerticalJustification === 'function') {
-                try { ann.setVerticalJustification(top); } catch (_) {}
-            }
-            let ok = false;
-            try { note.addModifier(ann, 0); ok = true; } catch (_) {}
-            if (!ok) {
-                try { note.addModifier(ann); ok = true; } catch (_) {}
-            }
-            if (!ok && typeof note.addAnnotation === 'function') {
-                try { note.addAnnotation(0, ann); } catch (_) {}
-            }
-        } catch (_) { /* swallow — рендеринг ноты важнее подписи */ }
-    }
-
+    // Подписи (D7, t53…) рисуем отдельно ПОД станом — см. drawChordLabelsBelow.
     return note;
 }
 
@@ -1875,9 +1925,9 @@ function renderNotationCard(container, data) {
             }
         });
 
-        const ROW_HEIGHT = 110;
-        const TOP_PAD = 28; // увеличен с 14: оставляем место для подписей-аннотаций (T5/3, D7 и т.п.) над нотой
-        const totalHeight = rows.length * ROW_HEIGHT + TOP_PAD + 14;
+        const ROW_HEIGHT = 118;
+        const TOP_PAD = 8;
+        const totalHeight = rows.length * ROW_HEIGHT + TOP_PAD + 22;
         const totalWidth = maxW + 16;
 
         const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
@@ -1921,6 +1971,7 @@ function renderNotationCard(container, data) {
                     const formatWidth = Math.max(mm.width - overhead, 50);
                     new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
                     voice.draw(ctx, stave);
+                    drawChordLabelsBelow(container.querySelector('svg'), staveNotes, mm.notes, y, noteColor);
                 }
 
                 x += mm.width;
