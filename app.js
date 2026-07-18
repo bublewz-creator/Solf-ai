@@ -1967,7 +1967,10 @@ function renderNotationCard(container, data) {
         const clef = (data.clef === 'bass') ? 'bass' : 'treble';
         const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
         const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
-        const rawNotes = Array.isArray(data.notes) ? data.notes : [];
+        let rawNotes = Array.isArray(data.notes) ? data.notes : [];
+        if (window.SolfTheory && typeof window.SolfTheory.normalizeNotationOctaves === 'function') {
+            try { rawNotes = window.SolfTheory.normalizeNotationOctaves(rawNotes, clef); } catch (_) {}
+        }
 
         const barlinesMode = (['none', 'manual', 'auto'].includes(data.barlines)) ? data.barlines : 'auto';
         const timeSigHidden = !rawTimeSig || rawTimeSig === 'none' || barlinesMode !== 'auto';

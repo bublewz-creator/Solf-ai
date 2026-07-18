@@ -771,8 +771,48 @@
         return null;
     }
 
+    function shiftVexKeyOctave(k, delta) {
+        const p = parseVexKey(k);
+        if (!p) return k;
+        const oct = Math.max(1, Math.min(8, p.octave + delta));
+        return noteKey({ letter: p.letter, acc: p.acc, octave: oct });
+    }
+
+    /** Удобный диапазон: treble ≈ A3–G5, без 6-й октавы и лишних добавочных. */
+    const OCTAVE_LIMITS = {
+        treble: { top: 79, bottom: 57 },
+        bass: { top: 67, bottom: 40 }
+    };
+
+    function normalizeChordOctaves(note, clef) {
+        if (!note || !Array.isArray(note.keys) || !note.keys.length) return note;
+        const lim = OCTAVE_LIMITS[clef === 'bass' ? 'bass' : 'treble'];
+        const pitches = note.keys.map(k => {
+            const p = parseVexKey(k);
+            return p ? noteAbs(p) : null;
+        }).filter(v => v != null);
+        if (!pitches.length) return note;
+        const maxA = Math.max(...pitches);
+        const minA = Math.min(...pitches);
+        let shift = 0;
+        if (maxA > lim.top) shift = -Math.ceil((maxA - lim.top) / 12);
+        if (shift && minA + shift * 12 < lim.bottom) {
+            while (shift < 0 && minA + shift * 12 < lim.bottom) shift += 1;
+        }
+        if (!shift) return note;
+        return { ...note, keys: note.keys.map(k => shiftVexKeyOctave(k, shift)) };
+    }
+
+    function normalizeNotationOctaves(notes, clef) {
+        if (!Array.isArray(notes)) return notes;
+        const c = clef === 'bass' ? 'bass' : 'treble';
+        return notes.map(n => normalizeChordOctaves(n, c));
+    }
+
     function finalize(data) {
         if (!data || !Array.isArray(data.notes) || !data.notes.length) return null;
+        const clef = data.clef === 'bass' ? 'bass' : 'treble';
+        data = { ...data, notes: normalizeNotationOctaves(data.notes, clef) };
         // финальная страховка: каждый key валиден
         for (const n of data.notes) {
             if (!Array.isArray(n.keys) || !n.keys.length) return null;
@@ -830,6 +870,7 @@
         buildNotationForQuery,
         applyBlock,
         autoLabelNotation,
-        setLabelLocale
+        setLabelLocale,
+        normalizeNotationOctaves
     };
 })();
