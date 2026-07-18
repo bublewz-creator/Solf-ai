@@ -1689,18 +1689,31 @@ function accToVfSuffix(acc) {
     return 'b'.repeat(-acc);
 }
 
-/** Убирает лишние ♭/♯, которые уже даёт ключ; оставляет только бекары и отклонения. */
+/** Убирает лишние ♭/♯ из ключа; отклонения — через modifier (не в строке key). */
 function prepareKeyForKeySig(key, keySig) {
     const p = parseVfKey(key);
     if (!p) return { key, modifier: null };
     const defaultAcc = getDefaultAccForLetter(p.letter, keySig);
-    if (p.acc === defaultAcc) {
-        return { key: `${p.letter}/${p.octave}`, modifier: null };
-    }
-    if (p.acc === 0 && defaultAcc !== 0) {
-        return { key: `${p.letter}/${p.octave}`, modifier: 'n' };
-    }
-    return { key: `${p.letter}${accToVfSuffix(p.acc)}/${p.octave}`, modifier: null };
+    const base = `${p.letter}/${p.octave}`;
+    if (p.acc === defaultAcc) return { key: base, modifier: null };
+    if (p.acc === 0 && defaultAcc !== 0) return { key: base, modifier: 'n' };
+    const mod = p.acc === 1 ? '#' : p.acc === 2 ? '##' : p.acc === -1 ? 'b' : p.acc === -2 ? 'bb' : null;
+    return { key: base, modifier: mod };
+}
+
+function applyPendingAccidentals(note, VF) {
+    const pending = note._pendingAcc;
+    if (!pending?.length || !VF.Accidental) return;
+    pending.forEach(({ modifier, origIdx }) => {
+        if (!modifier) return;
+        let idx = origIdx;
+        if (note.sortedKeyProps?.length) {
+            const pos = note.sortedKeyProps.findIndex(s => s.index === origIdx);
+            if (pos >= 0) idx = pos;
+        }
+        try { note.addModifier(new VF.Accidental(modifier), idx); } catch (_) {}
+    });
+    delete note._pendingAcc;
 }
 
 function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
@@ -1808,38 +1821,19 @@ function buildStaveNote(VF, clef, n, keySig) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
     const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
-    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, keySig || 'C').key);
+    const ks = keySig || 'C';
+    const keys = isRest ? rawKeys : rawKeys.map(k => prepareKeyForKeySig(k, ks).key);
     const note = new VF.StaveNote({
         clef,
         keys: isRest ? [clef === 'bass' ? 'd/3' : 'b/4'] : keys,
         duration
     });
     if (!isRest) {
-        const seenMod = new Set();
-        rawKeys.forEach((rawK, i) => {
-            const prep = prepareKeyForKeySig(rawK, keySig || 'C');
-            if (prep.modifier && VF.Accidental) {
-                const modKey = `${i}:${prep.modifier}`;
-                if (seenMod.has(modKey)) return;
-                seenMod.add(modKey);
-                const acc = new VF.Accidental(prep.modifier);
-                try { note.addModifier(acc, i); } catch (_) {
-                    try { note.addModifier(acc); } catch (__) {}
-                }
-                return;
-            }
-            const m = String(prep.key).match(/^[a-g]([#b]{1,2})\//i);
-            if (!m || !m[1] || !VF.Accidental) return;
-            const dedupeKey = `${i}:${String(prep.key).toLowerCase()}`;
-            if (seenMod.has(dedupeKey)) return;
-            seenMod.add(dedupeKey);
-            const acc = new VF.Accidental(m[1]);
-            try { note.addModifier(acc, i); } catch (_) {
-                try { note.addModifier(acc); } catch (__) {}
-            }
-        });
+        note._pendingAcc = rawKeys.map((rawK, origIdx) => {
+            const prep = prepareKeyForKeySig(rawK, ks);
+            return prep.modifier ? { modifier: prep.modifier, origIdx } : null;
+        }).filter(Boolean);
     }
-
     return note;
 }
 
@@ -2065,6 +2059,7 @@ function renderNotationCard(container, data) {
                     const overhead = mm.isFirstOfRow ? FIRST_OVERHEAD : 30;
                     const formatWidth = Math.max(mm.width - overhead, 50);
                     new VF.Formatter().joinVoices([voice]).format([voice], formatWidth);
+                    staveNotes.forEach(sn => applyPendingAccidentals(sn, VF));
                     voice.draw(ctx, stave);
                     unisonBatch.push({ staveNotes, notesData: mm.notes, stave });
                 }
