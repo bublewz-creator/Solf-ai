@@ -610,30 +610,54 @@
         return buildIntervalUp({ ...tonic, octave: 4 }, degree, semi);
     }
 
-    /** Подбирает октавы для плавного голосоведения от предыдущего аккорда. */
+    /** Подбирает октавы: сначала общий тон (та же нота), иначе ближайший по высоте голос. */
     function voiceLeadKeys(toneNotes, prevKeys) {
         if (!toneNotes.length) return [];
         const prevParsed = (prevKeys || []).map(parseVexKey).filter(Boolean);
-        const prevSorted = prevParsed.map(noteAbs).sort((a, b) => a - b);
+        if (!prevParsed.length) {
+            return toneNotes.map(n => noteKey({ ...n, octave: 4 }));
+        }
+        const used = new Set();
         const out = [];
-        for (let i = 0; i < toneNotes.length; i++) {
-            const n = toneNotes[i];
-            const anchor = prevSorted.length
-                ? prevSorted[Math.min(i, prevSorted.length - 1)]
-                : 60;
+        for (const n of toneNotes) {
+            let anchor = null;
+            const sameIdx = prevParsed.findIndex((p, i) => !used.has(i) && p.letter === n.letter && p.acc === n.acc);
+            if (sameIdx >= 0) {
+                used.add(sameIdx);
+                anchor = noteAbs(prevParsed[sameIdx]);
+            } else {
+                let bestI = -1;
+                let bestDist = Infinity;
+                prevParsed.forEach((p, i) => {
+                    if (used.has(i)) return;
+                    const dist = Math.abs(pc(n) - pc(p));
+                    if (dist < bestDist) { bestDist = dist; bestI = i; }
+                });
+                if (bestI >= 0) {
+                    used.add(bestI);
+                    anchor = noteAbs(prevParsed[bestI]);
+                }
+            }
+            if (anchor == null) anchor = 64;
             let bestOct = 4;
             let bestDist = Infinity;
             for (let oct = 3; oct <= 6; oct++) {
                 const abs = noteAbs({ ...n, octave: oct });
                 const dist = Math.abs(abs - anchor);
-                if (dist < bestDist) {
-                    bestDist = dist;
-                    bestOct = oct;
-                }
+                if (dist < bestDist) { bestDist = dist; bestOct = oct; }
             }
             out.push(noteKey({ ...n, octave: bestOct }));
         }
         return out;
+    }
+
+    /** Все T53 в цепочке — одна аппликатура (близкая позиция), как в начале. */
+    function unifyTriadVoicing(notes, label) {
+        const template = notes.find(n => n.label === label)?.keys;
+        if (!template) return;
+        notes.forEach(n => {
+            if (n.label === label) n.keys = [...template];
+        });
     }
 
     /**
@@ -662,6 +686,7 @@
             notes.push({ keys, duration: 'w', label: labels[idx] });
             prevKeys = keys;
         });
+        unifyTriadVoicing(notes, 'T53');
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, 'major'),
