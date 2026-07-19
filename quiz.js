@@ -104,7 +104,7 @@ function useQuiz() {
         const workerUrl = typeof WORKER_URL !== 'undefined' ? WORKER_URL : 'https://solf-ai-api.mlemonw.workers.dev';
         fetch(`${workerUrl}/increment-usage`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: solfAuthHeaders({ 'Content-Type': 'application/json' }),
             body: JSON.stringify({ id: currentUser.id, type: 'quiz' }),
         })
             .then(r => r.json())

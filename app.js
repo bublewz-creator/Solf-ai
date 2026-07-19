@@ -26,6 +26,22 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
     }
 }
 
+async function apiFetch(url, options = {}, timeoutMs = 25000) {
+    const headers = solfAuthHeaders(options.headers || {});
+    if (options.body && !headers['Content-Type']) {
+        headers['Content-Type'] = 'application/json';
+    }
+    const res = await fetchWithTimeout(url, { ...options, headers }, timeoutMs);
+    if (res.status === 401 && typeof clearSolfAuth === 'function') {
+        clearSolfAuth();
+        currentUser = null;
+        if (!/login\.html/i.test(window.location.pathname || '')) {
+            window.location.href = 'login.html';
+        }
+    }
+    return res;
+}
+
 async function syncAppData() {
     if (!currentUser?.id) return;
 
@@ -33,7 +49,7 @@ async function syncAppData() {
         // 12 сек — потолок для GET-запроса к БД. Если бэк за это время не ответил,
         // значит сеть/Cloudflare режут, и зависать дальше бессмысленно. Юзер останется
         // с локально-кэшированными данными (имя/план/счётчик), и UI будет работать.
-        const res = await fetchWithTimeout(`${WORKER_URL}/get-user?id=${currentUser.id}`, {}, 12000);
+        const res = await apiFetch(`${WORKER_URL}/get-user?id=${currentUser.id}`, {}, 12000);
         const data = await res.json();
 
         if (!res.ok || data.error) {
@@ -211,9 +227,13 @@ let attachedFiles = [];
 let currentUser = null;
 try {
     currentUser = JSON.parse(localStorage.getItem('solfai_user') || 'null');
+    if (currentUser?.id && typeof getSolfSessionToken === 'function' && !getSolfSessionToken()) {
+        if (typeof clearSolfAuth === 'function') clearSolfAuth();
+        currentUser = null;
+    }
 } catch (_) {
     currentUser = null;
-    try { localStorage.removeItem('solfai_user'); } catch (__) {}
+    if (typeof clearSolfAuth === 'function') clearSolfAuth();
 }
 let pendingQuery = null;
 let currentTheme = localStorage.getItem('solfai_theme') || 'default';
@@ -948,7 +968,7 @@ function enforceChatLimit() {
     if (currentUser && currentUser.id) {
         removed.forEach(chat => {
             if (!chat || !chat.id) return;
-            fetch(`${WORKER_URL}/delete-chat`, {
+            apiFetch(`${WORKER_URL}/delete-chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: chat.id, user_id: currentUser.id })
@@ -993,11 +1013,11 @@ window.deleteChatFromSidebar = function(id, e) {
         
         // НОВОЕ: Отправляем запрос на удаление из БД
         if (currentUser) {
-            fetch(`${WORKER_URL}/delete-chat`, {
+            apiFetch(`${WORKER_URL}/delete-chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ id: id, user_id: currentUser.id })
-            }).catch(err => console.error("Ошибка удаления чата из БД:", err));
+            }).catch(err => console.error('Failed to delete chat:', err));
         }
 
         if(currentChatId === id) startNewChat();
@@ -1434,11 +1454,11 @@ function saveChatToStorage() {
         const currentChatData = chats.find(c => c.id === currentChatId);
         if (currentChatData) {
             const chatToSave = { ...currentChatData, user_id: currentUser.id };
-            fetch(`${WORKER_URL}/save-chat`, {
+            apiFetch(`${WORKER_URL}/save-chat`, {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(chatToSave)
-            }).catch(err => console.error("Ошибка сохранения чата в БД:", err));
+            }).catch(err => console.error('Failed to save chat:', err));
         }
     }
 }
@@ -2324,7 +2344,7 @@ async function generateResponse(query, imageData = null) {
             } : null
         };
 
-        const res = await fetch(`${WORKER_URL}/generate`, { 
+        const res = await apiFetch(`${WORKER_URL}/generate`, { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(payload), 
@@ -2399,7 +2419,7 @@ async function generateResponse(query, imageData = null) {
                         { role: 'user', content: notationRetryPrompts[ri] }
                     ]);
                     const retryBudget = notationRetryBudgets[ri] ?? 2048;
-                    const retryRes = await fetch(`${WORKER_URL}/generate`, {
+                    const retryRes = await apiFetch(`${WORKER_URL}/generate`, {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({
@@ -2630,7 +2650,7 @@ function updateUIForUser() {
     // 15 сек хватит даже на медленную мобильную связь; если бэк не отвечает (без VPN),
     // юзер останется со списком из localStorage и сможет продолжать работу.
     if (currentUser) {
-        fetchWithTimeout(`${WORKER_URL}/get-chats?user_id=${currentUser.id}`, {}, 15000)
+        apiFetch(`${WORKER_URL}/get-chats?user_id=${currentUser.id}`, {}, 15000)
             .then(res => res.json())
             .then(data => {
                 if (data.chats && data.chats.length > 0) {
@@ -2647,8 +2667,14 @@ function updateUIForUser() {
 }
 
 function logout() {
+    if (typeof getSolfSessionToken === 'function' && getSolfSessionToken()) {
+        fetch(`${WORKER_URL}/auth/logout`, {
+            method: 'POST',
+            headers: solfAuthHeaders(),
+        }).catch(() => {});
+    }
+    if (typeof clearSolfAuth === 'function') clearSolfAuth();
     currentUser = null;
-    localStorage.removeItem('solfai_user');
     localStorage.setItem('solfai_plan_guest', JSON.stringify({ type: "free", emoji: PLAN_ICONS.free, name: "Free" }));
     updateUIForUser();
     updatePlanDisplay();

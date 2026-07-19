@@ -234,7 +234,13 @@ function initSettingsPage() {
         window.location.href = 'index.html';
     });
     document.getElementById('settingsLogoutBtn').addEventListener('click', () => {
-        localStorage.removeItem('solfai_user');
+        if (typeof getSolfSessionToken === 'function' && getSolfSessionToken()) {
+            fetch('https://solf-ai-api.mlemonw.workers.dev/auth/logout', {
+                method: 'POST',
+                headers: typeof solfAuthHeaders === 'function' ? solfAuthHeaders() : {},
+            }).catch(() => {});
+        }
+        if (typeof clearSolfAuth === 'function') clearSolfAuth();
         localStorage.setItem('solfai_plan_guest', JSON.stringify({
             type: 'free',
             emoji: '<svg class="svg-icon" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>',

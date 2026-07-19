@@ -12,7 +12,9 @@ let providersLoaded = false;
 (function redirectIfAlreadyLoggedIn() {
     try {
         const user = JSON.parse(localStorage.getItem('solfai_user') || 'null');
-        if (user?.id) location.replace(getReturnUrl());
+        if (user?.id && typeof getSolfSessionToken === 'function' && getSolfSessionToken()) {
+            location.replace(getReturnUrl());
+        }
     } catch (_) {}
 })();
 
@@ -27,33 +29,45 @@ async function fetchWithTimeout(url, options = {}, timeoutMs = 12000) {
     }
 }
 
-async function syncUserWithDB(user) {
-    try {
-        await fetchWithTimeout(`${WORKER_URL}/save-user`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                id: user.id,
-                email: user.email,
-                name: user.name,
-                picture: user.picture
-            })
-        });
-    } catch (error) {
-        console.warn('[Solf.ai] Failed to sync user:', error);
-    }
-}
-
 function getReturnUrl() {
     const ret = new URLSearchParams(location.search).get('return');
     if (!ret || ret.includes('://') || ret.startsWith('//')) return 'index.html';
     return ret;
 }
 
-function onAuthSuccess(user) {
-    localStorage.setItem('solfai_user', JSON.stringify(user));
-    syncUserWithDB(user);
+function onAuthSuccess(user, sessionToken) {
+    storeSolfAuth(user, sessionToken);
     location.href = getReturnUrl();
+}
+
+async function exchangeGoogleCredential(credential) {
+    const res = await fetchWithTimeout(`${WORKER_URL}/auth/google`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ credential }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.sessionToken) {
+        throw new Error(data.error || 'Google sign-in failed');
+    }
+    onAuthSuccess(data.user, data.sessionToken);
+}
+
+async function exchangeVkTokens(payload) {
+    const res = await fetchWithTimeout(`${WORKER_URL}/auth/vk`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+            id_token: payload.id_token,
+            access_token: payload.access_token,
+            client_id: VK_APP_ID,
+        }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok || !data.sessionToken) {
+        throw new Error(data.error || 'VK sign-in failed');
+    }
+    onAuthSuccess(data.user, data.sessionToken);
 }
 
 function updateAuthGate() {
@@ -111,12 +125,9 @@ function initGoogleAuth() {
         client_id: GOOGLE_CLIENT_ID,
         locale: 'en',
         callback: (r) => {
-            const payload = JSON.parse(atob(r.credential.split('.')[1]));
-            onAuthSuccess({
-                id: payload.sub,
-                email: payload.email,
-                name: payload.name,
-                picture: payload.picture
+            exchangeGoogleCredential(r.credential).catch((err) => {
+                console.warn('[Solf.ai] Google auth error:', err);
+                alert('Sign-in failed. Please try again.');
             });
         }
     });
@@ -143,28 +154,15 @@ function getVkIdScheme() {
 }
 
 async function handleVkIdAuthSuccess(data) {
-    const VKID = window.VKIDSDK;
-    let user = null;
     try {
-        if (data.id_token) {
-            const info = await VKID.Auth.publicInfo(data.id_token);
-            user = info.user || info;
-        } else if (data.access_token) {
-            const info = await VKID.Auth.userInfo(data.access_token);
-            user = info.user || info;
-        }
-    } catch (e) {
-        console.warn('[Solf.ai] VK user info fetch failed:', e);
+        await exchangeVkTokens({
+            id_token: data.id_token,
+            access_token: data.access_token,
+        });
+    } catch (err) {
+        console.warn('[Solf.ai] VK auth error:', err);
+        alert('Sign-in failed. Please try again.');
     }
-    const userId = user?.user_id || data.user_id;
-    if (!userId) return;
-    const name = user ? [user.first_name, user.last_name].filter(Boolean).join(' ').trim() : '';
-    onAuthSuccess({
-        id: 'vk_' + userId,
-        email: user?.email || '',
-        name: name || 'VK User',
-        picture: user?.avatar || ''
-    });
 }
 
 function exchangeVkCode(payload) {
@@ -198,17 +196,19 @@ function initVkIdAuth() {
         return;
     }
     const VKID = window.VKIDSDK;
-    if (!window.__solfVkIdConfigured) {
+    try {
         VKID.Config.init({
             app: VK_APP_ID,
             redirectUrl: VK_REDIRECT_URL,
             responseMode: VKID.ConfigResponseMode.Callback,
-            mode: VKID.ConfigAuthMode.InNewTab,
             source: VKID.ConfigSource.LOWCODE,
-            scope: ''
+            scope: '',
+            scheme: getVkIdScheme(),
         });
-        window.__solfVkIdConfigured = true;
+    } catch (e) {
+        console.warn('[Solf.ai] VK ID init failed:', e);
     }
+    bindAuthCircleClicks();
 }
 
 function ensureLoginProvidersLoaded() {
@@ -216,22 +216,13 @@ function ensureLoginProvidersLoaded() {
     ensureVkIdLoaded();
 }
 
-document.addEventListener('DOMContentLoaded', () => {
-    bindAuthCircleClicks();
-
-    document.getElementById('loginBackBtn')?.addEventListener('click', () => {
-        if (history.length > 1) history.back();
-        else location.href = 'index.html';
-    });
-
-    const laterBtn = document.getElementById('loginLaterBtn');
-    if (laterBtn) laterBtn.href = getReturnUrl();
-
-    const termsCheckbox = document.getElementById('termsAccept');
-    termsCheckbox?.addEventListener('change', () => {
-        termsAccepted = termsCheckbox.checked;
-        updateAuthGate();
-    });
-
+document.getElementById('termsAccept')?.addEventListener('change', (e) => {
+    termsAccepted = Boolean(e.target.checked);
     updateAuthGate();
 });
+
+document.getElementById('loginBackBtn')?.addEventListener('click', () => {
+    window.location.href = getReturnUrl() === 'index.html' ? 'index.html' : getReturnUrl();
+});
+
+updateAuthGate();
