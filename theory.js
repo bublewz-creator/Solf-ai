@@ -657,83 +657,50 @@
         return buildIntervalUp({ ...tonic, octave: 4 }, degree, semi);
     }
 
-    /** Подбирает октавы: сначала общий тон (та же нота), иначе ближайший по высоте голос. */
-    function voiceLeadKeys(toneNotes, prevKeys) {
-        if (!toneNotes.length) return [];
-        const prevParsed = (prevKeys || []).map(parseVexKey).filter(Boolean);
-        if (!prevParsed.length) {
-            return toneNotes.map(n => noteKey({ ...n, octave: 4 }));
-        }
-        const used = new Set();
-        const out = [];
-        for (const n of toneNotes) {
-            let anchor = null;
-            const sameIdx = prevParsed.findIndex((p, i) => !used.has(i) && p.letter === n.letter && p.acc === n.acc);
-            if (sameIdx >= 0) {
-                used.add(sameIdx);
-                anchor = noteAbs(prevParsed[sameIdx]);
-            } else {
-                let bestI = -1;
-                let bestDist = Infinity;
-                prevParsed.forEach((p, i) => {
-                    if (used.has(i)) return;
-                    const dist = Math.abs(pc(n) - pc(p));
-                    if (dist < bestDist) { bestDist = dist; bestI = i; }
-                });
-                if (bestI >= 0) {
-                    used.add(bestI);
-                    anchor = noteAbs(prevParsed[bestI]);
-                }
-            }
-            if (anchor == null) anchor = 64;
-            let bestOct = 4;
-            let bestDist = Infinity;
-            for (let oct = 3; oct <= 6; oct++) {
-                const abs = noteAbs({ ...n, octave: oct });
-                const dist = Math.abs(abs - anchor);
-                if (dist < bestDist) { bestDist = dist; bestOct = oct; }
-            }
-            out.push(noteKey({ ...n, octave: bestOct }));
-        }
-        return out;
-    }
-
-    /** Все T53 в цепочке — одна аппликатура (близкая позиция), как в начале. */
-    function unifyTriadVoicing(notes, label) {
-        const template = notes.find(n => n.label === label)?.keys;
-        if (!template) return;
-        notes.forEach(n => {
-            if (n.label === label) n.keys = [...template];
-        });
+    /** Септаккорд: 7 / 65 / 43 / 2 — бас = прима / терция / квинта / септима. */
+    function seventhVoicings(root, thirdSemi, fifthSemi, seventhSemi) {
+        const r = { ...root, octave: 4 };
+        const III = buildIntervalUp(r, 3, thirdSemi);
+        const V = buildIntervalUp(r, 5, fifthSemi);
+        const VII = buildIntervalUp(r, 7, seventhSemi);
+        const r8 = buildIntervalUp(r, 8, 12);
+        const III8 = buildIntervalUp(r8, 3, thirdSemi);
+        const V8 = buildIntervalUp(r8, 5, fifthSemi);
+        return {
+            '7': [noteKey(r), noteKey(III), noteKey(V), noteKey(VII)],
+            '65': [noteKey(III), noteKey(V), noteKey(VII), noteKey(r8)],
+            '43': [noteKey(V), noteKey(VII), noteKey(r8), noteKey(III8)],
+            '2': [noteKey(VII), noteKey(r8), noteKey(III8), noteKey(V8)]
+        };
     }
 
     /**
      * Цепочка 1 (мажор): T53 S64 VII7 D65 T53 S6 K64 D7 T53
-     * S64 и VII7 — гармонические (s53, уменьшённый вводный VII7).
-     * D65 — разрешение VII7 через общие три звука (верхняя септима → вниз на секунду).
+     * Каждый аккорд — правильное обращение (бас = 53/6/64/7/65).
      */
     function buildChain1(tonic) {
-        const labels = ['T53', 'S64', 'VII7', 'D65', 'T53', 'S6', 'K64', 'D7', 'T53'];
-        const specs = [
-            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }],
-            [{ d: 1, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 6, f: 'harmonic' }],
-            [{ d: 7, f: 'harmonic' }, { d: 2, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 6, f: 'harmonic' }],
-            [{ d: 7, f: 'harmonic' }, { d: 2, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 5, f: 'major' }],
-            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }],
-            [{ d: 6, f: 'major' }, { d: 1, f: 'major' }, { d: 4, f: 'major' }],
-            [{ d: 5, f: 'major' }, { d: 1, f: 'major' }, { d: 3, f: 'major' }],
-            [{ d: 5, f: 'major' }, { d: 7, f: 'harmonic' }, { d: 2, f: 'major' }, { d: 4, f: 'major' }],
-            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }]
+        const I = scaleDegree(tonic, 1, 'major');
+        const IV = scaleDegree(tonic, 4, 'major');
+        const V = scaleDegree(tonic, 5, 'major');
+        const VIIh = scaleDegree(tonic, 7, 'harmonic');
+
+        const T = triadVoicings(I, 4, 7);
+        const S_harm = triadVoicings(IV, 3, 7);
+        const S_nat = triadVoicings(IV, 4, 7);
+        const UmVII7 = seventhVoicings(VIIh, 3, 6, 9);
+        const Dom7 = seventhVoicings(V, 4, 7, 10);
+
+        const notes = [
+            { keys: T['53'], duration: 'w', label: 'T53' },
+            { keys: S_harm['64'], duration: 'w', label: 'S64' },
+            { keys: UmVII7['7'], duration: 'w', label: 'VII7' },
+            { keys: Dom7['65'], duration: 'w', label: 'D65' },
+            { keys: T['53'], duration: 'w', label: 'T53' },
+            { keys: S_nat['6'], duration: 'w', label: 'S6' },
+            { keys: T['64'], duration: 'w', label: 'K64' },
+            { keys: Dom7['7'], duration: 'w', label: 'D7' },
+            { keys: T['53'], duration: 'w', label: 'T53' }
         ];
-        const notes = [];
-        let prevKeys = null;
-        specs.forEach((spec, idx) => {
-            const tones = spec.map(s => scaleDegree(tonic, s.d, s.f)).filter(Boolean);
-            const keys = voiceLeadKeys(tones, prevKeys);
-            notes.push({ keys, duration: 'w', label: labels[idx] });
-            prevKeys = keys;
-        });
-        unifyTriadVoicing(notes, 'T53');
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, 'major'),

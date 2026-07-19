@@ -898,8 +898,8 @@ function patchAiWithTheory(userQuery, aiText) {
                     : 'Natural, harmonic, and melodic forms (ascending and descending):');
             } else if (isChain) {
                 intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
-                    ? 'Цепочка 1: T53–S64–VII7–D65–T53–S6–K64–D7–T53 (с гармоническими S64 и VII7):'
-                    : 'Chain 1: T53–S64–VII7–D65–T53–S6–K64–D7–T53 (harmonic S64 and VII7):');
+                    ? 'Цепочка 1 в заданной тональности:'
+                    : 'Chain 1 in the requested key:');
             }
             const base = intro ? intro : aiText;
             return window.SolfTheory.applyBlock(base, det.blockString);
