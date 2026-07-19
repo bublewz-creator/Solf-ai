@@ -2887,7 +2887,17 @@ function migrateRemoveStaleUsageKeysOnce() {
 }
 
 // ===== ИНИЦИАЛИЗАЦИЯ И СЛУШАТЕЛИ =====
+function redirectVkOAuthToLogin() {
+    try {
+        const params = new URLSearchParams(window.location.search);
+        if (!params.get('code') || !params.get('device_id')) return;
+        if (/login\.html/i.test(window.location.pathname || '')) return;
+        window.location.replace('login.html' + window.location.search);
+    } catch (_) {}
+}
+
 async function initApp() {
+    redirectVkOAuthToLogin();
     migrateRemoveStaleUsageKeysOnce();
     // КРИТИЧНО: НЕ ждём `await syncAppData()`. Раньше тут было `await`, и если Cloudflare
     // Workers не отвечал (юзер без VPN — workers.dev часто режется ТСПУ), весь initApp

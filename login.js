@@ -3,7 +3,7 @@
 const WORKER_URL = 'https://solf-ai-api.mlemonw.workers.dev';
 const GOOGLE_CLIENT_ID = '691304539168-iaouqdnkd73iprkcs6cou2i93t11qiak.apps.googleusercontent.com';
 const VK_APP_ID = 54641545;
-const VK_REDIRECT_URL = 'https://bublewz-creator.github.io/Solf-ai/login.html';
+const VK_REDIRECT_URL = 'https://bublewz-creator.github.io/Solf-ai/';
 const VKID_SDK_URL = 'https://unpkg.com/@vkid/sdk@2.5.2/dist-sdk/umd/index.js';
 
 let termsAccepted = false;
