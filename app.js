@@ -759,11 +759,17 @@ function patchAiWithTheory(userQuery, aiText) {
         const det = window.SolfTheory.buildNotationForQuery(q);
         if (det && det.blockString && typeof window.SolfTheory.applyBlock === 'function') {
             const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
-            const intro = isMultiScale
-                ? (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+            const isChain = /цепочк|chain/i.test(q) && !/цепочк\w*\s*2\b|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
+            let intro = null;
+            if (isMultiScale) {
+                intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
                     ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
-                    : 'Natural, harmonic, and melodic forms (ascending and descending):')
-                : null;
+                    : 'Natural, harmonic, and melodic forms (ascending and descending):');
+            } else if (isChain) {
+                intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+                    ? 'Цепочка 1: T53–S64–VII7–D65–T53–S6–K64–D7–T53 (с гармоническими S64 и VII7):'
+                    : 'Chain 1: T53–S64–VII7–D65–T53–S6–K64–D7–T53 (harmonic S64 and VII7):');
+            }
             const base = intro ? intro : aiText;
             return window.SolfTheory.applyBlock(base, det.blockString);
         }

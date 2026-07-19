@@ -42,6 +42,8 @@
 
     const MAJOR_FORMULA = [0, 2, 4, 5, 7, 9, 11];
     const MINOR_FORMULA = [0, 2, 3, 5, 7, 8, 10];
+    /** Гармонический мажор: пониженная VI ступень, повышенная VII. */
+    const HARM_MAJOR_FORMULA = [0, 2, 4, 5, 7, 8, 11];
 
     /** 7 ступеней натуральной гаммы в октаве 4 (ascending), верное написание. */
     function buildScale(tonic, mode) {
@@ -600,6 +602,81 @@
         return { clef: 'treble', keySignature: 'C', timeSignature: '', barlines: 'none', notes };
     }
 
+    // ---------- Цепочки аккордов (школьные схемы) ----------
+    function scaleDegree(tonic, degree, form) {
+        const formula = form === 'harmonic' ? HARM_MAJOR_FORMULA : MAJOR_FORMULA;
+        const semi = formula[degree - 1];
+        if (semi == null) return null;
+        return buildIntervalUp({ ...tonic, octave: 4 }, degree, semi);
+    }
+
+    /** Подбирает октавы для плавного голосоведения от предыдущего аккорда. */
+    function voiceLeadKeys(toneNotes, prevKeys) {
+        if (!toneNotes.length) return [];
+        const prevParsed = (prevKeys || []).map(parseVexKey).filter(Boolean);
+        const prevSorted = prevParsed.map(noteAbs).sort((a, b) => a - b);
+        const out = [];
+        for (let i = 0; i < toneNotes.length; i++) {
+            const n = toneNotes[i];
+            const anchor = prevSorted.length
+                ? prevSorted[Math.min(i, prevSorted.length - 1)]
+                : 60;
+            let bestOct = 4;
+            let bestDist = Infinity;
+            for (let oct = 3; oct <= 6; oct++) {
+                const abs = noteAbs({ ...n, octave: oct });
+                const dist = Math.abs(abs - anchor);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    bestOct = oct;
+                }
+            }
+            out.push(noteKey({ ...n, octave: bestOct }));
+        }
+        return out;
+    }
+
+    /**
+     * Цепочка 1 (мажор): T53 S64 VII7 D65 T53 S6 K64 D7 T53
+     * S64 и VII7 — гармонические (s53, уменьшённый вводный VII7).
+     * D65 — разрешение VII7 через общие три звука (верхняя септима → вниз на секунду).
+     */
+    function buildChain1(tonic) {
+        const labels = ['T53', 'S64', 'VII7', 'D65', 'T53', 'S6', 'K64', 'D7', 'T53'];
+        const specs = [
+            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }],
+            [{ d: 1, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 6, f: 'harmonic' }],
+            [{ d: 7, f: 'harmonic' }, { d: 2, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 6, f: 'harmonic' }],
+            [{ d: 7, f: 'harmonic' }, { d: 2, f: 'harmonic' }, { d: 4, f: 'harmonic' }, { d: 5, f: 'major' }],
+            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }],
+            [{ d: 6, f: 'major' }, { d: 1, f: 'major' }, { d: 4, f: 'major' }],
+            [{ d: 5, f: 'major' }, { d: 1, f: 'major' }, { d: 3, f: 'major' }],
+            [{ d: 5, f: 'major' }, { d: 7, f: 'harmonic' }, { d: 2, f: 'major' }, { d: 4, f: 'major' }],
+            [{ d: 1, f: 'major' }, { d: 3, f: 'major' }, { d: 5, f: 'major' }]
+        ];
+        const notes = [];
+        let prevKeys = null;
+        specs.forEach((spec, idx) => {
+            const tones = spec.map(s => scaleDegree(tonic, s.d, s.f)).filter(Boolean);
+            const keys = voiceLeadKeys(tones, prevKeys);
+            notes.push({ keys, duration: 'w', label: labels[idx] });
+            prevKeys = keys;
+        });
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'major'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
+    function parseChainNumber(t) {
+        if (/цепочк\w*\s*2\b|2[\s-]*(?:ю|я|й|e|nd)\s*цепоч|chain\s*2|втор\w*\s*цепоч/i.test(t)) return 2;
+        if (/цепочк|chain|1[\s-]*(?:ю|я|й|st)\s*цепоч|цепочк\w*\s*1\b|перв\w*\s*цепоч/i.test(t)) return 1;
+        return null;
+    }
+
     // ---------- Доминантсептаккорд D7 — готовые аппликатуры solfeggio-online.ru ----------
     // 30 тональностей × 8 аккордов (D7/D65/D43/D2 + разрешения). По запросу — только lookup по ключу.
     const D7_FORM_LABELS = [
@@ -773,6 +850,7 @@
     }
 
     function parseExercise(t) {
+        if (/цепочк|chain/.test(t)) return 'chain';
         if (/тритон|tritone/.test(t)) return 'tritone';
         if (/характерн\w*\s*интервал|характерные\b|characteristic\s*interval|\bх\.\s*и\./.test(t)) return 'characteristic';
         if (/доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t)) return 'dominant7';
@@ -859,6 +937,11 @@
                     key.tonic, key.mode, wantsInversions(t), wantsResolution(t)
                 );
                 break;
+            case 'chain': {
+                const num = parseChainNumber(t);
+                if (num === 1 && key.mode === 'major') data = buildChain1(key.tonic);
+                break;
+            }
         }
         return finalize(data);
     }
