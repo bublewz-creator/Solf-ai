@@ -1887,6 +1887,15 @@ function noteCenterX(sn) {
     }
 }
 
+const NOTATION_LABEL_FONT = "'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif";
+
+/** Latin v/y from AI or bad SVG font fallback → Cyrillic у in RU interval abbreviations (ув4, ум5…). */
+function normalizeIntervalLabel(lbl) {
+    if (!lbl) return lbl;
+    // Latin v/y or tick-like fallback glyph → Cyrillic у (ув4, ум5…)
+    return String(lbl).replace(/^[\u0076\u028B\u0079\u2713\u2714](?=[вм\d.])/i, '\u0443');
+}
+
 function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
     if (!svg || !staveNotes || !notesData) return;
     const NS = 'http://www.w3.org/2000/svg';
@@ -1904,11 +1913,11 @@ function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
         t.setAttribute('y', String(labelY));
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'hanging');
-        t.setAttribute('font-family', 'Arial, sans-serif');
+        t.setAttribute('font-family', NOTATION_LABEL_FONT);
         t.setAttribute('font-size', '18');
-        t.setAttribute('font-weight', '700');
+        t.setAttribute('font-weight', '600');
         t.setAttribute('fill', color);
-        t.textContent = lbl;
+        t.textContent = normalizeIntervalLabel(lbl);
         svg.appendChild(t);
     });
 }
