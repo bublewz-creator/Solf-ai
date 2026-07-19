@@ -758,7 +758,14 @@ function patchAiWithTheory(userQuery, aiText) {
     try {
         const det = window.SolfTheory.buildNotationForQuery(q);
         if (det && det.blockString && typeof window.SolfTheory.applyBlock === 'function') {
-            return window.SolfTheory.applyBlock(aiText, det.blockString);
+            const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
+            const intro = isMultiScale
+                ? (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+                    ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
+                    : 'Natural, harmonic, and melodic forms (ascending and descending):')
+                : null;
+            const base = intro ? intro : aiText;
+            return window.SolfTheory.applyBlock(base, det.blockString);
         }
     } catch (err) {
         console.warn('[Solf.ai] Theory patch skipped:', err);
@@ -2125,7 +2132,8 @@ function renderNotationCard(container, data) {
         const barlineNone = getBarlineNoneType(VF);
 
         const containerW = container.clientWidth || container.parentElement?.clientWidth || 600;
-        const preferSingleLine = barlinesMode === 'manual' && measures.length <= 6;
+        const preferSingleLine = (barlinesMode === 'manual' && measures.length <= 6)
+            || (barlinesMode === 'none' && rawNotes.length <= 9);
         const maxW = preferSingleLine
             ? Math.max(containerW - 16, 520)
             : Math.min(Math.max(containerW - 16, 280), 960);

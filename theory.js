@@ -443,22 +443,119 @@
         };
     }
 
-    /** Все виды гаммы: натуральная, гармоническая, мелодическая — каждая отдельным блоком. */
+    /**
+     * Мелодический мажор: восходящая часть (натуральный мажор вверх).
+     */
+    function buildMelodicMajorAsc(tonic) {
+        const ascFormula = [0, 2, 4, 5, 7, 9, 11, 12];
+        const notes = ascFormula.map((s, idx) => ({
+            keys: [noteKey(buildIntervalUp(tonic, idx + 1, s))],
+            duration: 'q',
+            label: ROMAN_DEGREES[idx]
+        }));
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'major'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
+    function buildMelodicMajorDesc(tonic) {
+        const steps = [
+            { deg: 8, semi: 12 },
+            { deg: 7, semi: 10 },
+            { deg: 6, semi: 8 },
+            { deg: 5, semi: 7 },
+            { deg: 4, semi: 5 },
+            { deg: 3, semi: 4 },
+            { deg: 2, semi: 2 },
+            { deg: 1, semi: 0 }
+        ];
+        const notes = steps.map(({ deg, semi }) => ({
+            keys: [noteKey(buildIntervalUp(tonic, deg, semi))],
+            duration: 'q',
+            label: ROMAN_DEGREES[deg - 1]
+        }));
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'major'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
+    function buildMelodicMinorAsc(tonic) {
+        const ascFormula = [0, 2, 3, 5, 7, 9, 11, 12];
+        const notes = ascFormula.map((s, idx) => ({
+            keys: [noteKey(buildIntervalUp(tonic, idx + 1, s))],
+            duration: 'q',
+            label: ROMAN_DEGREES[idx]
+        }));
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'minor'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
+    function buildMelodicMinorDesc(tonic) {
+        const steps = [
+            { deg: 8, semi: 12 },
+            { deg: 7, semi: 10 },
+            { deg: 6, semi: 8 },
+            { deg: 5, semi: 7 },
+            { deg: 4, semi: 5 },
+            { deg: 3, semi: 3 },
+            { deg: 2, semi: 2 },
+            { deg: 1, semi: 0 }
+        ];
+        const notes = steps.map(({ deg, semi }) => ({
+            keys: [noteKey(buildIntervalUp(tonic, deg, semi))],
+            duration: 'q',
+            label: ROMAN_DEGREES[deg - 1]
+        }));
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'minor'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
+    /** Все виды гаммы: натуральная, гармоническая, мелодическая — отдельными блоками. */
     function buildAllScaleForms(tonic, mode, isRu) {
         const L = isRu
-            ? { nat: 'Натуральная:', harm: 'Гармоническая:', mel: 'Мелодическая (вверх и вниз):' }
-            : { nat: 'Natural:', harm: 'Harmonic:', mel: 'Melodic (ascending & descending):' };
+            ? {
+                nat: 'Натуральная',
+                harm: 'Гармоническая',
+                melUp: 'Мелодическая (вверх)',
+                melDown: 'Мелодическая (вниз)'
+            }
+            : {
+                nat: 'Natural',
+                harm: 'Harmonic',
+                melUp: 'Melodic (ascending)',
+                melDown: 'Melodic (descending)'
+            };
         if (mode === 'minor') {
             return [
-                { label: L.nat,  data: buildScaleData(tonic, 'minor', 'minor') },
+                { label: L.nat, data: buildScaleData(tonic, 'minor', 'minor') },
                 { label: L.harm, data: buildScaleData(tonic, 'minor', 'harmonicMinor') },
-                { label: L.mel,  data: buildMelodicMinorBothWays(tonic) }
+                { label: L.melUp, data: buildMelodicMinorAsc(tonic) },
+                { label: L.melDown, data: buildMelodicMinorDesc(tonic) }
             ];
         }
         return [
-            { label: L.nat,  data: buildScaleData(tonic, 'major', 'major') },
+            { label: L.nat, data: buildScaleData(tonic, 'major', 'major') },
             { label: L.harm, data: buildScaleData(tonic, 'major', 'harmonicMajor') },
-            { label: L.mel,  data: buildMelodicMajorBothWays(tonic) }
+            { label: L.melUp, data: buildMelodicMajorAsc(tonic) },
+            { label: L.melDown, data: buildMelodicMajorDesc(tonic) }
         ];
     }
 
@@ -695,9 +792,9 @@
         return isD7Query(t);
     }
 
-    /** «все виды / все гаммы / три вида / all types of scales» → строим сразу несколько форм. */
+    /** «все виды / во всех видах / 3 вида гаммы» → строим сразу несколько форм. */
     function wantsAllForms(t) {
-        return /все\s*вид|все\s*гамм|три\s*вид|виды\s*гамм|all\s*(the\s*)?(types?|kinds?|forms?)|all\s*scales?/.test(t);
+        return /(?:во?\s+)?(?:все|всех)\w*\s*(?:вид|форм)|(?:три|3|трёх|трех)\s*(?:вид|форм)|виды\s*гамм|all\s*(?:the\s*)?(?:types?|kinds?|forms?)|all\s*scales?|in\s*all\s*forms?/.test(t);
     }
 
     function wantsResolution(t) {
@@ -745,8 +842,11 @@
                 data = buildCharacteristic(key.tonic, key.mode);
                 break;
             case 'scale':
-                // «все виды гамм» → несколько блоков (натуральная/гармоническая/мелодическая)
                 if (wantsAllForms(t) && !form) {
+                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
+                }
+                // «построй гамму X» без уточнения формы — по умолчанию все виды (школьная практика)
+                if (!form && /построй|постро|build|show|draw|сделай|напиши/.test(t)) {
                     return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
                 }
                 data = buildScaleExercise(key.tonic, key.mode, form);
@@ -839,7 +939,7 @@
         for (const it of items) {
             const single = finalize(it.data);
             if (!single) return null;
-            const label = it.label ? `${it.label}\n` : '';
+            const label = it.label ? `**${it.label}**\n` : '';
             parts.push(`${label}${single.blockString}`);
         }
         if (!parts.length) return null;
