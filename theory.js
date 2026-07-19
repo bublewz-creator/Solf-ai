@@ -657,49 +657,52 @@
         return buildIntervalUp({ ...tonic, octave: 4 }, degree, semi);
     }
 
-    /** Септаккорд: 7 / 65 / 43 / 2 — бас = прима / терция / квинта / септима. */
-    function seventhVoicings(root, thirdSemi, fifthSemi, seventhSemi) {
-        const r = { ...root, octave: 4 };
-        const III = buildIntervalUp(r, 3, thirdSemi);
-        const V = buildIntervalUp(r, 5, fifthSemi);
-        const VII = buildIntervalUp(r, 7, seventhSemi);
-        const r8 = buildIntervalUp(r, 8, 12);
-        const III8 = buildIntervalUp(r8, 3, thirdSemi);
-        const V8 = buildIntervalUp(r8, 5, fifthSemi);
-        return {
-            '7': [noteKey(r), noteKey(III), noteKey(V), noteKey(VII)],
-            '65': [noteKey(III), noteKey(V), noteKey(VII), noteKey(r8)],
-            '43': [noteKey(V), noteKey(VII), noteKey(r8), noteKey(III8)],
-            '2': [noteKey(VII), noteKey(r8), noteKey(III8), noteKey(V8)]
-        };
+    /** Трезвучие в близкой позиции: bassDeg — ступень в басу (53/6/64). */
+    function triadCloseBass(tonic, bassDeg, midDeg, topDeg, form, bassOct) {
+        const bass = scaleDegree(tonic, bassDeg, form);
+        const mid = scaleDegree(tonic, midDeg, form);
+        const top = scaleDegree(tonic, topDeg, form);
+        bass.octave = bassOct;
+        mid.octave = bassOct;
+        top.octave = bassOct;
+        while (noteAbs(mid) <= noteAbs(bass)) mid.octave++;
+        while (noteAbs(top) <= noteAbs(mid)) top.octave++;
+        return [noteKey(bass), noteKey(mid), noteKey(top)];
+    }
+
+    /** Септаккорд в близкой позиции: bassDeg — ступень в басу (7/65/43/2). */
+    function seventhCloseBass(tonic, degs, forms, bassOct) {
+        const notes = degs.map((d, i) => {
+            const n = scaleDegree(tonic, d, forms[i]);
+            n.octave = bassOct;
+            return n;
+        });
+        for (let i = 1; i < notes.length; i++) {
+            while (noteAbs(notes[i]) <= noteAbs(notes[i - 1])) notes[i].octave++;
+        }
+        return notes.map(noteKey);
     }
 
     /**
      * Цепочка 1 (мажор): T53 S64 VII7 D65 T53 S6 K64 D7 T53
-     * Каждый аккорд — правильное обращение (бас = 53/6/64/7/65).
+     * Трезвучия = 3 ноты. D7 и D65 = септаккорды (4 ноты — это норма для 65).
      */
     function buildChain1(tonic) {
-        const I = scaleDegree(tonic, 1, 'major');
-        const IV = scaleDegree(tonic, 4, 'major');
-        const V = scaleDegree(tonic, 5, 'major');
-        const VIIh = scaleDegree(tonic, 7, 'harmonic');
-
-        const T = triadVoicings(I, 4, 7);
-        const S_harm = triadVoicings(IV, 3, 7);
-        const S_nat = triadVoicings(IV, 4, 7);
-        const UmVII7 = seventhVoicings(VIIh, 3, 6, 9);
-        const Dom7 = seventhVoicings(V, 4, 7, 10);
+        const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'major', 4);
+        const preset = D7_PRESETS[d7KeyId(tonic, 'major')];
+        const d7Keys = preset ? preset[0].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [5, 7, 2, 4], ['major', 'harmonic', 'major', 'major'], 4);
+        const d65Keys = preset ? preset[2].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [7, 2, 4, 5], ['harmonic', 'major', 'major', 'major'], 4);
 
         const notes = [
-            { keys: T['53'], duration: 'w', label: 'T53' },
-            { keys: S_harm['64'], duration: 'w', label: 'S64' },
-            { keys: UmVII7['7'], duration: 'w', label: 'VII7' },
-            { keys: Dom7['65'], duration: 'w', label: 'D65' },
-            { keys: T['53'], duration: 'w', label: 'T53' },
-            { keys: S_nat['6'], duration: 'w', label: 'S6' },
-            { keys: T['64'], duration: 'w', label: 'K64' },
-            { keys: Dom7['7'], duration: 'w', label: 'D7' },
-            { keys: T['53'], duration: 'w', label: 'T53' }
+            { keys: t53(), duration: 'w', label: 'T53' },
+            { keys: triadCloseBass(tonic, 1, 4, 6, 'harmonic', 4), duration: 'w', label: 'S64' },
+            { keys: seventhCloseBass(tonic, [7, 2, 4, 6], ['harmonic', 'major', 'major', 'harmonic'], 3), duration: 'w', label: 'VII7' },
+            { keys: d65Keys, duration: 'w', label: 'D65' },
+            { keys: t53(), duration: 'w', label: 'T53' },
+            { keys: triadCloseBass(tonic, 6, 1, 4, 'major', 4), duration: 'w', label: 'S6' },
+            { keys: triadCloseBass(tonic, 5, 1, 3, 'major', 4), duration: 'w', label: 'K64' },
+            { keys: d7Keys, duration: 'w', label: 'D7' },
+            { keys: t53(), duration: 'w', label: 'T53' }
         ];
         return {
             clef: 'treble',
