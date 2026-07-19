@@ -602,6 +602,53 @@
         return { clef: 'treble', keySignature: 'C', timeSignature: '', barlines: 'none', notes };
     }
 
+    /** Три обращения трезвучия от root с заданными терцией/квинтой (в полутонах). */
+    function triadVoicings(root, thirdSemi, fifthSemi) {
+        const r = { ...root, octave: 4 };
+        const III = buildIntervalUp(r, 3, thirdSemi);
+        const V = buildIntervalUp(r, 5, fifthSemi);
+        const r8 = buildIntervalUp(r, 8, 12);
+        const III8 = buildIntervalUp(r8, 3, thirdSemi);
+        return {
+            '53': [noteKey(r), noteKey(III), noteKey(V)],
+            '6': [noteKey(III), noteKey(V), noteKey(r8)],
+            '64': [noteKey(V), noteKey(r8), noteKey(III8)]
+        };
+    }
+
+    /** Главные трезвучия T, S, D (+ обращения) в заданной тональности. */
+    function buildMainTriads(tonic, mode, withInversions, form) {
+        const harm = form === 'harmonic';
+        const maj = mode === 'major';
+        const defs = maj
+            ? [
+                { L: 'T', root: scaleDegree(tonic, 1, 'major'), t: 4, f: 7 },
+                { L: harm ? 's' : 'S', root: scaleDegree(tonic, 4, harm ? 'harmonic' : 'major'), t: harm ? 3 : 4, f: 7 },
+                { L: 'D', root: scaleDegree(tonic, 5, 'major'), t: 4, f: 7 }
+            ]
+            : [
+                { L: 't', root: scaleDegree(tonic, 1, 'major'), t: 3, f: 7 },
+                { L: 's', root: scaleDegree(tonic, 4, 'major'), t: 3, f: 7 },
+                { L: harm ? 'D' : 'd', root: scaleDegree(tonic, 5, harm ? 'harmonic' : 'major'), t: harm ? 4 : 3, f: 7 }
+            ];
+        const notes = [];
+        defs.forEach(({ L, root, t, f }) => {
+            const v = triadVoicings(root, t, f);
+            notes.push({ keys: v['53'], duration: 'w', label: L + '53' });
+            if (withInversions) {
+                notes.push({ keys: v['6'], duration: 'w', label: L + '6' });
+                notes.push({ keys: v['64'], duration: 'w', label: L + '64' });
+            }
+        });
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, mode),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
     // ---------- Цепочки аккордов (школьные схемы) ----------
     function scaleDegree(tonic, degree, form) {
         const formula = form === 'harmonic' ? HARM_MAJOR_FORMULA : MAJOR_FORMULA;
@@ -880,6 +927,7 @@
         if (/характерн\w*\s*интервал|характерные\b|characteristic\s*interval|\bх\.\s*и\./.test(t)) return 'characteristic';
         if (/доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t)) return 'dominant7';
         if (/(все\s*)?виды\s*трезвучи\w*\s*от|types?\s*of\s*triads?\s*from/.test(t)) return 'allTriadsFromNote';
+        if (/главн\w*\s*трезвуч|main\s*triads?|tonic.*subdominant.*dominant|T[\s,]+S[\s,]+D/i.test(t)) return 'mainTriads';
         if (/гамм|звукоряд\b|\bscale\b/.test(t)) return 'scale';
         if (/трезвучи|triad/.test(t)) return 'triad';
         return null;
@@ -956,6 +1004,9 @@
                 break;
             case 'triad':
                 data = buildTonicTriadExercise(key.tonic, key.mode, wantsInversions(t));
+                break;
+            case 'mainTriads':
+                data = buildMainTriads(key.tonic, key.mode, wantsInversions(t), detectForm(t) || (key.mode === 'minor' ? 'harmonic' : null));
                 break;
             case 'dominant7':
                 data = buildDominantSeventh(
