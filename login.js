@@ -48,7 +48,8 @@ async function exchangeGoogleCredential(credential) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.sessionToken) {
-        throw new Error(data.error || 'Google sign-in failed');
+        const detail = data.error || `HTTP ${res.status}`;
+        throw new Error(detail);
     }
     onAuthSuccess(data.user, data.sessionToken);
 }
@@ -65,7 +66,8 @@ async function exchangeVkTokens(payload) {
     });
     const data = await res.json().catch(() => ({}));
     if (!res.ok || !data.sessionToken) {
-        throw new Error(data.error || 'VK sign-in failed');
+        const detail = data.error || `HTTP ${res.status}`;
+        throw new Error(detail);
     }
     onAuthSuccess(data.user, data.sessionToken);
 }
@@ -127,7 +129,7 @@ function initGoogleAuth() {
         callback: (r) => {
             exchangeGoogleCredential(r.credential).catch((err) => {
                 console.warn('[Solf.ai] Google auth error:', err);
-                alert('Sign-in failed. Please try again.');
+                alert('Sign-in failed: ' + (err.message || 'Unknown error'));
             });
         }
     });
@@ -161,7 +163,7 @@ async function handleVkIdAuthSuccess(data) {
         });
     } catch (err) {
         console.warn('[Solf.ai] VK auth error:', err);
-        alert('Sign-in failed. Please try again.');
+        alert('Sign-in failed: ' + (err.message || 'Unknown error'));
     }
 }
 
