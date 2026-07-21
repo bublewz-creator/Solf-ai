@@ -430,7 +430,7 @@ NOTATION LENGTH (mirror the text):
 - DEFAULT = SHORT example that fits ONE staff line: 1–2 measures, ~2–8 notes/chords total.
 - Use longer multi-line notation (8–24+ notes, the renderer wraps to multiple rows) ONLY when the task genuinely needs a progression / harmonization / dictation. Don’t pad simple questions with extra measures.
 - ГАРМОНИЗАЦИЯ / HARMONIZATION (с картинкой или без) ПЕРЕОПРЕДЕЛЯЕТ «DEFAULT короче»: выведи аккорд на КАЖДЫЙ такт всего упражнения с изображения/задания (часто 12–20+ тактов). Один демонстрационный T53 = НЕПРАВИЛЬНЫЙ ответ.
-- SATB: каждый элемент notes[] = один 4-голосный аккорд (keys: ровно 4 ноты, сопрано→бас). barlines:"auto", keySignature и timeSignature — по картинке (считай знаки при ключе, не угадывай).
+- SATB / гармонизация: JSON с "layout":"satb" — ДВА нотоносца (скрипичный S+A, басовый T+B). НЕ клади 4 голоса одним столбиком в скрипичный ключ.
 
 EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAULT короче»):
 Когда пользователь просит ПОСТРОИТЬ упражнение по теории, отвечай ПОЛНЫМ комплектом, а не одним примером. Минимальный «комплект» по типам:
@@ -948,6 +948,9 @@ function getSystemInstruction(responseLang) {
     if (notationModeEnabled) {
         prompt += NOTATION_PROMPT_INSTRUCTION;
         prompt += HARMONY_RULEBOOK;
+        if (typeof window !== 'undefined' && window.SolfHarmonyTextbook && typeof window.SolfHarmonyTextbook.getPrompt === 'function') {
+            prompt += window.SolfHarmonyTextbook.getPrompt();
+        }
     }
     return prompt;
 }
@@ -1014,7 +1017,7 @@ const NOTATION_RETRY_PROMPT_3 =
     'Your JSON block was TRUNCATED (missing closing ]}]]). Output EXACTLY one complete valid [[NOTATION:{...}]] block and NOTHING else — no words before or after, no markdown. Close with ]}]] on the same line.';
 
 const HARMONIZATION_RETRY_PROMPT =
-    'HARMONIZATION INCOMPLETE: you output only 1–3 demo chords. WRONG. Read the attached image again. Output ONE [[NOTATION:{...}]] block with SATB: notes[] must contain one 4-voice chord (keys with exactly 4 pitches, soprano→bass) for EVERY measure of the entire exercise visible in the image — typically 12–20+ entries. barlines:"auto", correct keySignature from the image (count sharps/flats). Functional label on each chord (T53, S6, D7…). No prose — only the complete block.';
+    'HARMONIZATION INCOMPLETE or WRONG FORMAT. Read the image again. Output ONE [[NOTATION:{...}]] with "layout":"satb": treble clef staff = soprano (given melody!) + alto; BASS clef staff = tenor + bass; "chords"[] = one entry per measure with fields soprano, alto, tenor, bass, duration, label. ALL measures of the exercise — not one demo chord. keySignature from the image (count sharps/flats). No prose — only the block.';
 
 function hasNotationBlock(text) {
     return /\[\[NOTATION:\s*\{[\s\S]*?\}\s*\]\]/.test(String(text || ''));
@@ -1070,7 +1073,8 @@ function countNotationChords(text) {
     const match = String(text || '').match(/\[\[NOTATION:\s*(\{[\s\S]*?\})\s*\]\]/);
     if (!match) return 0;
     try {
-        const data = JSON.parse(match[1]);
+        const data = normalizeNotationLayout(JSON.parse(match[1]));
+        if (data.layout === 'satb' && Array.isArray(data.chords)) return data.chords.length;
         const notes = Array.isArray(data.notes) ? data.notes : [];
         return notes.filter(n => Array.isArray(n.keys) && n.keys.length >= 3).length;
     } catch (_) {
@@ -1082,16 +1086,16 @@ function buildHarmonizationReminder(lang, hasImage) {
     const ru = lang === 'ru';
     if (ru) {
         return '\n\n[ГАРМОНИЗАЦИЯ — обязательно]\n' +
-            (hasImage ? 'Прочитай ВСЮ мелодию с приложенного изображения. Тональность — по знакам при ключе на картинке (пересчитай диезы/бемоли, не угадывай).\n' : '') +
-            'Гармонизуй ПОЛНОСТЬЮ всё упражнение: один 4-голосный аккорд (SATB) на каждый такт. НЕ выводи один демонстрационный аккорд.\n' +
-            'JSON: notes[] — по одному аккорду; keys[] — ровно 4 ноты (с→a→t→b, от высокой к низкой); label — функция (T53, S6, D7…); barlines:"auto".\n' +
-            'Если на картинке две строки — выведи все видимые такты.';
+            (hasImage ? 'Прочитай ВСЮ мелодию с приложенного изображения. Тональность — по знакам при ключе (пересчитай диезы/бемоли).\n' : '') +
+            'Формат: "layout":"satb" — верхний стан (скрипичный ключ): soprano=данная мелодия + alto; нижний стан (БАСОВЫЙ ключ): tenor + bass.\n' +
+            'chords[] — по одному аккорду на такт на всё упражнение. label — функция (T53, S6, D7…). НЕ один демо-аккорд.\n' +
+            'Проверь голосоведение: без параллельных квинт/октав; мелодия в soprano совпадает с картинкой.';
     }
     return '\n\n[HARMONIZATION — mandatory]\n' +
-        (hasImage ? 'Read the ENTIRE melody from the attached image. Key signature — count sharps/flats on the image, do not guess.\n' : '') +
-        'Harmonize the FULL exercise: one SATB chord per measure. Do NOT output a single demo chord.\n' +
-        'JSON: one notes[] entry per chord; keys[] = exactly 4 pitches (soprano→bass); label every chord; barlines:"auto".\n' +
-        'If the image has two staff lines, include all visible measures.';
+        (hasImage ? 'Read the ENTIRE melody from the attached image. Key signature — count sharps/flats on the image.\n' : '') +
+        'Format: "layout":"satb" — upper staff (treble): soprano=given melody + alto; lower staff (BASS clef): tenor + bass.\n' +
+        'chords[] — one chord per measure for the full exercise. label every chord. NOT a single demo chord.\n' +
+        'Voice-leading rules apply; soprano must match the image melody.';
 }
 
 /** Для build-задач: краткий императив «сброса памяти» — модель не должна копировать старые ошибки. */
@@ -1949,7 +1953,7 @@ function formatMessage(text) {
     const placeholders = [];
     let working = text.replace(NOTATION_BLOCK_RE, (match, json) => {
         try {
-            const data = JSON.parse(json);
+            const data = normalizeNotationLayout(JSON.parse(json));
             const idx = placeholders.length;
             placeholders.push(data);
             return `\u0001SOLF_NOT_${idx}\u0001`;
@@ -2398,7 +2402,232 @@ function getBarlineNoneType(VF) {
     return 0;
 }
 
+function normalizeNotationLayout(data) {
+    if (!data || typeof data !== 'object') return data;
+    if (data.layout === 'satb' && Array.isArray(data.chords)) return data;
+    if (Array.isArray(data.notes) && data.notes.length) {
+        const satbLike = data.notes.every(n => Array.isArray(n.keys) && n.keys.length >= 4);
+        if (satbLike) {
+            return {
+                layout: 'satb',
+                keySignature: data.keySignature || 'C',
+                timeSignature: data.timeSignature || '4/4',
+                barlines: data.barlines || 'auto',
+                chords: data.notes.map(n => ({
+                    duration: n.duration || 'q',
+                    soprano: n.keys[0],
+                    alto: n.keys[1],
+                    tenor: n.keys[2],
+                    bass: n.keys[3],
+                    label: n.label,
+                    barAfter: n.barAfter
+                }))
+            };
+        }
+    }
+    return data;
+}
+
+function groupSatbChords(chords, barlinesMode, numBeats, beatValue) {
+    if (!chords.length) return [[]];
+    const markers = chords.map(c => ({
+        duration: c.duration || 'q',
+        barAfter: c.barAfter
+    }));
+    const segments = groupNotesIntoSegments(markers, barlinesMode, numBeats, beatValue);
+    const result = [];
+    let idx = 0;
+    for (const seg of segments) {
+        result.push(chords.slice(idx, idx + seg.length));
+        idx += seg.length;
+    }
+    if (idx < chords.length) result.push(chords.slice(idx));
+    return result.filter(m => m.length);
+}
+
+function satbChordSliceToNotes(chordSlice, clef) {
+    return chordSlice.map(c => ({
+        keys: clef === 'bass'
+            ? [c.tenor, c.bass].filter(Boolean)
+            : [c.soprano, c.alto].filter(Boolean),
+        duration: c.duration || 'q',
+        label: clef === 'treble' ? c.label : undefined,
+        barAfter: c.barAfter
+    }));
+}
+
+function renderSatbNotationCard(container, data) {
+    const VF = getVexFlowNamespace();
+    if (!VF) {
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineNotLoaded', { chat: true, fallback: 'Music engine not loaded' })}</div>`;
+        return;
+    }
+    container.innerHTML = '';
+    container.classList.add('solf-notation-satb');
+
+    try {
+        const isLight = document.documentElement.getAttribute('data-theme') === 'light';
+        const noteColor = isLight ? '#1a1a2e' : '#e6e6f0';
+        const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
+        const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
+        const barlinesMode = (['none', 'manual', 'auto'].includes(data.barlines)) ? data.barlines : 'auto';
+        const timeSigHidden = !rawTimeSig || rawTimeSig === 'none' || barlinesMode !== 'auto';
+        const timeSig = timeSigHidden ? '4/4' : rawTimeSig;
+        const tsParts = timeSig.split('/');
+        const numBeats = Math.max(parseInt(tsParts[0], 10) || 4, 1);
+        const beatValue = Math.max(parseInt(tsParts[1], 10) || 4, 1);
+        const chords = Array.isArray(data.chords) ? data.chords : [];
+        const measures = groupSatbChords(chords, barlinesMode, numBeats, beatValue);
+        const barlineNone = getBarlineNoneType(VF);
+
+        const containerW = container.clientWidth || container.parentElement?.clientWidth || 600;
+        const maxW = Math.min(Math.max(containerW - 16, 320), 960);
+        const FIRST_OVERHEAD = 100;
+        const NEXT_OVERHEAD = 14;
+        const PER_NOTE = 28;
+        const MIN_MEASURE = 88;
+        const measureBaseW = m => Math.max(MIN_MEASURE, m.length * PER_NOTE + 22);
+
+        let rows = [];
+        let row = [];
+        let rowW = 0;
+        measures.forEach(m => {
+            const isFirstOfRow = row.length === 0;
+            const overhead = isFirstOfRow ? FIRST_OVERHEAD : NEXT_OVERHEAD;
+            const w = measureBaseW(m) + overhead;
+            if (!isFirstOfRow && rowW + w > maxW) {
+                rows.push(row);
+                row = [{ chords: m, width: FIRST_OVERHEAD + measureBaseW(m), isFirstOfRow: true }];
+                rowW = FIRST_OVERHEAD + measureBaseW(m);
+            } else {
+                row.push({ chords: m, width: w, isFirstOfRow });
+                rowW += w;
+            }
+        });
+        if (row.length) rows.push(row);
+
+        rows.forEach(r => {
+            const total = r.reduce((s, mm) => s + mm.width, 0);
+            const slack = Math.max(0, maxW - total);
+            if (slack > 0) {
+                const totalNotes = r.reduce((s, mm) => s + Math.max(mm.chords.length, 1), 0);
+                r.forEach(mm => {
+                    mm.width += Math.round(slack * (Math.max(mm.chords.length, 1) / totalNotes));
+                });
+            }
+        });
+
+        const STAVE_GAP = 78;
+        const ROW_HEIGHT = 188;
+        const TOP_PAD = 12;
+        const totalHeight = rows.length * ROW_HEIGHT + TOP_PAD + 40;
+        const rowPixelW = rows.reduce((mx, r) => Math.max(mx, r.reduce((s, mm) => s + mm.width, 0)), 0);
+        const totalWidth = Math.max(maxW + 16, rowPixelW + 16);
+
+        const renderer = new VF.Renderer(container, VF.Renderer.Backends.SVG);
+        renderer.resize(totalWidth, totalHeight);
+        const ctx = renderer.getContext();
+        if (typeof ctx.setFillStyle === 'function') ctx.setFillStyle(noteColor);
+        if (typeof ctx.setStrokeStyle === 'function') ctx.setStrokeStyle(noteColor);
+
+        const unisonBatch = [];
+
+        rows.forEach((r, rowIdx) => {
+            let x = 8;
+            const yTreble = TOP_PAD + rowIdx * ROW_HEIGHT;
+            const yBass = yTreble + STAVE_GAP;
+            let firstTrebleStave = null;
+            let lastBassStave = null;
+
+            r.forEach((mm, mIdx) => {
+                const trebleStave = new VF.Stave(x, yTreble, mm.width);
+                const bassStave = new VF.Stave(x, yBass, mm.width);
+                if (mm.isFirstOfRow) {
+                    try { trebleStave.addClef('treble'); } catch (_) {}
+                    try { bassStave.addClef('bass'); } catch (_) {}
+                    try { trebleStave.addKeySignature(keySig); } catch (_) {}
+                    try { bassStave.addKeySignature(keySig); } catch (_) {}
+                    if (rowIdx === 0 && mIdx === 0 && !timeSigHidden) {
+                        try { trebleStave.addTimeSignature(timeSig); } catch (_) {}
+                    }
+                }
+                if (barlinesMode === 'none') {
+                    try { trebleStave.setBegBarType(barlineNone); trebleStave.setEndBarType(barlineNone); } catch (_) {}
+                    try { bassStave.setBegBarType(barlineNone); bassStave.setEndBarType(barlineNone); } catch (_) {}
+                }
+                trebleStave.setContext(ctx).draw();
+                bassStave.setContext(ctx).draw();
+                if (!firstTrebleStave) firstTrebleStave = trebleStave;
+                lastBassStave = bassStave;
+
+                const trebleData = satbChordSliceToNotes(mm.chords, 'treble');
+                const bassData = satbChordSliceToNotes(mm.chords, 'bass');
+                const drawVoice = (stave, clef, notesData) => {
+                    if (!notesData.length) return null;
+                    const staveNotes = notesData.map(n => buildStaveNote(VF, clef, n, keySig));
+                    const voiceBeats = barlinesMode === 'auto'
+                        ? numBeats
+                        : Math.max(notesData.reduce((s, n) => s + noteDurationBeats(n.duration, beatValue), 0), 1e-3);
+                    const voice = new VF.Voice({ num_beats: voiceBeats, beat_value: beatValue });
+                    if (typeof voice.setStrict === 'function') voice.setStrict(false);
+                    voice.addTickables(staveNotes);
+                    staveNotes.forEach(sn => { try { sn.setStave(stave); } catch (_) {} });
+                    const overhead = mm.isFirstOfRow ? FIRST_OVERHEAD : 30;
+                    const formatWidth = Math.max(mm.width - overhead, 50);
+                    const formatter = new VF.Formatter();
+                    formatter.joinVoices([voice]).format([voice], formatWidth);
+                    staveNotes.forEach(sn => applyNoteAccidentals(sn, VF));
+                    formatter.joinVoices([voice]).format([voice], formatWidth);
+                    voice.draw(ctx, stave);
+                    return { staveNotes, notesData, stave, clef };
+                };
+
+                const trebleDrawn = drawVoice(trebleStave, 'treble', trebleData);
+                const bassDrawn = drawVoice(bassStave, 'bass', bassData);
+                if (trebleDrawn) unisonBatch.push(trebleDrawn);
+                if (bassDrawn) unisonBatch.push(bassDrawn);
+                x += mm.width;
+            });
+
+            if (firstTrebleStave && lastBassStave && VF.StaveConnector) {
+                try {
+                    const brace = new VF.StaveConnector(firstTrebleStave, lastBassStave);
+                    if (VF.StaveConnector.type && VF.StaveConnector.type.BRACE != null) {
+                        brace.setType(VF.StaveConnector.type.BRACE);
+                    }
+                    brace.setContext(ctx).draw();
+                } catch (_) {}
+            }
+        });
+
+        const svg = container.querySelector('svg');
+        unisonBatch.forEach(({ staveNotes, notesData, stave, clef }) => {
+            try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor); } catch (_) {}
+            try { drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor); } catch (_) {}
+        });
+
+        if (svg) {
+            svg.setAttribute('preserveAspectRatio', 'xMidYMid meet');
+            svg.querySelectorAll('path, rect, line, ellipse, polygon').forEach(el => {
+                const fill = el.getAttribute('fill');
+                if (fill && fill !== 'none') el.setAttribute('fill', noteColor);
+                const stroke = el.getAttribute('stroke');
+                if (stroke && stroke !== 'none') el.setAttribute('stroke', noteColor);
+            });
+            svg.querySelectorAll('text').forEach(el => el.setAttribute('fill', noteColor));
+        }
+    } catch (err) {
+        console.error('[Solf.ai] SATB VexFlow render error:', err);
+        container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationRenderFailed', { chat: true, fallback: 'Could not render notation' })}: ${err.message || err}</div>`;
+    }
+}
+
 function renderNotationCard(container, data) {
+    data = normalizeNotationLayout(data);
+    if (data.layout === 'satb') {
+        renderSatbNotationCard(container, data);
+        return;
+    }
     const VF = getVexFlowNamespace();
     if (!VF) {
         container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationEngineNotLoaded', { chat: true, fallback: 'Music engine not loaded' })}</div>`;

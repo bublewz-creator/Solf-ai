@@ -1391,6 +1391,9 @@ button:focus:not(:focus-visible) {
     box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
     position: relative;
 }
+.solf-notation.solf-notation-satb {
+    min-height: 220px;
+}
 [data-theme="light"] .solf-notation {
     background: rgba(139, 92, 246, 0.05);
     box-shadow: 0 4px 14px rgba(15, 23, 42, 0.06);
