@@ -14,13 +14,27 @@ const WORKER_URL = 'https://solf-ai-api.mlemonw.workers.dev';
 // При таймауте кидает AbortError — в местах вызова обрабатывается так же, как и сетевая ошибка.
 async function fetchWithTimeout(url, options = {}, timeoutMs = 25000) {
     if (typeof AbortController === 'undefined') return fetch(url, options); // совсем старый браузер
-    const ctrl = new AbortController();
-    const merged = { ...options, signal: ctrl.signal };
+    const timeoutCtrl = new AbortController();
+    const userSignal = options.signal;
+    let signal = timeoutCtrl.signal;
+
+    if (userSignal) {
+        if (userSignal.aborted) {
+            try { timeoutCtrl.abort(); } catch (_) {}
+        } else if (typeof AbortSignal !== 'undefined' && typeof AbortSignal.any === 'function') {
+            signal = AbortSignal.any([timeoutCtrl.signal, userSignal]);
+        } else {
+            userSignal.addEventListener('abort', () => {
+                try { timeoutCtrl.abort(); } catch (_) {}
+            }, { once: true });
+        }
+    }
+
     const timer = setTimeout(() => {
-        try { ctrl.abort(); } catch (_) {}
+        try { timeoutCtrl.abort(); } catch (_) {}
     }, timeoutMs);
     try {
-        return await fetch(url, merged);
+        return await fetch(url, { ...options, signal });
     } finally {
         clearTimeout(timer);
     }
@@ -221,8 +235,9 @@ function bindAppButtonFocusBehavior() {
         if (!shouldPreventButtonFocusSteal(el)) return;
         e.preventDefault();
         e.stopImmediatePropagation();
+        // Enter не должен мгновенно жать «Стоп» (часто дублирует отправку на мобилке).
         if (el.id === 'chatSendBtn' && isGenerating) {
-            abortGeneration();
+            e.preventDefault();
             return;
         }
         const hasContent = (chatInput.value?.trim?.() || '') !== '' || attachedFiles.length > 0;
@@ -269,6 +284,13 @@ const chatAttachedFiles = document.getElementById('chatAttachedFiles');
 let isGenerating = false;
 let shouldAutoScroll = true;
 let currentAbortController = null;
+let generationStartedAt = 0;
+let userAbortedGeneration = false;
+const GENERATION_ABORT_GRACE_MS = 600;
+
+function canAbortGeneration() {
+    return isGenerating && (Date.now() - generationStartedAt >= GENERATION_ABORT_GRACE_MS);
+}
 let lastUserQuery = '';
 let currentChatId = null;
 let chats = []; 
@@ -2539,7 +2561,10 @@ async function generateResponse(query, imageData = null) {
     }
     if (isGenerating) return; 
 
-    isGenerating = true; currentAbortController = new AbortController(); 
+    isGenerating = true;
+    userAbortedGeneration = false;
+    generationStartedAt = Date.now();
+    currentAbortController = new AbortController();
     chatSendBtn.disabled = false; chatSendBtn.classList.add('stop-btn');
     chatSendBtn.innerHTML = `<svg class="svg-icon" style="color:white;" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`;
     
@@ -2602,12 +2627,13 @@ async function generateResponse(query, imageData = null) {
             } : null
         };
 
+        const requestTimeoutMs = imageData ? 90000 : 60000;
         const res = await apiFetch(`${WORKER_URL}/generate`, { 
             method: 'POST', 
             headers: { 'Content-Type': 'application/json' }, 
             body: JSON.stringify(payload), 
             signal: currentAbortController.signal 
-        });
+        }, requestTimeoutMs);
 
         const data = await res.json();
         if (!res.ok || data.error) {
@@ -2690,7 +2716,7 @@ async function generateResponse(query, imageData = null) {
                             image: null
                         }),
                         signal: currentAbortController.signal
-                    });
+                    }, requestTimeoutMs);
                     const retryData = await retryRes.json().catch(() => ({}));
                     if (retryRes.ok && !retryData.error) {
                         const retryText = retryData.text || retryData.choices?.[0]?.message?.content || '';
@@ -2735,12 +2761,18 @@ async function generateResponse(query, imageData = null) {
             if (imageData) rollbackImageUsage();
         }
         if (e.name === 'AbortError') {
-            addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
+            if (userAbortedGeneration) {
+                addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
+            } else {
+                addMessageToUI('ai', `❌ ${uiText('chatTimeout', { chat: true, fallback: 'Request timed out. Try again.' })}`, [], false);
+            }
         } else {
             addMessageToUI('ai', `❌ ${uiText('chatError', { chat: true, fallback: 'Error' })}: ${e.message}`, [], false);
         }
     } finally {
-        isGenerating = false; currentAbortController = null;
+        isGenerating = false;
+        userAbortedGeneration = false;
+        currentAbortController = null;
         chatSendBtn.classList.remove('stop-btn');
         chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
         refreshSendButtonState();
@@ -3216,7 +3248,13 @@ async function initApp() {
         chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isGenerating) sendChatMessage(); } });
     }
     
-    if (chatSendBtn) chatSendBtn.addEventListener('click', () => { if (isGenerating) { abortGeneration(); } else sendChatMessage(); });
+    if (chatSendBtn) chatSendBtn.addEventListener('click', () => {
+        if (isGenerating) {
+            if (canAbortGeneration()) abortGeneration();
+            return;
+        }
+        sendChatMessage();
+    });
     if (newChatBtn) newChatBtn.addEventListener('click', startNewChat);
     
     if (toggleSidebarBtn) toggleSidebarBtn.addEventListener('click', e => {
@@ -3364,6 +3402,8 @@ window.addEventListener('pageshow', () => {
 });
 
 function abortGeneration() {
+    if (!canAbortGeneration()) return;
+    userAbortedGeneration = true;
     currentAbortController?.abort();
     if (lastUserQuery && chatInput) {
         chatInput.value = lastUserQuery;
