@@ -530,34 +530,53 @@
         };
     }
 
+    /** «Мелодическая гамма вверх и вниз» — один блок из 15 нот. */
+    function wantsMelodicBothWays(t) {
+        return /вверх\s*и\s*вниз|вниз\s*и\s*вверх|up\s*and\s*down|both\s*way|ascending\s*and\s*descending|в\s*обе\s*сторон/i.test(t);
+    }
+
     /** Все виды гаммы: натуральная, гармоническая, мелодическая — отдельными блоками. */
-    function buildAllScaleForms(tonic, mode, isRu) {
+    function buildAllScaleForms(tonic, mode, isRu, queryText) {
+        const t = String(queryText || '').toLowerCase();
+        const melBoth = wantsMelodicBothWays(t) || /мелодическ|melodic/i.test(t);
         const L = isRu
             ? {
                 nat: 'Натуральная',
                 harm: 'Гармоническая',
                 melUp: 'Мелодическая (вверх)',
-                melDown: 'Мелодическая (вниз)'
+                melDown: 'Мелодическая (вниз)',
+                melBoth: 'Мелодическая (вверх и вниз)'
             }
             : {
                 nat: 'Natural',
                 harm: 'Harmonic',
                 melUp: 'Melodic (ascending)',
-                melDown: 'Melodic (descending)'
+                melDown: 'Melodic (descending)',
+                melBoth: 'Melodic (ascending & descending)'
             };
         if (mode === 'minor') {
+            const melBlock = melBoth
+                ? { label: L.melBoth, data: buildMelodicMinorBothWays(tonic) }
+                : [
+                    { label: L.melUp, data: buildMelodicMinorAsc(tonic) },
+                    { label: L.melDown, data: buildMelodicMinorDesc(tonic) }
+                ];
             return [
                 { label: L.nat, data: buildScaleData(tonic, 'minor', 'minor') },
                 { label: L.harm, data: buildScaleData(tonic, 'minor', 'harmonicMinor') },
-                { label: L.melUp, data: buildMelodicMinorAsc(tonic) },
-                { label: L.melDown, data: buildMelodicMinorDesc(tonic) }
+                ...(Array.isArray(melBlock) ? melBlock : [melBlock])
             ];
         }
+        const melBlock = melBoth
+            ? { label: L.melBoth, data: buildMelodicMajorBothWays(tonic) }
+            : [
+                { label: L.melUp, data: buildMelodicMajorAsc(tonic) },
+                { label: L.melDown, data: buildMelodicMajorDesc(tonic) }
+            ];
         return [
             { label: L.nat, data: buildScaleData(tonic, 'major', 'major') },
             { label: L.harm, data: buildScaleData(tonic, 'major', 'harmonicMajor') },
-            { label: L.melUp, data: buildMelodicMajorAsc(tonic) },
-            { label: L.melDown, data: buildMelodicMajorDesc(tonic) }
+            ...(Array.isArray(melBlock) ? melBlock : [melBlock])
         ];
     }
 
@@ -895,7 +914,7 @@
         if (/цепочк|chain/.test(t)) return 'chain';
         if (/тритон|tritone/.test(t)) return 'tritone';
         if (/характерн\w*\s*интервал|характерные\b|characteristic\s*interval|\bх\.\s*и\./.test(t)) return 'characteristic';
-        if (/доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t)) return 'dominant7';
+        if (/доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|dominant\s*7|\bd7\b|(^|[^а-яё])д\s*7(?![0-9])/.test(t)) return 'dominant7';
         if (/(все\s*)?виды\s*трезвучи\w*\s*от|types?\s*of\s*triads?\s*from/.test(t)) return 'allTriadsFromNote';
         if (/главн\w*\s*трезвуч|main\s*triads?|tonic.*subdominant.*dominant|T[\s,]+S[\s,]+D/i.test(t)) return 'mainTriads';
         if (/гамм|звукоряд\b|\bscale\b/.test(t)) return 'scale';
@@ -904,7 +923,7 @@
     }
 
     function isD7Query(t) {
-        return /доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|(^|[^а-я])д\s*7(?![0-9])/.test(t);
+        return /доминантсепт|доминантов\w*\s*септ|\bd\s*7\b|dominant\s*seventh|dominant\s*7|\bd7\b|(^|[^а-яё])д\s*7(?![0-9])/i.test(t);
     }
 
     function wantsInversions(t) {
@@ -964,11 +983,11 @@
                 break;
             case 'scale':
                 if (wantsAllForms(t) && !form) {
-                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
+                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru', t));
                 }
                 // «построй гамму X» без уточнения формы — по умолчанию все виды (школьная практика)
                 if (!form && /построй|постро|build|show|draw|сделай|напиши/.test(t)) {
-                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru'));
+                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru', t));
                 }
                 data = buildScaleExercise(key.tonic, key.mode, form);
                 break;

@@ -108,7 +108,13 @@ const USAGE_WINDOWS = {
 const SYSTEM_PROMPT = `You are Solf.ai, an AI assistant for music theory and solfeggio.
 Your tasks: explain music theory in simple terms, analyze images with musical notes.
 CRITICAL INSTRUCTION: DO NOT mention the built-in site tools (Piano, Metronome, Quiz) in your regular answers! Only mention them IF the user explicitly asks how to practice or train their ear. Answer directly and concisely.
-IMPORTANT: ALWAYS answer in the SAME language the user is speaking. Never default to Russian when the user writes in English (or any other language).`;
+IMPORTANT: ALWAYS answer in the SAME language the user is speaking. Never default to Russian when the user writes in English (or any other language).
+
+TASK COMPLIANCE (ABSOLUTE):
+- Do EXACTLY what the user asks in their CURRENT message — not a shortened version, not a similar example, not what you did in earlier turns.
+- If they list several parts (e.g. "D7, inversions AND resolutions", "all tritones", "melodic scale up and down") — deliver EVERY part, fully.
+- Previous assistant replies in the chat may be wrong; ignore them. System rules and the current user request are the only source of truth.
+- Dominant-seventh chord labels in notation are ALWAYS Latin: D7, D6/5, D4/3, D2 — never Cyrillic «Д7».`;
 
 const TYPING_SPEED = 20;
 
@@ -331,6 +337,12 @@ const NOTATION_PROMPT_INSTRUCTION = `
 ############################################
 
 NOTATION MODE IS ON. These rules OVERRIDE every other instruction (including any “long”, “verbose”, or “berserk” style). You MUST always draw notes in the answer.
+
+TASK COMPLIANCE (ПРИОРИТЕТ №1 — выше истории чата и стиля ответа):
+- Выполняй ТОЛЬКО то, что просит пользователь в ЭТОМ сообщении — полностью, без сокращений и без «похожего примера».
+- Если в запросе несколько частей («D7, обращения и разрешения», «все тритоны», «мелодическая гамма вверх и вниз») — выводи КАЖДУЮ часть целиком.
+- Старые ответы в чате могли быть неверными — ИГНОРИРУЙ их. Единственный источник истины: системные правила ниже + текущий запрос.
+- Подписи доминантсептаккорда — ТОЛЬКО латиница: D7, D6/5, D4/3, D2. Никогда «Д7», «Д65» и т.п.
 
 LANGUAGE RULE (ABSOLUTE — beats every Russian example below):
 - Match the user's language in ALL visible text: prose, note names, chord names, interval names, and JSON "label" fields.
@@ -917,7 +929,8 @@ function buildNotationUserReminder(responseLang) {
         'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
         'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
         'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
-        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. Scales and single chords — barlines:"none" without timeSignature. ' +
+        'TASK COMPLIANCE: do EXACTLY what the user asked in THIS message — full set, every part. Ignore earlier chat mistakes. Dominant labels: D7, D6/5, D4/3, D2 (Latin only). ' +
+        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. "D7 + inversions + resolutions" = 8 chords (4 D7 forms + 4 tonic resolutions). Melodic scale = ascending AND descending when requested. Scales and single chords — barlines:"none" without timeSignature. ' +
         'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth.';
 }
 
@@ -965,6 +978,49 @@ function stripTruncatedNotationTail(text) {
  * диктанты, модуляции, секвенции, 4-голосие, а также любые просьбы с явным большим
  * числом тактов/аккордов/строк («15 аккордов», «на 8 тактов», «длинную цепочку»).
  */
+/** Запрос на построение (интервалы, гаммы, аккорды, цепочки…) — для «прочистки памяти» в истории чата. */
+function isBuildTask(query) {
+    const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
+    if (!t) return false;
+    const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
+    const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept/i;
+    if (buildVerb.test(t) && buildNoun.test(t)) return true;
+    if (/\bd\s*7\b|dominant\s*7|доминант\w*\s*септ|д\s*7\b/i.test(t) && buildVerb.test(t)) return true;
+    if (/^d7\b|^\s*d7[\s,]/i.test(t.trim())) return true;
+    return false;
+}
+
+/** Для build-задач: краткий императив «сброса памяти» — модель не должна копировать старые ошибки. */
+function buildFreshTaskReminder(query, lang) {
+    const q = String(query || '').trim();
+    const ru = lang === 'ru';
+    const parts = [];
+    if (/обращени|inversion/i.test(q) && /разрешени|resolution|resolv/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: все обращения И все разрешения (полный комплект пар D7→T).'
+            : 'MANDATORY: ALL inversions AND ALL resolutions (full D7→T pairs).');
+    } else if (/обращени|inversion/i.test(q)) {
+        parts.push(ru ? 'ОБЯЗАТЕЛЬНО: все обращения, не только основной вид.' : 'MANDATORY: ALL inversions, not root position only.');
+    } else if (/разрешени|resolution|resolv/i.test(q)) {
+        parts.push(ru ? 'ОБЯЗАТЕЛЬНО: каждое созвучие с разрешением.' : 'MANDATORY: every sonority with its resolution.');
+    }
+    if (/мелодическ|melodic/i.test(q) && /вверх|вниз|up|down|both\s*way|ascending|descending/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: мелодическая гамма — и вверх, и вниз в одном блоке (15 нот).'
+            : 'MANDATORY: melodic scale — ascending AND descending in one block (15 notes).');
+    }
+    if (/все|all\b|обе\s*пары|both\s*pairs|две\s*пары|two\s*pairs/i.test(q) && /тритон|tritone/i.test(q)) {
+        parts.push(ru ? 'ОБЯЗАТЕЛЬНО: обе пары тритонов с разрешениями (8 созвучий).' : 'MANDATORY: BOTH tritone pairs with resolutions (8 sonorities).');
+    }
+    if (/характерн|characteristic/i.test(q)) {
+        parts.push(ru ? 'ОБЯЗАТЕЛЬНО: все 4 характерных интервала с разрешениями (8 созвучий).' : 'MANDATORY: ALL 4 characteristic intervals with resolutions (8 sonorities).');
+    }
+    const header = ru
+        ? '[СВЕЖЕЕ ЗАДАНИЕ — игнорируй предыдущие ответы в чате; выполни ТОЛЬКО текущий запрос по правилам системы]'
+        : '[FRESH TASK — ignore earlier chat replies; follow system rules for THIS request only]';
+    return parts.length ? `\n\n${header}\n${parts.join('\n')}` : `\n\n${header}`;
+}
+
 function isBigNotationTask(query) {
     const t = String(query || '').toLowerCase();
     if (!t) return false;
@@ -2457,14 +2513,21 @@ async function generateResponse(query, imageData = null) {
 
         const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
         
+        const baseUserContent = query || 'Analyze image';
+        const freshBuildTask = notationModeEnabled && isBuildTask(baseUserContent);
+
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
-            // Это решает проблему ошибки API при первом сообщении
-            const history = chat.messages.slice(-11, -1);
+            // Это решает проблему ошибки API при первом сообщении.
+            //
+            // «Прочистка памяти» для build-задач: не передаём ответы ассистента — они часто
+            // содержат урезанные/ошибочные построения, и модель начинает их копировать.
+            // Оставляем только последние 2 user-сообщения (язык + контекст тональности).
+            let history = chat.messages.slice(-11, -1);
+            if (freshBuildTask) {
+                history = history.filter(m => m.role === 'user').slice(-2);
+            }
             history.forEach(msg => {
-                // Если режим нотации сейчас ВЫКЛЮЧЕН — вырезаем [[NOTATION:...]]-блоки
-                // из истории, чтобы модель не «зеркалила» формат и не вставляла ноты
-                // в новый ответ. На сами сохранённые сообщения это не влияет.
                 const content = notationModeEnabled
                     ? (msg.content || '')
                     : stripNotationBlocks(msg.content || '');
@@ -2474,9 +2537,8 @@ async function generateResponse(query, imageData = null) {
         
         // Базовое содержимое user-сообщения. При включённом режиме нотации — добавляем
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
-        const baseUserContent = query || 'Analyze image';
         const apiUserContent = notationModeEnabled
-            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}`
+            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}${freshBuildTask ? buildFreshTaskReminder(baseUserContent, responseLang) : ''}`
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
@@ -2489,7 +2551,7 @@ async function generateResponse(query, imageData = null) {
         const payload = {
             userId: currentUser?.id,
             messages,
-            temperature: notationModeEnabled ? 0.45 : 0.7,
+            temperature: notationModeEnabled ? (freshBuildTask ? 0.35 : 0.45) : 0.7,
             max_tokens: tokenBudget,
             maxOutputTokens: tokenBudget,
             image: imageData ? {
