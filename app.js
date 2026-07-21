@@ -277,11 +277,7 @@ if (modeToggleBtn && modeDropdown) {
             modeDropdown.classList.add('hidden');
 
             // Обновляем переводы (после замены innerHTML в кнопке)
-            if (typeof updateInterfaceTranslations === 'function') {
-                updateInterfaceTranslations();
-            } else if (typeof updateTexts === 'function') {
-                updateTexts();
-            }
+            if (typeof updateTexts === 'function') updateTexts();
         });
     });
 
@@ -300,7 +296,7 @@ function getNotationLocaleStrings() {
     const lang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('solfai_lang') || 'en';
     const map = {
         en: { on: 'Notation mode enabled', off: 'Notation mode disabled', tooltip: 'Notation mode' },
-        ru: { on: 'Notation mode enabled', off: 'Notation mode disabled', tooltip: 'Notation mode' },
+        ru: { on: 'Режим нотации включён', off: 'Режим нотации выключен', tooltip: 'Режим нотации' },
         de: { on: 'Notenmodus aktiviert', off: 'Notenmodus deaktiviert', tooltip: 'Notenmodus' },
         es: { on: 'Modo notación activado', off: 'Modo notación desactivado', tooltip: 'Modo notación' },
         zh: { on: '已启用乐谱模式', off: '已关闭乐谱模式', tooltip: '乐谱模式' },
