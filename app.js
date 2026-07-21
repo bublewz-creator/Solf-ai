@@ -1243,11 +1243,14 @@ function renderChatsList() {
         const olderChats = chats.slice(TOP_VISIBLE_CHATS, TOP_VISIBLE_CHATS + OLDER_VISIBLE_CHATS);
         html += recentChats.map(chat => renderChatItemHTML(chat)).join('');
         
-        const olderLabel = (typeof solfaiGetText === 'function' ? solfaiGetText('olderChatsGroup') : '').replace(/\{n\}/g, String(olderChats.length)) || `💬 Older chats (${olderChats.length})`;
+        const olderLabel = (typeof solfaiGetText === 'function' ? solfaiGetText('olderChatsGroup') : '').replace(/\{n\}/g, String(olderChats.length)) || `Older chats (${olderChats.length})`;
         html += `
-        <div class="chats-group-header ${groupOpen ? 'open' : ''}" onclick="toggleChatGroup(event)" style="display:flex; justify-content:space-between; align-items:center; cursor:pointer; padding: 14px 10px; color: var(--text-secondary); font-size: 13px; font-weight: 600; border-radius: 8px; margin-top: 5px; transition: background 0.2s;">
-            <span>${olderLabel}</span>
-            <span class="group-arrow" style="transition: transform 0.3s; font-size: 10px; ${groupOpen ? 'transform: rotate(180deg);' : ''}">▼</span>
+        <div class="chats-group-header ${groupOpen ? 'open' : ''}" onclick="toggleChatGroup(event)">
+            <span class="chats-group-header-label">
+                <svg class="svg-icon chats-group-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path></svg>
+                <span>${olderLabel}</span>
+            </span>
+            <svg class="svg-icon group-arrow" viewBox="0 0 24 24" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>
         </div>`;
         
         const limitNotice = (typeof solfaiGetText === 'function' ? solfaiGetText('chatLimitNotice') : '') || `Only the last ${MAX_SAVED_CHATS} chats are saved.`;
