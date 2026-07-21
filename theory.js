@@ -732,6 +732,39 @@
         };
     }
 
+    /**
+     * Цепочка 2 (минор): t53 – d6 – s6 – D53 – D2 – t6 – II7 – D43 – t53 – s64 – t53
+     */
+    function buildChain2(tonic) {
+        const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'minor', 4);
+        const preset = D7_PRESETS[d7KeyId(tonic, 'minor')];
+        const d7Keys = preset ? preset[0].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [5, 7, 2, 4], ['harmonic', 'harmonic', 'minor', 'minor'], 4);
+        const d43Keys = preset ? preset[2].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'harmonic', 'harmonic'], 4);
+        const d2Keys = preset ? preset[3].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [4, 5, 7, 2], ['minor', 'harmonic', 'harmonic', 'minor'], 4);
+        const ii7Keys = seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'minor', 'minor'], 4);
+
+        const notes = [
+            { keys: t53(), duration: 'w', label: 't53' },
+            { keys: triadCloseBass(tonic, 7, 2, 5, 'harmonic', 4), duration: 'w', label: 'd6' },
+            { keys: triadCloseBass(tonic, 6, 1, 4, 'minor', 4), duration: 'w', label: 's6' },
+            { keys: triadCloseBass(tonic, 5, 7, 2, 'harmonic', 4), duration: 'w', label: 'D53' },
+            { keys: d2Keys, duration: 'w', label: 'D2' },
+            { keys: triadCloseBass(tonic, 3, 5, 1, 'minor', 4), duration: 'w', label: 't6' },
+            { keys: ii7Keys, duration: 'w', label: 'II7' },
+            { keys: d43Keys, duration: 'w', label: 'D43' },
+            { keys: t53(), duration: 'w', label: 't53' },
+            { keys: triadCloseBass(tonic, 4, 6, 1, 'minor', 4), duration: 'w', label: 's64' },
+            { keys: t53(), duration: 'w', label: 't53' }
+        ];
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, 'minor'),
+            timeSignature: '',
+            barlines: 'none',
+            notes
+        };
+    }
+
     function parseChainNumber(t) {
         if (/цепочк\w*\s*2\b|2[\s-]*(?:ю|я|й|e|nd)\s*цепоч|chain\s*2|втор\w*\s*цепоч/i.test(t)) return 2;
         if (/цепочк|chain|1[\s-]*(?:ю|я|й|st)\s*цепоч|цепочк\w*\s*1\b|перв\w*\s*цепоч/i.test(t)) return 1;
@@ -1004,7 +1037,8 @@
                 break;
             case 'chain': {
                 const num = parseChainNumber(t);
-                if (num === 1 && key.mode === 'major') data = buildChain1(key.tonic);
+                if (num === 2 || (num !== 1 && key.mode === 'minor')) data = buildChain2(key.tonic);
+                else data = buildChain1(key.tonic);
                 break;
             }
         }

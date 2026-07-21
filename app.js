@@ -456,8 +456,9 @@ EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAU
 - «Все виды трезвучий от ноты N» = мажорное, минорное, увеличенное, уменьшенное (4 аккорда).
 - «Все виды септаккордов от N» = малый мажорный, малый минорный, малый ум., ум.7 и т.д. — выводи столько, сколько корректно для запроса, не один.
 - «Гармонизуй (мелодию/задачу/упражнение)» / harmonize → ПОЛНАЯ гармонизация всего фрагмента: SATB, label на каждый аккорд (T53, S6, D7…), все такты с картинки. Не один аккорд-пример.
+- «Цепочка / chain» → ПОЛНАЯ цепочка целиком: мажор = Цепочка 1 (9 аккордов: T53 S64 VII7 D65 T53 S6 K64 D7 T53); минор = Цепочка 2 (11 аккордов: t53 d6 s6 D53 D2 t6 II7 D43 t53 s64 t53). barlines:"none". Каждый аккорд с label. Не 1–3 аккорда «для примера».
 
-ПРАВИЛО: если просьба по форме «построй ВСЕ … / тритоны / характерные / обращения / виды», ВСЕГДА выводи полный набор. Один пример из набора = НЕПРАВИЛЬНЫЙ ответ. Если пользователь явно сказал «две пары», «обе пары», «все тритоны» — это всегда ГАРМОНИЧЕСКАЯ форма, никогда не урезай до натуральной. Текст при этом остаётся коротким (1–2 предложения), а длина ИМЕННО НОТАЦИИ диктуется типом упражнения, не правилом «1–2 такта».
+ПРАВИЛО: если просьба по форме «построй ВСЕ … / тритоны / характерные / обращения / виды / цепочку», ВСЕГДА выводи полный набор. Один пример из набора = НЕПРАВИЛЬНЫЙ ответ. Если пользователь явно сказал «две пары», «обе пары», «все тритоны» — это всегда ГАРМОНИЧЕСКАЯ форма, никогда не урезай до натуральной. Текст при этом остаётся коротким (1–2 предложения), а длина ИМЕННО НОТАЦИИ диктуется типом упражнения, не правилом «1–2 такта».
 
 ALWAYS END WITH NOTATION:
 - The very LAST line of the message MUST be a valid [[NOTATION:{...}]] block:
@@ -926,7 +927,7 @@ D65 строится на VII СТУПЕНИ (первая инверсия D7).
 5) Label в JSON = точная функция; ноты = точное строение. Несовпадение label и нот = КРИТИЧЕСКАЯ ОШИБКА.
 
 --- И. ЧТО СТРОИТ ДВИЖОК theory.js (не переписывай!) ---
-Система автоматически подставляет правильные ноты для: тритонов, характерных интервалов, гамм (все формы), D7+обращения+разрешения, цепочки 1, трезвучия T с обращениями, «все виды трезвучий от ноты». Если запрос распознан — используй готовый блок, не выдумывай свои ноты.
+Система автоматически подставляет правильные ноты для: тритонов, характерных интервалов, гамм (все формы), D7+обращения+разрешения, цепочки 1 и 2, трезвучия T с обращениями, «все виды трезвучий от ноты». Если запрос распознан — используй готовый блок, не выдумывай свои ноты.
 
 === БОЛЬШИЕ ЗАДАЧИ (важно!) ===
 - Ты МОЖЕШЬ и ДОЛЖЕН выполнять большие задания целиком: цепочки на 15+ аккордов, гармонизации мелодии/баса, длинные секвенции, модуляции. НЕ сокращай количество аккордов, если пользователь просит длинную цепочку — выводи столько, сколько попросили.
@@ -969,16 +970,18 @@ function patchAiWithTheory(userQuery, aiText) {
         const det = window.SolfTheory.buildNotationForQuery(q);
         if (det && det.blockString && typeof window.SolfTheory.applyBlock === 'function') {
             const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
-            const isChain = /цепочк|chain/i.test(q) && !/цепочк\w*\s*2\b|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
+            const isChain = /цепочк|chain/i.test(q);
             let intro = null;
             if (isMultiScale) {
                 intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
                     ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
                     : 'Natural, harmonic, and melodic forms (ascending and descending):');
             } else if (isChain) {
+                const chain2 = /цепочк\w*\s*2|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
+                const isMinor = /min|moll|mol\b|минор/i.test(q);
                 intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
-                    ? 'Цепочка 1 в заданной тональности:'
-                    : 'Chain 1 in the requested key:');
+                    ? (chain2 || isMinor ? 'Цепочка 2 в заданной тональности:' : 'Цепочка 1 в заданной тональности:')
+                    : (chain2 || isMinor ? 'Chain 2 in the requested key:' : 'Chain 1 in the requested key:'));
             }
             const base = intro ? intro : aiText;
             return window.SolfTheory.applyBlock(base, det.blockString);
@@ -997,7 +1000,7 @@ function buildNotationUserReminder(responseLang) {
         'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). HARMONIZATION / image exercise = long block (one SATB chord per measure for the whole piece). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
         'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
         'TASK COMPLIANCE: do EXACTLY what the user asked in THIS message — full set, every part. Ignore earlier chat mistakes. Dominant labels: D7, D6/5, D4/3, D2 (Latin only). ' +
-        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. "D7 + inversions + resolutions" = 8 chords (4 D7 forms + 4 tonic resolutions). Melodic scale = ascending AND descending when requested. Scales and single chords — barlines:"none" without timeSignature. ' +
+        'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. "D7 + inversions + resolutions" = 8 chords (4 D7 forms + 4 tonic resolutions). Melodic scale = ascending AND descending when requested. Scales and single chords — barlines:"none" without timeSignature. Chain / цепочка = FULL Chain 1 (9 chords) or Chain 2 (11 chords) per key mode; barlines:"none"; label on EVERY chord; never a 1–3 chord demo. ' +
         'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth.';
 }
 
@@ -1018,6 +1021,9 @@ const NOTATION_RETRY_PROMPT_3 =
 
 const HARMONIZATION_RETRY_PROMPT =
     'HARMONIZATION INCOMPLETE or WRONG FORMAT. Read the image again. Output ONE [[NOTATION:{...}]] with "layout":"satb": treble clef staff = soprano (given melody!) + alto; BASS clef staff = tenor + bass; "chords"[] = one entry per measure with fields soprano, alto, tenor, bass, duration, label. ALL measures of the exercise — not one demo chord. keySignature from the image (count sharps/flats). No prose — only the block.';
+
+const CHAIN_RETRY_PROMPT =
+    'CHAIN INCOMPLETE or WRONG ORDER. Output ONE [[NOTATION:{...}]] with barlines:"none", clef:"treble", and notes[] = EVERY chord of the full chain in exact schema order, each with duration and label. Major = Chain 1 (9 chords: T53 S64 VII7 D65 T53 S6 K64 D7 T53). Minor = Chain 2 (11 chords: t53 d6 s6 D53 D2 t6 II7 D43 t53 s64 t53). No prose — only the block.';
 
 function hasNotationBlock(text) {
     return /\[\[NOTATION:\s*\{[\s\S]*?\}\s*\]\]/.test(String(text || ''));
@@ -1067,6 +1073,38 @@ function isHarmonizationTask(query, hasImage = false) {
     if (/гармониз|harmoniz|harmoni[sz]e|спиш[иь]\s*голос|4[\s-]?голос|четырех\s*голос|четырёх\s*голос|satb|s\.?a\.?t\.?b|voice\s*leading|голосоведени/i.test(t)) return true;
     if (hasImage && /задач|упражнен|мелоди|эту|этот|это|фото|картин|example|exercise|this|analyze|анализ|разбер/i.test(t)) return true;
     return false;
+}
+
+/** Запрос на цепочку аккордов (Chain 1 / Chain 2). */
+function isChainTask(query) {
+    const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
+    return /цепочк|chain|chord\s*chain|аккордн\w*\s*цепоч/i.test(t);
+}
+
+/** Ожидаемое число аккордов: Chain 1 = 9, Chain 2 = 11. */
+function expectedChainLength(query) {
+    const t = String(query || '');
+    const chain2 = /цепочк\w*\s*2|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(t);
+    const chain1Explicit = /цепочк\w*\s*1|chain\s*1|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i.test(t);
+    const isMinor = /min|moll|mol\b|минор/i.test(t);
+    if (chain2 || (isMinor && !chain1Explicit)) return 11;
+    return 9;
+}
+
+function buildChainReminder(lang, query) {
+    const len = expectedChainLength(query);
+    const chain2 = len === 11;
+    const schema = chain2
+        ? 't53 – d6 – s6 – D53 – D2 – t6 – II7 – D43 – t53 – s64 – t53'
+        : 'T53 – S64 – VII7 – D65 – T53 – S6 – K64 – D7 – T53';
+    if (lang === 'ru') {
+        return '\n\n[ЦЕПОЧКА — обязательно]\n' +
+            `Цепочка ${chain2 ? 2 : 1}: ровно ${len} аккордов подряд в порядке:\n${schema}\n` +
+            'barlines:"none", timeSignature:"", label на КАЖДЫЙ аккорд. НЕ 1–3 аккорда «для примера». Система подставит эталонные ноты — не выдумывай свои.';
+    }
+    return '\n\n[CHAIN — mandatory]\n' +
+        `Chain ${chain2 ? 2 : 1}: exactly ${len} chords in order:\n${schema}\n` +
+        'barlines:"none", timeSignature:"", label every chord. NOT a 1–3 chord demo. System will inject reference notes — do not invent your own.';
 }
 
 function countNotationChords(text) {
@@ -1127,6 +1165,12 @@ function buildFreshTaskReminder(query, lang) {
         parts.push(ru
             ? 'ОБЯЗАТЕЛЬНО: полная гармонизация SATB — аккорд на КАЖДЫЙ такт всего упражнения, не один пример.'
             : 'MANDATORY: FULL SATB harmonization — one chord per measure for the entire exercise, not a demo chord.');
+    }
+    if (/цепочк|chain/i.test(q)) {
+        const len = expectedChainLength(q);
+        parts.push(ru
+            ? `ОБЯЗАТЕЛЬНО: полная цепочка — ровно ${len} аккордов подряд, все labels по схеме, barlines:"none".`
+            : `MANDATORY: FULL chain — exactly ${len} chords in sequence with correct labels, barlines:"none".`);
     }
     const header = ru
         ? '[СВЕЖЕЕ ЗАДАНИЕ — игнорируй предыдущие ответы в чате; выполни ТОЛЬКО текущий запрос по правилам системы]'
@@ -2868,7 +2912,8 @@ async function generateResponse(query, imageData = null) {
         
         const baseUserContent = query || 'Analyze image';
         const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
-        const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask);
+        const chainTask = isChainTask(baseUserContent);
+        const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask || chainTask);
 
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -2892,19 +2937,19 @@ async function generateResponse(query, imageData = null) {
         // Базовое содержимое user-сообщения. При включённом режиме нотации — добавляем
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
         let apiUserContent = notationModeEnabled
-            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}${freshBuildTask ? buildFreshTaskReminder(baseUserContent, responseLang) : ''}${harmonizationTask ? buildHarmonizationReminder(responseLang, !!imageData) : ''}`
+            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}${freshBuildTask ? buildFreshTaskReminder(baseUserContent, responseLang) : ''}${harmonizationTask ? buildHarmonizationReminder(responseLang, !!imageData) : ''}${chainTask ? buildChainReminder(responseLang, baseUserContent) : ''}`
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
         // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
         // isBigNotationTask() / isHarmonizationTask() поднимают лимит до 8192.
-        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask);
+        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask || chainTask);
         const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : (harmonizationTask ? 4096 : 1024);
         const payload = {
             userId: currentUser?.id,
             messages,
-            temperature: notationModeEnabled ? ((freshBuildTask || harmonizationTask) ? 0.35 : 0.45) : 0.7,
+            temperature: notationModeEnabled ? ((freshBuildTask || harmonizationTask || chainTask) ? 0.35 : 0.45) : 0.7,
             max_tokens: tokenBudget,
             maxOutputTokens: tokenBudget,
             image: imageData ? {
@@ -3065,6 +3110,43 @@ async function generateResponse(query, imageData = null) {
             } catch (harmErr) {
                 if (harmErr?.name !== 'AbortError') {
                     console.warn('[Solf.ai] Harmonization auto-retry failed:', harmErr);
+                }
+            }
+        }
+
+        // Цепочка: модель часто выдаёт 1–3 аккорда вместо полной схемы — переспрашиваем.
+        if (notationModeEnabled && chainTask && hasNotationBlock(aiText)) {
+            const expectedLen = expectedChainLength(baseUserContent);
+            try {
+                for (let ci = 0; ci < 2 && countNotationChords(aiText) < expectedLen; ci++) {
+                    const chainRetryRes = await apiFetch(`${WORKER_URL}/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: currentUser?.id,
+                            usageAlreadyCounted: true,
+                            messages: messages.concat([
+                                { role: 'assistant', content: aiText },
+                                { role: 'user', content: `${CHAIN_RETRY_PROMPT}${buildChainReminder(responseLang, baseUserContent)}` }
+                            ]),
+                            temperature: 0.2,
+                            max_tokens: 8192,
+                            maxOutputTokens: 8192,
+                            image: null
+                        }),
+                        signal: currentAbortController.signal
+                    }, requestTimeoutMs);
+                    const chainRetryData = await chainRetryRes.json().catch(() => ({}));
+                    if (chainRetryRes.ok && !chainRetryData.error) {
+                        const chainText = chainRetryData.text || chainRetryData.choices?.[0]?.message?.content || '';
+                        if (hasNotationBlock(chainText) && countNotationChords(chainText) >= countNotationChords(aiText)) {
+                            aiText = chainText;
+                        }
+                    }
+                }
+            } catch (chainErr) {
+                if (chainErr?.name !== 'AbortError') {
+                    console.warn('[Solf.ai] Chain auto-retry failed:', chainErr);
                 }
             }
         }
