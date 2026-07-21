@@ -460,6 +460,12 @@ body {
     gap: 12px;
 }
 
+/* Клик мышью не должен оставлять «залипший» focus-ring на кнопках тулбара */
+.chat-input-toolbar button:focus:not(:focus-visible),
+.mode-option:focus:not(:focus-visible) {
+    outline: none;
+}
+
 .toolbar-left-group, .toolbar-right-group {
     display: flex;
     align-items: center;

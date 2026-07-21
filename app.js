@@ -187,6 +187,48 @@ const newChatBtn = document.getElementById('newChatBtn');
 const sidebar = document.getElementById('sidebar');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 
+/** Вернуть фокус в поле ввода после клика по кнопкам тулбара (Enter иначе снова жмёт кнопку). */
+function refocusChatInput() {
+    if (!chatInput || document.activeElement === chatInput) return;
+    try {
+        chatInput.focus({ preventScroll: true });
+    } catch (_) {
+        chatInput.focus();
+    }
+}
+
+/** Кнопки над полем ввода не должны забирать фокус мышью; Enter — отправка, не повторный toggle. */
+function bindChatToolbarFocusBehavior() {
+    const toolbar = document.querySelector('.chat-input-toolbar');
+    if (!toolbar || !chatInput) return;
+
+    const toolbarButtons = toolbar.querySelectorAll('button');
+    toolbarButtons.forEach(btn => {
+        if (btn.id === 'chatSendBtn') return;
+
+        btn.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+        });
+
+        btn.addEventListener('keydown', e => {
+            if (e.key !== 'Enter' || e.shiftKey) return;
+            e.preventDefault();
+            e.stopPropagation();
+            refocusChatInput();
+            const hasContent = (chatInput.value?.trim?.() || '') !== '' || attachedFiles.length > 0;
+            if (!isGenerating && hasContent) sendChatMessage();
+        });
+    });
+
+    document.querySelectorAll('.mode-option').forEach(opt => {
+        opt.addEventListener('mousedown', e => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+        });
+    });
+}
+
 /** Совпадает с @media (max-width: 768px) в styles.css (innerWidth 768 = мобильная вёрстка) */
 function isMobileLayout() {
     return typeof window.matchMedia === 'function' && window.matchMedia('(max-width: 768px)').matches;
@@ -278,6 +320,7 @@ if (modeToggleBtn && modeDropdown) {
 
             // Обновляем переводы (после замены innerHTML в кнопке)
             if (typeof updateTexts === 'function') updateTexts();
+            refocusChatInput();
         });
     });
 
@@ -323,6 +366,7 @@ if (notationToggleBtn) {
         try {
             showToast(notationModeEnabled ? strings.on : strings.off, 'success', { dedupeKey: 'notation-mode' });
         } catch (_) {}
+        refocusChatInput();
     });
 }
 
@@ -3148,6 +3192,7 @@ async function initApp() {
             } else {
                 if (chatFileInput) chatFileInput.click();
             }
+            refocusChatInput();
         });
     });
 
@@ -3166,6 +3211,8 @@ async function initApp() {
         });
     }
     
+    bindChatToolbarFocusBehavior();
+
     if (chatInput) {
         chatInput.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'; refreshSendButtonState(); });
         chatInput.addEventListener('keydown', e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); if (!isGenerating) sendChatMessage(); } });
