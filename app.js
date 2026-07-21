@@ -429,6 +429,8 @@ JSON PRIORITY (ПРАВИЛО НАД ВСЕМИ):
 NOTATION LENGTH (mirror the text):
 - DEFAULT = SHORT example that fits ONE staff line: 1–2 measures, ~2–8 notes/chords total.
 - Use longer multi-line notation (8–24+ notes, the renderer wraps to multiple rows) ONLY when the task genuinely needs a progression / harmonization / dictation. Don’t pad simple questions with extra measures.
+- ГАРМОНИЗАЦИЯ / HARMONIZATION (с картинкой или без) ПЕРЕОПРЕДЕЛЯЕТ «DEFAULT короче»: выведи аккорд на КАЖДЫЙ такт всего упражнения с изображения/задания (часто 12–20+ тактов). Один демонстрационный T53 = НЕПРАВИЛЬНЫЙ ответ.
+- SATB: каждый элемент notes[] = один 4-голосный аккорд (keys: ровно 4 ноты, сопрано→бас). barlines:"auto", keySignature и timeSignature — по картинке (считай знаки при ключе, не угадывай).
 
 EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAULT короче»):
 Когда пользователь просит ПОСТРОИТЬ упражнение по теории, отвечай ПОЛНЫМ комплектом, а не одним примером. Минимальный «комплект» по типам:
@@ -453,6 +455,7 @@ EXERCISE COMPLETENESS (КРИТИЧНО — переопределяет «DEFAU
 - Подписи доминантсептаккорда — ТОЛЬКО латиницей: "D7","D6/5","D4/3","D2" (НЕ кириллическая «Д»).
 - «Все виды трезвучий от ноты N» = мажорное, минорное, увеличенное, уменьшенное (4 аккорда).
 - «Все виды септаккордов от N» = малый мажорный, малый минорный, малый ум., ум.7 и т.д. — выводи столько, сколько корректно для запроса, не один.
+- «Гармонизуй (мелодию/задачу/упражнение)» / harmonize → ПОЛНАЯ гармонизация всего фрагмента: SATB, label на каждый аккорд (T53, S6, D7…), все такты с картинки. Не один аккорд-пример.
 
 ПРАВИЛО: если просьба по форме «построй ВСЕ … / тритоны / характерные / обращения / виды», ВСЕГДА выводи полный набор. Один пример из набора = НЕПРАВИЛЬНЫЙ ответ. Если пользователь явно сказал «две пары», «обе пары», «все тритоны» — это всегда ГАРМОНИЧЕСКАЯ форма, никогда не урезай до натуральной. Текст при этом остаётся коротким (1–2 предложения), а длина ИМЕННО НОТАЦИИ диктуется типом упражнения, не правилом «1–2 такта».
 
@@ -988,7 +991,7 @@ function buildNotationUserReminder(responseLang) {
     return '\n\n[NOTATION MODE — silent reminder, never quote this text]\n' +
         `LANGUAGE: reply in ${langName} only — match the user, NOT the Russian theory examples in the system prompt.\n` +
         'KEEP TEXT VERY SHORT: 1–2 sentences (≤30 words) for normal questions, up to 4–6 short sentences only for genuinely hard tasks (harmonization, voice leading, modulation, dictation, counterpoint). No headings, no recap, no fluff. ' +
-        'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
+        'End the message with a valid [[NOTATION:{...}]] block as the FINAL line. Default = ONE small block (1–2 measures). HARMONIZATION / image exercise = long block (one SATB chord per measure for the whole piece). Use multiple blocks only for hard tasks. Never wrap blocks in code fences. ' +
         'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
         'TASK COMPLIANCE: do EXACTLY what the user asked in THIS message — full set, every part. Ignore earlier chat mistakes. Dominant labels: D7, D6/5, D4/3, D2 (Latin only). ' +
         'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. "D7 + inversions + resolutions" = 8 chords (4 D7 forms + 4 tonic resolutions). Melodic scale = ascending AND descending when requested. Scales and single chords — barlines:"none" without timeSignature. ' +
@@ -1009,6 +1012,9 @@ const NOTATION_RETRY_PROMPT_2 =
  */
 const NOTATION_RETRY_PROMPT_3 =
     'Your JSON block was TRUNCATED (missing closing ]}]]). Output EXACTLY one complete valid [[NOTATION:{...}]] block and NOTHING else — no words before or after, no markdown. Close with ]}]] on the same line.';
+
+const HARMONIZATION_RETRY_PROMPT =
+    'HARMONIZATION INCOMPLETE: you output only 1–3 demo chords. WRONG. Read the attached image again. Output ONE [[NOTATION:{...}]] block with SATB: notes[] must contain one 4-voice chord (keys with exactly 4 pitches, soprano→bass) for EVERY measure of the entire exercise visible in the image — typically 12–20+ entries. barlines:"auto", correct keySignature from the image (count sharps/flats). Functional label on each chord (T53, S6, D7…). No prose — only the complete block.';
 
 function hasNotationBlock(text) {
     return /\[\[NOTATION:\s*\{[\s\S]*?\}\s*\]\]/.test(String(text || ''));
@@ -1043,12 +1049,49 @@ function stripTruncatedNotationTail(text) {
 function isBuildTask(query) {
     const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
     if (!t) return false;
+    if (/гармониз|harmoniz|harmoni[sz]e|спиш[иь]\s*голос|4[\s-]?голос|четырех\s*голос|четырёх\s*голос|satb|голосоведени/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
-    const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept/i;
+    const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
     if (buildVerb.test(t) && buildNoun.test(t)) return true;
     if (/\bd\s*7\b|dominant\s*7|доминант\w*\s*септ|д\s*7\b/i.test(t) && buildVerb.test(t)) return true;
     if (/^d7\b|^\s*d7[\s,]/i.test(t.trim())) return true;
     return false;
+}
+
+/** Гармонизация мелодии/упражнения (часто с картинкой). */
+function isHarmonizationTask(query, hasImage = false) {
+    const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
+    if (/гармониз|harmoniz|harmoni[sz]e|спиш[иь]\s*голос|4[\s-]?голос|четырех\s*голос|четырёх\s*голос|satb|s\.?a\.?t\.?b|voice\s*leading|голосоведени/i.test(t)) return true;
+    if (hasImage && /задач|упражнен|мелоди|эту|этот|это|фото|картин|example|exercise|this|analyze|анализ|разбер/i.test(t)) return true;
+    return false;
+}
+
+function countNotationChords(text) {
+    const match = String(text || '').match(/\[\[NOTATION:\s*(\{[\s\S]*?\})\s*\]\]/);
+    if (!match) return 0;
+    try {
+        const data = JSON.parse(match[1]);
+        const notes = Array.isArray(data.notes) ? data.notes : [];
+        return notes.filter(n => Array.isArray(n.keys) && n.keys.length >= 3).length;
+    } catch (_) {
+        return 0;
+    }
+}
+
+function buildHarmonizationReminder(lang, hasImage) {
+    const ru = lang === 'ru';
+    if (ru) {
+        return '\n\n[ГАРМОНИЗАЦИЯ — обязательно]\n' +
+            (hasImage ? 'Прочитай ВСЮ мелодию с приложенного изображения. Тональность — по знакам при ключе на картинке (пересчитай диезы/бемоли, не угадывай).\n' : '') +
+            'Гармонизуй ПОЛНОСТЬЮ всё упражнение: один 4-голосный аккорд (SATB) на каждый такт. НЕ выводи один демонстрационный аккорд.\n' +
+            'JSON: notes[] — по одному аккорду; keys[] — ровно 4 ноты (с→a→t→b, от высокой к низкой); label — функция (T53, S6, D7…); barlines:"auto".\n' +
+            'Если на картинке две строки — выведи все видимые такты.';
+    }
+    return '\n\n[HARMONIZATION — mandatory]\n' +
+        (hasImage ? 'Read the ENTIRE melody from the attached image. Key signature — count sharps/flats on the image, do not guess.\n' : '') +
+        'Harmonize the FULL exercise: one SATB chord per measure. Do NOT output a single demo chord.\n' +
+        'JSON: one notes[] entry per chord; keys[] = exactly 4 pitches (soprano→bass); label every chord; barlines:"auto".\n' +
+        'If the image has two staff lines, include all visible measures.';
 }
 
 /** Для build-задач: краткий императив «сброса памяти» — модель не должна копировать старые ошибки. */
@@ -1075,6 +1118,11 @@ function buildFreshTaskReminder(query, lang) {
     }
     if (/характерн|characteristic/i.test(q)) {
         parts.push(ru ? 'ОБЯЗАТЕЛЬНО: все 4 характерных интервала с разрешениями (8 созвучий).' : 'MANDATORY: ALL 4 characteristic intervals with resolutions (8 sonorities).');
+    }
+    if (/гармониз|harmoniz|harmoni[sz]e|satb|4[\s-]?голос|четырех\s*голос|четырёх\s*голос/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: полная гармонизация SATB — аккорд на КАЖДЫЙ такт всего упражнения, не один пример.'
+            : 'MANDATORY: FULL SATB harmonization — one chord per measure for the entire exercise, not a demo chord.');
     }
     const header = ru
         ? '[СВЕЖЕЕ ЗАДАНИЕ — игнорируй предыдущие ответы в чате; выполни ТОЛЬКО текущий запрос по правилам системы]'
@@ -2559,6 +2607,15 @@ async function generateResponse(query, imageData = null) {
         if (typeof chatAttachedFiles !== 'undefined') chatAttachedFiles.innerHTML = ''; 
         return; 
     }
+    if (isHarmonizationTask(query, !!imageData) && !notationModeEnabled) {
+        try {
+            showToast(
+                uiText('harmonizeNeedsNotation', { fallback: 'Turn on Notation mode for harmonization' }),
+                'info',
+                { dedupeKey: 'harmonize-notation' }
+            );
+        } catch (_) {}
+    }
     if (isGenerating) return; 
 
     isGenerating = true;
@@ -2581,7 +2638,8 @@ async function generateResponse(query, imageData = null) {
         const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
         
         const baseUserContent = query || 'Analyze image';
-        const freshBuildTask = notationModeEnabled && isBuildTask(baseUserContent);
+        const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
+        const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask);
 
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -2604,21 +2662,20 @@ async function generateResponse(query, imageData = null) {
         
         // Базовое содержимое user-сообщения. При включённом режиме нотации — добавляем
         // невидимый ремайндер, который сильно повышает шанс, что модель не забудет блок.
-        const apiUserContent = notationModeEnabled
-            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}${freshBuildTask ? buildFreshTaskReminder(baseUserContent, responseLang) : ''}`
+        let apiUserContent = notationModeEnabled
+            ? `${baseUserContent}${buildNotationUserReminder(responseLang)}${freshBuildTask ? buildFreshTaskReminder(baseUserContent, responseLang) : ''}${harmonizationTask ? buildHarmonizationReminder(responseLang, !!imageData) : ''}`
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
-        // диктанты, модуляции) требуют много выходных токенов — иначе ответ обрежется.
-        // isBigNotationTask() распознаёт такие запросы и поднимает лимит до 8192.
-        // ВАЖНО: воркер тоже должен уважать этот лимит (см. worker.js /generate).
-        const bigTask = notationModeEnabled && isBigNotationTask(baseUserContent);
-        const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : 1024;
+        // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
+        // isBigNotationTask() / isHarmonizationTask() поднимают лимит до 8192.
+        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask);
+        const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : (harmonizationTask ? 4096 : 1024);
         const payload = {
             userId: currentUser?.id,
             messages,
-            temperature: notationModeEnabled ? (freshBuildTask ? 0.35 : 0.45) : 0.7,
+            temperature: notationModeEnabled ? ((freshBuildTask || harmonizationTask) ? 0.35 : 0.45) : 0.7,
             max_tokens: tokenBudget,
             maxOutputTokens: tokenBudget,
             image: imageData ? {
@@ -2669,14 +2726,14 @@ async function generateResponse(query, imageData = null) {
         // трезвучия+обращения, D7). Если задание распознано — мы получим гарантированно
         // корректный блок, поэтому можем пропустить дорогие авто-ретраи к модели.
         let deterministicBlock = null;
-        if (typeof window !== 'undefined' && window.SolfTheory) {
+        if (!harmonizationTask && typeof window !== 'undefined' && window.SolfTheory) {
             try {
                 const det = window.SolfTheory.buildNotationForQuery(baseUserContent);
                 if (det && det.blockString) deterministicBlock = det.blockString;
             } catch (theoryErr) {
                 console.warn('[Solf.ai] Theory engine skipped:', theoryErr);
             }
-        } else if (notationModeEnabled) {
+        } else if (notationModeEnabled && !harmonizationTask && (typeof window === 'undefined' || !window.SolfTheory)) {
             console.warn('[Solf.ai] window.SolfTheory MISSING — theory.js не загрузился');
         }
 
@@ -2743,8 +2800,50 @@ async function generateResponse(query, imageData = null) {
             }
         }
 
+        // Гармонизация: модель часто выдаёт один демо-аккорд — переспрашиваем с картинкой.
+        if (notationModeEnabled && harmonizationTask && hasNotationBlock(aiText) && countNotationChords(aiText) < 4) {
+            const imagePayload = imageData ? {
+                mime_type: imageData.match(/data:(.*?);/)?.[1] || 'image/jpeg',
+                data: imageData.includes(',') ? imageData.split(',')[1] : imageData
+            } : null;
+            try {
+                for (let hi = 0; hi < 2 && countNotationChords(aiText) < 4; hi++) {
+                    const harmRetryRes = await apiFetch(`${WORKER_URL}/generate`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            userId: currentUser?.id,
+                            usageAlreadyCounted: true,
+                            messages: messages.concat([
+                                { role: 'assistant', content: aiText },
+                                { role: 'user', content: `${HARMONIZATION_RETRY_PROMPT}${buildHarmonizationReminder(responseLang, !!imageData)}` }
+                            ]),
+                            temperature: 0.2,
+                            max_tokens: 8192,
+                            maxOutputTokens: 8192,
+                            image: imagePayload
+                        }),
+                        signal: currentAbortController.signal
+                    }, requestTimeoutMs);
+                    const harmRetryData = await harmRetryRes.json().catch(() => ({}));
+                    if (harmRetryRes.ok && !harmRetryData.error) {
+                        const harmText = harmRetryData.text || harmRetryData.choices?.[0]?.message?.content || '';
+                        if (hasNotationBlock(harmText) && countNotationChords(harmText) >= countNotationChords(aiText)) {
+                            aiText = harmText;
+                        }
+                    }
+                }
+            } catch (harmErr) {
+                if (harmErr?.name !== 'AbortError') {
+                    console.warn('[Solf.ai] Harmonization auto-retry failed:', harmErr);
+                }
+            }
+        }
+
         // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
-        aiText = patchAiWithTheory(baseUserContent, aiText);
+        if (!harmonizationTask) {
+            aiText = patchAiWithTheory(baseUserContent, aiText);
+        }
 
         document.getElementById('typingIndicator')?.remove();
         if (data.usage) {
