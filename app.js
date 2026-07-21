@@ -187,9 +187,10 @@ const newChatBtn = document.getElementById('newChatBtn');
 const sidebar = document.getElementById('sidebar');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 
-/** Вернуть фокус в поле ввода после клика по кнопкам тулбара (Enter иначе снова жмёт кнопку). */
+/** Вернуть фокус в поле ввода после клика по кнопке (Enter иначе снова жмёт кнопку). */
 function refocusChatInput() {
     if (!chatInput || document.activeElement === chatInput) return;
+    if (sessionStorage.getItem('solfai_skip_focus_once') === '1') return;
     try {
         chatInput.focus({ preventScroll: true });
     } catch (_) {
@@ -197,36 +198,52 @@ function refocusChatInput() {
     }
 }
 
-/** Кнопки над полем ввода не должны забирать фокус мышью; Enter — отправка, не повторный toggle. */
-function bindChatToolbarFocusBehavior() {
-    const toolbar = document.querySelector('.chat-input-toolbar');
-    if (!toolbar || !chatInput) return;
+function isBlockingOverlayActive() {
+    return !!document.querySelector(
+        '.tool-modal.active, .quiz-modal.active, .limit-modal.active, .exit-modal-overlay.active'
+    );
+}
 
-    const toolbarButtons = toolbar.querySelectorAll('button');
-    toolbarButtons.forEach(btn => {
-        if (btn.id === 'chatSendBtn') return;
+/** Кнопки не должны забирать фокус у поля ввода; Enter — отправка, не повторный click. */
+function shouldReturnFocusToChatInput(el) {
+    if (!chatInput || isBlockingOverlayActive()) return false;
+    if (sessionStorage.getItem('solfai_skip_focus_once') === '1') return false;
+    if (!el || !(el instanceof Element)) return false;
+    if (el.closest('input, textarea, select, [contenteditable="true"]')) return false;
+    return el.matches('button');
+}
 
-        btn.addEventListener('mousedown', e => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-        });
+function bindAppButtonFocusBehavior() {
+    if (!chatInput) return;
 
-        btn.addEventListener('keydown', e => {
-            if (e.key !== 'Enter' || e.shiftKey) return;
-            e.preventDefault();
-            e.stopPropagation();
-            refocusChatInput();
-            const hasContent = (chatInput.value?.trim?.() || '') !== '' || attachedFiles.length > 0;
-            if (!isGenerating && hasContent) sendChatMessage();
-        });
-    });
+    document.addEventListener('mousedown', e => {
+        const btn = e.target.closest('button');
+        if (!btn || e.button !== 0) return;
+        if (!shouldReturnFocusToChatInput(btn)) return;
+        e.preventDefault();
+    }, true);
 
-    document.querySelectorAll('.mode-option').forEach(opt => {
-        opt.addEventListener('mousedown', e => {
-            if (e.button !== 0) return;
-            e.preventDefault();
-        });
-    });
+    document.addEventListener('click', e => {
+        const btn = e.target.closest('button');
+        if (!btn || !shouldReturnFocusToChatInput(btn)) return;
+        requestAnimationFrame(() => refocusChatInput());
+    }, true);
+
+    document.addEventListener('keydown', e => {
+        if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
+        const el = document.activeElement;
+        if (!(el instanceof HTMLButtonElement)) return;
+        if (!shouldReturnFocusToChatInput(el)) return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        if (el.id === 'chatSendBtn' && isGenerating) {
+            abortGeneration();
+            return;
+        }
+        refocusChatInput();
+        const hasContent = (chatInput.value?.trim?.() || '') !== '' || attachedFiles.length > 0;
+        if (!isGenerating && hasContent) sendChatMessage();
+    }, true);
 }
 
 /** Совпадает с @media (max-width: 768px) в styles.css (innerWidth 768 = мобильная вёрстка) */
@@ -320,7 +337,6 @@ if (modeToggleBtn && modeDropdown) {
 
             // Обновляем переводы (после замены innerHTML в кнопке)
             if (typeof updateTexts === 'function') updateTexts();
-            refocusChatInput();
         });
     });
 
@@ -366,7 +382,6 @@ if (notationToggleBtn) {
         try {
             showToast(notationModeEnabled ? strings.on : strings.off, 'success', { dedupeKey: 'notation-mode' });
         } catch (_) {}
-        refocusChatInput();
     });
 }
 
@@ -3192,7 +3207,6 @@ async function initApp() {
             } else {
                 if (chatFileInput) chatFileInput.click();
             }
-            refocusChatInput();
         });
     });
 
@@ -3211,7 +3225,7 @@ async function initApp() {
         });
     }
     
-    bindChatToolbarFocusBehavior();
+    bindAppButtonFocusBehavior();
 
     if (chatInput) {
         chatInput.addEventListener('input', () => { chatInput.style.height = 'auto'; chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px'; refreshSendButtonState(); });
