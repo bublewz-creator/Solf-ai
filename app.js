@@ -977,7 +977,7 @@ function patchAiWithTheory(userQuery, aiText) {
                     ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
                     : 'Natural, harmonic, and melodic forms (ascending and descending):');
             } else if (isChain) {
-                const chain2 = /цепочк\w*\s*2|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
+                const chain2 = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
                 const isMinor = /min|moll|mol\b|минор/i.test(q);
                 intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
                     ? (chain2 || isMinor ? 'Цепочка 2 в заданной тональности:' : 'Цепочка 1 в заданной тональности:')
@@ -1084,8 +1084,8 @@ function isChainTask(query) {
 /** Ожидаемое число аккордов: Chain 1 = 9, Chain 2 = 11. */
 function expectedChainLength(query) {
     const t = String(query || '');
-    const chain2 = /цепочк\w*\s*2|chain\s*2|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(t);
-    const chain1Explicit = /цепочк\w*\s*1|chain\s*1|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i.test(t);
+    const chain2 = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(t);
+    const chain1Explicit = /цепочка\s*1\b|chain\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i.test(t);
     const isMinor = /min|moll|mol\b|минор/i.test(t);
     if (chain2 || (isMinor && !chain1Explicit)) return 11;
     return 9;

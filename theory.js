@@ -670,7 +670,16 @@
 
     // ---------- Цепочки аккордов (школьные схемы) ----------
     function scaleDegree(tonic, degree, form) {
-        const formula = form === 'harmonic' ? HARM_MAJOR_FORMULA : MAJOR_FORMULA;
+        let formula;
+        if (form === 'minor' || form === 'natural') {
+            formula = MINOR_FORMULA;
+        } else if (form === 'harmonicMinor') {
+            formula = SCALE_FORMULAS.harmonicMinor;
+        } else if (form === 'harmonic' || form === 'harmonicMajor') {
+            formula = HARM_MAJOR_FORMULA;
+        } else {
+            formula = MAJOR_FORMULA;
+        }
         const semi = formula[degree - 1];
         if (semi == null) return null;
         return buildIntervalUp({ ...tonic, octave: 4 }, degree, semi);
@@ -745,15 +754,15 @@
 
         const notes = [
             { keys: t53(), duration: 'w', label: 't53' },
-            { keys: triadCloseBass(tonic, 7, 2, 5, 'harmonic', 4), duration: 'w', label: 'd6' },
+            { keys: triadCloseBass(tonic, 7, 2, 5, 'harmonicMinor', 4), duration: 'w', label: 'd6' },
             { keys: triadCloseBass(tonic, 6, 1, 4, 'minor', 4), duration: 'w', label: 's6' },
-            { keys: triadCloseBass(tonic, 5, 7, 2, 'harmonic', 4), duration: 'w', label: 'D53' },
+            { keys: triadCloseBass(tonic, 5, 7, 2, 'harmonicMinor', 4), duration: 'w', label: 'D53' },
             { keys: d2Keys, duration: 'w', label: 'D2' },
             { keys: triadCloseBass(tonic, 3, 5, 1, 'minor', 4), duration: 'w', label: 't6' },
             { keys: ii7Keys, duration: 'w', label: 'II7' },
             { keys: d43Keys, duration: 'w', label: 'D43' },
             { keys: t53(), duration: 'w', label: 't53' },
-            { keys: triadCloseBass(tonic, 4, 6, 1, 'minor', 4), duration: 'w', label: 's64' },
+            { keys: triadCloseBass(tonic, 1, 4, 6, 'minor', 4), duration: 'w', label: 's64' },
             { keys: t53(), duration: 'w', label: 't53' }
         ];
         return {
@@ -766,8 +775,10 @@
     }
 
     function parseChainNumber(t) {
-        if (/цепочк\w*\s*2\b|2[\s-]*(?:ю|я|й|e|nd)\s*цепоч|chain\s*2|втор\w*\s*цепоч/i.test(t)) return 2;
-        if (/цепочк|chain|1[\s-]*(?:ю|я|й|st)\s*цепоч|цепочк\w*\s*1\b|перв\w*\s*цепоч/i.test(t)) return 1;
+        // «цепочка 2» / «chain 2» — явно вторая схема. Не используем \w после «цепочк»:
+        // в JS \w без флага u не матчит кириллицу, и «цепочка 2» не распознаётся.
+        if (/цепочка\s*2\b|2[\s-]*(?:ю|я|й|e|nd)\s*цепоч|chain\s*2\b|втор\w*\s*цепоч/i.test(t)) return 2;
+        if (/цепочка\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|chain\s*1\b|перв\w*\s*цепоч/i.test(t)) return 1;
         return null;
     }
 
