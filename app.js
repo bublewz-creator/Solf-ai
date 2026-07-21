@@ -187,17 +187,6 @@ const newChatBtn = document.getElementById('newChatBtn');
 const sidebar = document.getElementById('sidebar');
 const toggleSidebarBtn = document.getElementById('toggleSidebarBtn');
 
-/** Вернуть фокус в поле ввода после клика по кнопке (Enter иначе снова жмёт кнопку). */
-function refocusChatInput() {
-    if (!chatInput || document.activeElement === chatInput) return;
-    if (sessionStorage.getItem('solfai_skip_focus_once') === '1') return;
-    try {
-        chatInput.focus({ preventScroll: true });
-    } catch (_) {
-        chatInput.focus();
-    }
-}
-
 function isBlockingOverlayActive() {
     return !!document.querySelector(
         '.tool-modal.active, .quiz-modal.active, .limit-modal.active, .exit-modal-overlay.active'
@@ -205,7 +194,7 @@ function isBlockingOverlayActive() {
 }
 
 /** Кнопки не должны забирать фокус у поля ввода; Enter — отправка, не повторный click. */
-function shouldReturnFocusToChatInput(el) {
+function shouldPreventButtonFocusSteal(el) {
     if (!chatInput || isBlockingOverlayActive()) return false;
     if (sessionStorage.getItem('solfai_skip_focus_once') === '1') return false;
     if (!el || !(el instanceof Element)) return false;
@@ -216,31 +205,26 @@ function shouldReturnFocusToChatInput(el) {
 function bindAppButtonFocusBehavior() {
     if (!chatInput) return;
 
+    // Не даём кнопке забрать фокус — Enter в поле ввода не будет повторно жать кнопку.
+    // Намеренно НЕ возвращаем фокус в textarea после клика: на мобилке это выдвигает клавиатуру.
     document.addEventListener('mousedown', e => {
         const btn = e.target.closest('button');
         if (!btn || e.button !== 0) return;
-        if (!shouldReturnFocusToChatInput(btn)) return;
+        if (!shouldPreventButtonFocusSteal(btn)) return;
         e.preventDefault();
-    }, true);
-
-    document.addEventListener('click', e => {
-        const btn = e.target.closest('button');
-        if (!btn || !shouldReturnFocusToChatInput(btn)) return;
-        requestAnimationFrame(() => refocusChatInput());
     }, true);
 
     document.addEventListener('keydown', e => {
         if (e.key !== 'Enter' || e.shiftKey || e.isComposing) return;
         const el = document.activeElement;
         if (!(el instanceof HTMLButtonElement)) return;
-        if (!shouldReturnFocusToChatInput(el)) return;
+        if (!shouldPreventButtonFocusSteal(el)) return;
         e.preventDefault();
         e.stopImmediatePropagation();
         if (el.id === 'chatSendBtn' && isGenerating) {
             abortGeneration();
             return;
         }
-        refocusChatInput();
         const hasContent = (chatInput.value?.trim?.() || '') !== '' || attachedFiles.length > 0;
         if (!isGenerating && hasContent) sendChatMessage();
     }, true);
