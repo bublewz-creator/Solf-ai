@@ -40,14 +40,17 @@
         return { letter, acc, octave };
     }
 
-    const MAJOR_FORMULA = [0, 2, 4, 5, 7, 9, 11];
-    const MINOR_FORMULA = [0, 2, 3, 5, 7, 8, 10];
-    /** Гармонический мажор: пониженная VI ступень, повышенная VII. */
-    const HARM_MAJOR_FORMULA = [0, 2, 4, 5, 7, 8, 11];
+    const SCALE_FORMULAS = {
+        major: [0, 2, 4, 5, 7, 9, 11],
+        minor: [0, 2, 3, 5, 7, 8, 10],
+        harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
+        melodicMinor: [0, 2, 3, 5, 7, 9, 11],
+        harmonicMajor: [0, 2, 4, 5, 7, 8, 11]
+    };
 
     /** 7 ступеней натуральной гаммы в октаве 4 (ascending), верное написание. */
     function buildScale(tonic, mode) {
-        const formula = mode === 'major' ? MAJOR_FORMULA : MINOR_FORMULA;
+        const formula = mode === 'major' ? SCALE_FORMULAS.major : SCALE_FORMULAS.minor;
         const out = [];
         for (let i = 0; i < 7; i++) out.push(buildIntervalUp(tonic, i + 1, formula[i]));
         return out;
@@ -349,14 +352,6 @@
     }
 
     // ---------- Гаммы ----------
-    const SCALE_FORMULAS = {
-        major: [0, 2, 4, 5, 7, 9, 11],
-        minor: [0, 2, 3, 5, 7, 8, 10],
-        harmonicMinor: [0, 2, 3, 5, 7, 8, 11],
-        melodicMinor: [0, 2, 3, 5, 7, 9, 11],
-        harmonicMajor: [0, 2, 4, 5, 7, 8, 11]
-    };
-
     // Римские цифры ступеней — для подписи нот гаммы (I … VIII).
     const ROMAN_DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
 
@@ -672,13 +667,13 @@
     function scaleDegree(tonic, degree, form) {
         let formula;
         if (form === 'minor' || form === 'natural') {
-            formula = MINOR_FORMULA;
+            formula = SCALE_FORMULAS.minor;
         } else if (form === 'harmonicMinor') {
             formula = SCALE_FORMULAS.harmonicMinor;
         } else if (form === 'harmonic' || form === 'harmonicMajor') {
-            formula = HARM_MAJOR_FORMULA;
+            formula = SCALE_FORMULAS.harmonicMajor;
         } else {
-            formula = MAJOR_FORMULA;
+            formula = SCALE_FORMULAS.major;
         }
         const semi = formula[degree - 1];
         if (semi == null) return null;

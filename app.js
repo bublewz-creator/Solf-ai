@@ -956,40 +956,59 @@ function getSystemInstruction(responseLang) {
     return prompt;
 }
 
+const CHAIN2_QUERY_RE = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i;
+const CHAIN1_EXPLICIT_RE = /цепочка\s*1\b|chain\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i;
+const CHAIN_MINOR_RE = /min|moll|mol\b|минор/i;
+const CHAIN1_LABELS = 'T53 – S64 – VII7 – D65 – T53 – S6 – K64 – D7 – T53';
+const CHAIN2_LABELS = 't53 – d6 – s6 – D53 – D2 – t6 – II7 – D43 – t53 – s64 – t53';
+
 /** Убирает служебный постфикс режима нотации из текста user-сообщения. */
 function stripNotationReminder(text) {
     return String(text || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '').trim();
 }
 
-/** Подставляет готовый нотный блок из theory.js (solfeggio-online.ru), если запрос распознан. */
-function patchAiWithTheory(userQuery, aiText) {
-    if (!window.SolfTheory || typeof window.SolfTheory.buildNotationForQuery !== 'function') return aiText;
+function isChain2Query(query) {
+    return CHAIN2_QUERY_RE.test(String(query || ''));
+}
+
+function isChain1ExplicitQuery(query) {
+    return CHAIN1_EXPLICIT_RE.test(String(query || ''));
+}
+
+function queryTheoryNotation(userQuery) {
+    if (!window.SolfTheory?.buildNotationForQuery) return null;
     const q = stripNotationReminder(userQuery);
-    if (!q) return aiText;
+    if (!q) return null;
     try {
-        const det = window.SolfTheory.buildNotationForQuery(q);
-        if (det && det.blockString && typeof window.SolfTheory.applyBlock === 'function') {
-            const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
-            const isChain = /цепочк|chain/i.test(q);
-            let intro = null;
-            if (isMultiScale) {
-                intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
-                    ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
-                    : 'Natural, harmonic, and melodic forms (ascending and descending):');
-            } else if (isChain) {
-                const chain2 = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(q);
-                const isMinor = /min|moll|mol\b|минор/i.test(q);
-                intro = (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
-                    ? (chain2 || isMinor ? 'Цепочка 2 в заданной тональности:' : 'Цепочка 1 в заданной тональности:')
-                    : (chain2 || isMinor ? 'Chain 2 in the requested key:' : 'Chain 1 in the requested key:'));
-            }
-            const base = intro ? intro : aiText;
-            return window.SolfTheory.applyBlock(base, det.blockString);
-        }
+        return window.SolfTheory.buildNotationForQuery(q) || null;
     } catch (err) {
-        console.warn('[Solf.ai] Theory patch skipped:', err);
+        console.warn('[Solf.ai] Theory lookup failed:', err);
+        return null;
     }
-    return aiText;
+}
+
+function buildTheoryIntro(q) {
+    const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
+    if (isMultiScale) {
+        return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+            ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
+            : 'Natural, harmonic, and melodic forms (ascending and descending):');
+    }
+    if (/цепочк|chain/i.test(q)) {
+        const useChain2 = isChain2Query(q) || (CHAIN_MINOR_RE.test(q) && !isChain1ExplicitQuery(q));
+        return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+            ? (useChain2 ? 'Цепочка 2 в заданной тональности:' : 'Цепочка 1 в заданной тональности:')
+            : (useChain2 ? 'Chain 2 in the requested key:' : 'Chain 1 in the requested key:'));
+    }
+    return null;
+}
+
+/** Подставляет готовый нотный блок из theory.js, если запрос распознан. */
+function patchAiWithTheory(userQuery, aiText, det) {
+    const resolved = det !== undefined ? det : queryTheoryNotation(userQuery);
+    if (!resolved?.blockString || !window.SolfTheory?.applyBlock) return aiText;
+    const intro = buildTheoryIntro(stripNotationReminder(userQuery));
+    return window.SolfTheory.applyBlock(intro || aiText, resolved.blockString);
 }
 
 function buildNotationUserReminder(responseLang) {
@@ -1083,20 +1102,15 @@ function isChainTask(query) {
 
 /** Ожидаемое число аккордов: Chain 1 = 9, Chain 2 = 11. */
 function expectedChainLength(query) {
-    const t = String(query || '');
-    const chain2 = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i.test(t);
-    const chain1Explicit = /цепочка\s*1\b|chain\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i.test(t);
-    const isMinor = /min|moll|mol\b|минор/i.test(t);
-    if (chain2 || (isMinor && !chain1Explicit)) return 11;
+    const q = String(query || '');
+    if (isChain2Query(q) || (CHAIN_MINOR_RE.test(q) && !isChain1ExplicitQuery(q))) return 11;
     return 9;
 }
 
 function buildChainReminder(lang, query) {
     const len = expectedChainLength(query);
     const chain2 = len === 11;
-    const schema = chain2
-        ? 't53 – d6 – s6 – D53 – D2 – t6 – II7 – D43 – t53 – s64 – t53'
-        : 'T53 – S64 – VII7 – D65 – T53 – S6 – K64 – D7 – T53';
+    const schema = chain2 ? CHAIN2_LABELS : CHAIN1_LABELS;
     if (lang === 'ru') {
         return '\n\n[ЦЕПОЧКА — обязательно]\n' +
             `Цепочка ${chain2 ? 2 : 1}: ровно ${len} аккордов подряд в порядке:\n${schema}\n` +
@@ -2995,28 +3009,11 @@ async function generateResponse(query, imageData = null) {
             aiText = stripNotationBlocks(aiText).trim();
         }
 
-        // === Детерминированная нотация: считаем ВЕРНЫЕ ноты для распознанных заданий ===
-        // Движок theory.js строит ноты формулами (тритоны, характерные интервалы, гаммы,
-        // трезвучия+обращения, D7). Если задание распознано — мы получим гарантированно
-        // корректный блок, поэтому можем пропустить дорогие авто-ретраи к модели.
-        let deterministicBlock = null;
-        if (!harmonizationTask && typeof window !== 'undefined' && window.SolfTheory) {
-            try {
-                const det = window.SolfTheory.buildNotationForQuery(baseUserContent);
-                if (det && det.blockString) deterministicBlock = det.blockString;
-            } catch (theoryErr) {
-                console.warn('[Solf.ai] Theory engine skipped:', theoryErr);
-            }
-        } else if (notationModeEnabled && !harmonizationTask && (typeof window === 'undefined' || !window.SolfTheory)) {
-            console.warn('[Solf.ai] window.SolfTheory MISSING — theory.js не загрузился');
-        }
+        // Детерминированная нотация: один lookup theory.js на запрос (ретраи пропускаем, если блок уже есть).
+        const theoryDet = harmonizationTask ? undefined : queryTheoryNotation(baseUserContent);
+        const deterministicBlock = theoryDet?.blockString || null;
 
-        // === Silent auto-retry, если режим нотации включён, а модель "забыла" блок ===
-        // Покрываем 2 случая: (1) блок отсутствует целиком; (2) блок начался, но обрезан
-        // (нет закрывающего `]}]]`). Во втором случае срезаем «хвост» и просим
-        // догенерировать ТОЛЬКО блок (без прозы), что гарантированно влезает в любой лимит.
-        // Ретраи НЕ нужны, если у нас уже есть детерминированный блок — он всё равно перекроет ответ.
-        // Тайпинг-индикатор намеренно НЕ убираем — пользователь видит обычное ожидание.
+        // Silent auto-retry, если режим нотации включён, а модель «забыла» блок.
         if (notationModeEnabled && !deterministicBlock && !hasNotationBlock(aiText)) {
             const truncated = hasTruncatedNotationStart(aiText);
             const cleanedAiText = truncated ? stripTruncatedNotationTail(aiText) : aiText;
@@ -3153,7 +3150,7 @@ async function generateResponse(query, imageData = null) {
 
         // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
         if (!harmonizationTask) {
-            aiText = patchAiWithTheory(baseUserContent, aiText);
+            aiText = patchAiWithTheory(baseUserContent, aiText, theoryDet);
         }
 
         document.getElementById('typingIndicator')?.remove();
