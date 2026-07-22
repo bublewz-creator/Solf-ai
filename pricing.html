@@ -607,7 +607,8 @@
                     <li><span class="feature-icon check">✓</span><span id="feature1_1">10 requests per day</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature1_2">10 quizzes per day</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature1_3">Basic music theory help</span></li>
-                    <li><span class="feature-icon cross">✗</span><span id="feature1_4">Image analysis</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature1_4">Notation mode</span></li>
+                    <li><span class="feature-icon cross">✗</span><span id="feature1_5">Image analysis</span></li>
                 </ul>
                 <button class="plan-btn secondary" id="basicBtn">Get Started</button>
             </div>
@@ -626,7 +627,8 @@
                     <li><span class="feature-icon check">✓</span><span id="feature2_1">50 requests per day</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature2_2">Unlimited quizzes</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature2_3">Advanced theory explanations</span></li>
-                    <li><span class="feature-icon check">✓</span><span id="feature2_4">Image analysis (5/day)</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_4">Notation mode</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature2_5">Image analysis (5/day)</span></li>
                 </ul>
                 <button class="plan-btn secondary" id="proBtn">Get Started</button>
             </div>
@@ -644,7 +646,8 @@
                     <li><span class="feature-icon check">✓</span><span id="feature3_1">Unlimited requests</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature3_2">Unlimited quizzes</span></li>
                     <li><span class="feature-icon check">✓</span><span id="feature3_3">All theory topics</span></li>
-                    <li><span class="feature-icon check">✓</span><span id="feature3_4">Unlimited image analysis</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_4">Notation mode</span></li>
+                    <li><span class="feature-icon check">✓</span><span id="feature3_5">Unlimited image analysis</span></li>
                 </ul>
                 <button class="plan-btn secondary" id="unlimitedBtn">Go Unlimited</button>
             </div>
@@ -708,11 +711,11 @@
                 unlimitedPrice: '699', unlimitedPriceYearlyMo: '499', unlimitedYearly: '5988 ₽/year (save 2400 ₽)',
                 perMonth: '/month', popular: 'Most Popular',
                 feature1_1: '10 requests per day', feature1_2: '10 quizzes per day', feature1_3: 'Basic music theory help',
-                feature1_4: 'Image analysis',
+                feature1_4: 'Notation mode', feature1_5: 'Image analysis',
                 feature2_1: '50 requests per day', feature2_2: 'Unlimited quizzes', feature2_3: 'Advanced theory explanations',
-                feature2_4: 'Image analysis (5/day)',
+                feature2_4: 'Notation mode', feature2_5: 'Image analysis (5/day)',
                 feature3_1: 'Unlimited requests', feature3_2: 'Unlimited quizzes', feature3_3: 'All theory topics',
-                feature3_4: 'Unlimited image analysis',
+                feature3_4: 'Notation mode', feature3_5: 'Unlimited image analysis',
                 basicBtn: 'Get Started', proBtn: 'Get Started', unlimitedBtn: 'Get Started',
 
                 faqTitle: 'Frequently Asked Questions',
@@ -735,11 +738,11 @@
                 unlimitedPrice: '699', unlimitedPriceYearlyMo: '499', unlimitedYearly: '5988 ₽/год (экономия 2400 ₽)',
                 perMonth: '/месяц', popular: 'Популярный',
                 feature1_1: '10 запросов в день', feature1_2: '10 викторин в день', feature1_3: 'Базовая помощь по теории',
-                feature1_4: 'Анализ изображений',
+                feature1_4: 'Режим нотации', feature1_5: 'Анализ изображений',
                 feature2_1: '50 запросов в день', feature2_2: 'Безлимит викторин', feature2_3: 'Продвинутые объяснения',
-                feature2_4: 'Анализ изображений (5/день)',
+                feature2_4: 'Режим нотации', feature2_5: 'Анализ изображений (5/день)',
                 feature3_1: 'Безлимит запросов', feature3_2: 'Безлимит викторин', feature3_3: 'Все темы теории',
-                feature3_4: 'Безлимит анализа изображений',
+                feature3_4: 'Режим нотации', feature3_5: 'Безлимит анализа изображений',
                 basicBtn: 'Начать', proBtn: 'Начать', unlimitedBtn: 'Начать',
 
                 faqTitle: 'Частые вопросы',
@@ -811,7 +814,7 @@
         document.getElementById('popularBadge').textContent = t.popular;
         
         // Features
-        for (let i = 1; i <= 4; i++) {
+        for (let i = 1; i <= 5; i++) {
             document.getElementById(`feature1_${i}`).textContent = t[`feature1_${i}`];
             document.getElementById(`feature2_${i}`).textContent = t[`feature2_${i}`];
             document.getElementById(`feature3_${i}`).textContent = t[`feature3_${i}`];
