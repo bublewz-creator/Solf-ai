@@ -706,6 +706,55 @@
         return notes.map(noteKey);
     }
 
+    /** D7 / D65 / D43 / D2 — индексы 0 / 2 / 4 / 6 в пресете (между ними разрешения). */
+    function d7PresetForm(preset, formIndex) {
+        if (!preset) return null;
+        const idx = formIndex * 2;
+        return presetKeys(preset, idx);
+    }
+
+    /** Голосоведение цепочки: каждый аккорд ближе к предыдущему (общие тоны, плавный бас). */
+    function connectChainVoices(notes) {
+        if (!Array.isArray(notes) || notes.length < 2) return notes;
+        let prevKeys = null;
+        return notes.map(n => {
+            const keys = voiceLeadChord(prevKeys, n.keys || []);
+            prevKeys = keys;
+            return { ...n, keys };
+        });
+    }
+
+    function voiceLeadChord(prevKeys, nextKeys) {
+        if (!prevKeys?.length || !nextKeys?.length) return nextKeys;
+        const prevSorted = prevKeys.map(k => noteAbs(parseVexKey(k))).sort((a, b) => a - b);
+        return nextKeys.map((k, i) => {
+            const p = parseVexKey(k);
+            if (!p) return k;
+            const target = prevSorted[Math.min(i, prevSorted.length - 1)] ?? prevSorted[0];
+            let best = k;
+            let bestDist = Infinity;
+            for (let shift = -2; shift <= 2; shift++) {
+                const cand = { ...p, octave: Math.max(1, Math.min(8, p.octave + shift)) };
+                const dist = Math.abs(noteAbs(cand) - target);
+                if (dist < bestDist) {
+                    bestDist = dist;
+                    best = noteKey(cand);
+                }
+            }
+            return best;
+        });
+    }
+
+    function wrapChain(notes, tonic, mode) {
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, mode),
+            timeSignature: '',
+            barlines: 'none',
+            notes: connectChainVoices(notes)
+        };
+    }
+
     /**
      * Цепочка 1 (мажор): T53 S64 VII7 D65 T53 S6 K64 D7 T53
      * Трезвучия = 3 ноты. D7 и D65 = септаккорды (4 ноты — это норма для 65).
@@ -713,8 +762,8 @@
     function buildChain1(tonic) {
         const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'major', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, 'major')];
-        const d7Keys = preset ? presetKeys(preset, 0) : seventhCloseBass(tonic, [5, 7, 2, 4], ['major', 'harmonic', 'major', 'major'], 4);
-        const d65Keys = preset ? presetKeys(preset, 2) : seventhCloseBass(tonic, [7, 2, 4, 5], ['harmonic', 'major', 'major', 'major'], 4);
+        const d7Keys = preset ? d7PresetForm(preset, 0) : seventhCloseBass(tonic, [5, 7, 2, 4], ['major', 'harmonic', 'major', 'major'], 4);
+        const d65Keys = preset ? d7PresetForm(preset, 1) : seventhCloseBass(tonic, [7, 2, 4, 5], ['harmonic', 'major', 'major', 'major'], 4);
 
         const notes = [
             { keys: t53(), duration: 'w', label: 'T53' },
@@ -727,13 +776,7 @@
             { keys: d7Keys, duration: 'w', label: 'D7' },
             { keys: t53(), duration: 'w', label: 'T53' }
         ];
-        return {
-            clef: 'treble',
-            keySignature: keySigFor(tonic, 'major'),
-            timeSignature: '',
-            barlines: 'none',
-            notes
-        };
+        return wrapChain(notes, tonic, 'major');
     }
 
     /**
@@ -742,10 +785,9 @@
     function buildChain2(tonic) {
         const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'minor', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, 'minor')];
-        const d7Keys = preset ? presetKeys(preset, 0) : seventhCloseBass(tonic, [5, 7, 2, 4], ['harmonic', 'harmonic', 'minor', 'minor'], 4);
-        const d43Keys = preset ? presetKeys(preset, 2) : seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'harmonic', 'harmonic'], 4);
-        const d2Keys = preset ? presetKeys(preset, 3) : seventhCloseBass(tonic, [4, 5, 7, 2], ['minor', 'harmonic', 'harmonic', 'minor'], 4);
-        const ii7Keys = seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'minor', 'minor'], 4);
+        const d43Keys = preset ? d7PresetForm(preset, 2) : seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'harmonic', 'harmonic'], 4);
+        const d2Keys = preset ? d7PresetForm(preset, 3) : seventhCloseBass(tonic, [4, 5, 7, 2], ['minor', 'harmonic', 'harmonic', 'minor'], 4);
+        const ii7Keys = seventhCloseBass(tonic, [2, 4, 6, 1], ['minor', 'minor', 'minor', 'minor'], 4);
 
         const notes = [
             { keys: t53(), duration: 'w', label: 't53' },
@@ -760,13 +802,7 @@
             { keys: triadCloseBass(tonic, 1, 4, 6, 'minor', 4), duration: 'w', label: 's64' },
             { keys: t53(), duration: 'w', label: 't53' }
         ];
-        return {
-            clef: 'treble',
-            keySignature: keySigFor(tonic, 'minor'),
-            timeSignature: '',
-            barlines: 'none',
-            notes
-        };
+        return wrapChain(notes, tonic, 'minor');
     }
 
     function parseChainNumber(t) {
@@ -951,6 +987,85 @@
         return { tonic: { ...tonic, octave: 4 }, mode };
     }
 
+    const KEY_SHARP_COUNT = {
+        C: 0, F: 0, Bb: 0, Eb: 0, Ab: 0, Db: 0, Gb: 0, Cb: 0,
+        G: 1, D: 2, A: 3, E: 4, B: 5, 'F#': 6, 'C#': 7, 'G#': 8, 'D#': 9, 'A#': 10
+    };
+    const KEY_FLAT_COUNT = {
+        C: 0, G: 0, D: 0, A: 0, E: 0, B: 0, 'F#': 0, 'C#': 0, 'G#': 0, 'D#': 0, 'A#': 0,
+        F: 1, Bb: 2, Eb: 3, Ab: 4, Db: 5, Gb: 6, Cb: 7
+    };
+    const SHARP_ORDER_EN = ['F', 'C', 'G', 'D', 'A', 'E', 'B'];
+    const FLAT_ORDER_EN = ['B', 'E', 'A', 'D', 'G', 'C', 'F'];
+    const SHARP_ORDER_RU = ['фа', 'до', 'соль', 'ре', 'ля', 'ми', 'си'];
+    const FLAT_ORDER_RU = ['си', 'ми', 'ля', 'ре', 'соль', 'до', 'фа'];
+    const RU_NOTE_NAMES = { c: 'до', d: 'ре', e: 'ми', f: 'фа', g: 'соль', a: 'ля', b: 'си' };
+
+    function tonalityDisplayName(tonic, mode, ru) {
+        const accRu = tonic.acc === 1 ? '-диез' : tonic.acc === -1 ? '-бемоль' : tonic.acc < 0 ? '-бемоль'.repeat(-tonic.acc) : tonic.acc > 1 ? '-диез'.repeat(tonic.acc) : '';
+        if (ru) {
+            const n = (RU_NOTE_NAMES[tonic.letter] || tonic.letter) + accRu;
+            return mode === 'minor' ? `${n} минор` : `${n} мажор`;
+        }
+        const accEn = tonic.acc === 0 ? '' : tonic.acc > 0 ? '#'.repeat(tonic.acc) : 'b'.repeat(-tonic.acc);
+        const n = `${tonic.letter.toUpperCase()}${accEn}`;
+        return mode === 'minor' ? `${n} minor` : `${n} major`;
+    }
+
+    function isKeySignatureQuery(t) {
+        if (/построй|постро|build|draw|сделай|напиши|цепоч|тритон|d7|д7|гамм|scale|характерн|х\.\s*и/i.test(t)) return false;
+        if (!parseKey(t)) return false;
+        return /(?:сколько|как\s*много|how\s*many)\s*(?:знаков?|бемол|диез|бекар|sharps?|flats?)/i.test(t)
+            || /(?:какой|какие)\s*(?:ключ|знаки)/i.test(t)
+            || /key\s*signature/i.test(t)
+            || /знаков?\s*(?:при\s*ключе|в\s*тональност)/i.test(t);
+    }
+
+    function formatKeySignatureAnswer(key, ru) {
+        const name = tonalityDisplayName(key.tonic, key.mode, ru);
+        const sig = keySigFor(key.tonic, key.mode);
+        const sharps = KEY_SHARP_COUNT[sig] ?? 0;
+        const flats = KEY_FLAT_COUNT[sig] ?? 0;
+        const sharpList = SHARP_ORDER_EN.slice(0, sharps).map(s => s + '#').join(', ');
+        const flatList = FLAT_ORDER_EN.slice(0, flats).map(s => s + 'b').join(', ');
+        const sharpRu = SHARP_ORDER_RU.slice(0, sharps).map(n => `${n}-диез`).join(', ');
+        const flatRu = FLAT_ORDER_RU.slice(0, flats).map(n => `${n}-бемоль`).join(', ');
+
+        if (ru) {
+            if (sharps === 0 && flats === 0) {
+                return `В **${name}** знаков при ключе нет.`;
+            }
+            const relHint = key.mode === 'minor'
+                ? ` (для минора — ключ относительного мажора, ${sig})`
+                : '';
+            if (sharps > 0) {
+                return `В **${name}** **${sharps} ${sharps === 1 ? 'диез' : 'диеза'}** при ключе: ${sharpRu}.${relHint}`;
+            }
+            return `В **${name}** **${flats} ${flats === 1 ? 'бемоль' : 'бемоля'}** при ключе: ${flatRu}.${relHint}`;
+        }
+
+        if (sharps === 0 && flats === 0) {
+            return `**${name}** has no key signature.`;
+        }
+        if (sharps > 0) {
+            return `**${name}** has **${sharps} sharp${sharps > 1 ? 's' : ''}**: ${sharpList}.`;
+        }
+        return `**${name}** has **${flats} flat${flats > 1 ? 's' : ''}**: ${flatList}.`;
+    }
+
+    /** Мгновенный текстовый ответ без нотации (ключ, знаки…). */
+    function buildTheoryQuickAnswer(rawQuery) {
+        if (!rawQuery || typeof rawQuery !== 'string') return null;
+        const t = rawQuery.toLowerCase().replace(/ё/g, 'е');
+        if (isKeySignatureQuery(t)) {
+            const key = parseKey(t);
+            if (!key) return null;
+            const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+            return { text: formatKeySignatureAnswer(key, ru) };
+        }
+        return null;
+    }
+
     function parseExercise(t) {
         if (/цепочк|chain/.test(t)) return 'chain';
         if (/тритон|tritone/.test(t)) return 'tritone';
@@ -1002,11 +1117,11 @@
         const isMajor = mode === 'major';
         const t53Keys = () => triadCloseBass(tonic, 1, 3, 5, isMajor ? 'major' : 'minor', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, mode)];
-        const d7Keys = preset ? presetKeys(preset, 0) : null;
-        const d65Keys = preset ? presetKeys(preset, 1) : null;
-        const d43Keys = preset ? presetKeys(preset, 2) : null;
-        const d2Keys = preset ? presetKeys(preset, 3) : null;
-        const ii7Keys = seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'minor', 'minor'], 4);
+        const d7Keys = preset ? d7PresetForm(preset, 0) : null;
+        const d65Keys = preset ? d7PresetForm(preset, 1) : null;
+        const d43Keys = preset ? d7PresetForm(preset, 2) : null;
+        const d2Keys = preset ? d7PresetForm(preset, 3) : null;
+        const ii7Keys = seventhCloseBass(tonic, [2, 4, 6, 1], ['minor', 'minor', 'minor', 'minor'], 4);
         const builders = {
             t53: () => ({ keys: t53Keys(), label: 't53' }),
             T53: () => ({ keys: t53Keys(), label: 'T53' }),
@@ -1014,7 +1129,7 @@
             D6: () => ({ keys: triadCloseBass(tonic, 7, 2, 5, 'harmonicMinor', 4), label: 'D6' }),
             s6: () => ({ keys: triadCloseBass(tonic, 6, 1, 4, 'minor', 4), label: 's6' }),
             S6: () => ({ keys: triadCloseBass(tonic, 6, 1, 4, 'major', 4), label: 'S6' }),
-            d53: () => ({ keys: triadCloseBass(tonic, 5, 7, 2, 'harmonicMinor', 4), label: 'd53' }),
+            d53: () => ({ keys: triadCloseBass(tonic, 5, 7, 2, 'minor', 4), label: 'd53' }),
             D53: () => ({ keys: triadCloseBass(tonic, 5, 7, 2, 'harmonicMinor', 4), label: 'D53' }),
             D2: () => d2Keys ? ({ keys: d2Keys, label: 'D2' }) : null,
             d2: () => d2Keys ? ({ keys: d2Keys, label: 'D2' }) : null,
@@ -1045,13 +1160,7 @@
             if (!n) return null;
             notes.push(n);
         }
-        return {
-            clef: 'treble',
-            keySignature: keySigFor(tonic, mode),
-            timeSignature: '',
-            barlines: 'none',
-            notes
-        };
+        return wrapChain(notes, tonic, mode);
     }
 
     /** Билет / несколько пунктов — собираем все распознанные упражнения. */
@@ -1667,6 +1776,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
 
     window.SolfTheory = {
         buildNotationForQuery,
+        buildTheoryQuickAnswer,
         getSystemPrompt,
         getTheoryProse,
         applyBlock,

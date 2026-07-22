@@ -63,7 +63,12 @@ async function syncAppData() {
         // 12 сек — потолок для GET-запроса к БД. Если бэк за это время не ответил,
         // значит сеть/Cloudflare режут, и зависать дальше бессмысленно. Юзер останется
         // с локально-кэшированными данными (имя/план/счётчик), и UI будет работать.
-        const res = await apiFetch(`${WORKER_URL}/get-user?id=${currentUser.id}`, {}, 12000);
+        const prevPlan = currentUser?.plan_type || 'free';
+        const res = await apiFetch(
+            `${WORKER_URL}/get-user?id=${currentUser.id}&prev_plan=${encodeURIComponent(prevPlan)}`,
+            {},
+            12000
+        );
         const data = await res.json();
 
         if (!res.ok || data.error) {
@@ -755,6 +760,35 @@ function patchAiWithTheory(userQuery, aiText, det) {
     return window.SolfTheory.applyBlock(prose, resolved.blockString);
 }
 
+function queryTheoryQuickAnswer(userQuery) {
+    if (!window.SolfTheory?.buildTheoryQuickAnswer) return null;
+    const q = stripNotationReminder(userQuery);
+    if (!q) return null;
+    try {
+        return window.SolfTheory.buildTheoryQuickAnswer(q) || null;
+    } catch (err) {
+        console.warn('[Solf.ai] Theory quick answer failed:', err);
+        return null;
+    }
+}
+
+function deliverInstantAiReply(text) {
+    document.getElementById('typingIndicator')?.remove();
+    const chat = chats.find(c => c.id === currentChatId);
+    if (chat) {
+        chat.messages.push({ role: 'ai', content: text, time: new Date().toISOString(), id: Date.now().toString() });
+        saveChatToStorage();
+    }
+    return addMessageToUI('ai', text, [], true).then(() => {
+        isGenerating = false;
+        userAbortedGeneration = false;
+        currentAbortController = null;
+        chatSendBtn.classList.remove('stop-btn');
+        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+        refreshSendButtonState();
+    });
+}
+
 /** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
 function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
     if (harmonizationTask || hasImage) return false;
@@ -1130,7 +1164,7 @@ function renderChatItemHTML(chat) {
 window.togglePinChat = function(id, e) {
     e.stopPropagation();
     const chat = chats.find(c => c.id === id);
-    if(chat) { chat.pinned = !chat.pinned; saveChatToStorage(); renderChatsList(); }
+    if(chat) { chat.pinned = !chat.pinned; saveChatToStorage(); saveChatToServer(chat); renderChatsList(); }
 };
 
 window.deleteChatFromSidebar = function(id, e) {
@@ -1597,6 +1631,15 @@ function showToast(message, type = 'success', options = {}) {
 }
 
 // ===== ДВИЖОК ЧАТА =====
+function saveChatToServer(chat) {
+    if (!currentUser?.id || !chat?.id) return;
+    apiFetch(`${WORKER_URL}/save-chat`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...chat, user_id: currentUser.id })
+    }).catch(err => console.error('Failed to save chat:', err));
+}
+
 function saveChatToStorage() {
     enforceChatLimit();
     const slimChats = chats.slice(0, MAX_SAVED_CHATS).map(c => ({
@@ -1609,14 +1652,7 @@ function saveChatToStorage() {
     // Отправка текущего чата в базу данных NeonDB
     if (currentUser && currentChatId) {
         const currentChatData = chats.find(c => c.id === currentChatId);
-        if (currentChatData) {
-            const chatToSave = { ...currentChatData, user_id: currentUser.id };
-            apiFetch(`${WORKER_URL}/save-chat`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(chatToSave)
-            }).catch(err => console.error('Failed to save chat:', err));
-        }
+        if (currentChatData) saveChatToServer(currentChatData);
     }
 }
 
@@ -2734,21 +2770,17 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
+        const theoryQuick = harmonizationTask || imageData ? null : queryTheoryQuickAnswer(baseUserContent);
+        if (theoryQuick?.text) {
+            await deliverInstantAiReply(theoryQuick.text);
+            return;
+        }
+
         const theoryDet = harmonizationTask ? undefined : queryTheoryNotation(baseUserContent);
         const deterministicBlock = theoryDet?.blockString || null;
 
         if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
-            document.getElementById('typingIndicator')?.remove();
-            const aiText = patchAiWithTheory(baseUserContent, '', theoryDet);
-            chat.messages.push({ role: 'ai', content: aiText, time: new Date().toISOString(), id: Date.now().toString() });
-            saveChatToStorage();
-            await addMessageToUI('ai', aiText, [], true);
-            isGenerating = false;
-            userAbortedGeneration = false;
-            currentAbortController = null;
-            chatSendBtn.classList.remove('stop-btn');
-            chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
-            refreshSendButtonState();
+            await deliverInstantAiReply(patchAiWithTheory(baseUserContent, '', theoryDet));
             return;
         }
 
@@ -3149,7 +3181,12 @@ function updateUIForUser() {
             .then(res => res.json())
             .then(data => {
                 if (data.chats && data.chats.length > 0) {
-                    chats = data.chats;
+                    const local = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
+                    const pinnedLocal = new Map(local.filter(c => c.pinned).map(c => [c.id, true]));
+                    chats = data.chats.map(c => ({
+                        ...c,
+                        pinned: !!(c.pinned || pinnedLocal.get(c.id))
+                    }));
                     // Срезаем «лишние» чаты сверх MAX_SAVED_CHATS и удаляем их с сервера,
                     // чтобы БД не раздувалась.
                     enforceChatLimit();
