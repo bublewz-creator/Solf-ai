@@ -713,8 +713,8 @@
     function buildChain1(tonic) {
         const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'major', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, 'major')];
-        const d7Keys = preset ? preset[0].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [5, 7, 2, 4], ['major', 'harmonic', 'major', 'major'], 4);
-        const d65Keys = preset ? preset[2].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [7, 2, 4, 5], ['harmonic', 'major', 'major', 'major'], 4);
+        const d7Keys = preset ? presetKeys(preset, 0) : seventhCloseBass(tonic, [5, 7, 2, 4], ['major', 'harmonic', 'major', 'major'], 4);
+        const d65Keys = preset ? presetKeys(preset, 2) : seventhCloseBass(tonic, [7, 2, 4, 5], ['harmonic', 'major', 'major', 'major'], 4);
 
         const notes = [
             { keys: t53(), duration: 'w', label: 'T53' },
@@ -742,9 +742,9 @@
     function buildChain2(tonic) {
         const t53 = () => triadCloseBass(tonic, 1, 3, 5, 'minor', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, 'minor')];
-        const d7Keys = preset ? preset[0].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [5, 7, 2, 4], ['harmonic', 'harmonic', 'minor', 'minor'], 4);
-        const d43Keys = preset ? preset[2].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'harmonic', 'harmonic'], 4);
-        const d2Keys = preset ? preset[3].map(k => shiftVexKeyOctave(k, -1)) : seventhCloseBass(tonic, [4, 5, 7, 2], ['minor', 'harmonic', 'harmonic', 'minor'], 4);
+        const d7Keys = preset ? presetKeys(preset, 0) : seventhCloseBass(tonic, [5, 7, 2, 4], ['harmonic', 'harmonic', 'minor', 'minor'], 4);
+        const d43Keys = preset ? presetKeys(preset, 2) : seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'harmonic', 'harmonic'], 4);
+        const d2Keys = preset ? presetKeys(preset, 3) : seventhCloseBass(tonic, [4, 5, 7, 2], ['minor', 'harmonic', 'harmonic', 'minor'], 4);
         const ii7Keys = seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'minor', 'minor'], 4);
 
         const notes = [
@@ -800,11 +800,13 @@
         const tonicSuffix = ['3', '53', '53', '6'];
         const notes = [];
         for (let i = 0; i < forms; i++) {
-            const d7Keys = preset[i * 2].map(k => shiftVexKeyOctave(k, -1));
+            const d7Keys = presetKeys(preset, i * 2);
+            const resKeys = presetKeys(preset, i * 2 + 1);
+            if (!d7Keys) continue;
             notes.push({ keys: d7Keys, duration: 'w', label: D7_FORM_LABELS[i][0] });
-            if (withResolutions) {
+            if (withResolutions && resKeys) {
                 notes.push({
-                    keys: preset[i * 2 + 1].map(k => shiftVexKeyOctave(k, -1)),
+                    keys: resKeys,
                     duration: 'w',
                     label: Tl + tonicSuffix[i],
                     barAfter: i < forms - 1
@@ -1000,10 +1002,10 @@
         const isMajor = mode === 'major';
         const t53Keys = () => triadCloseBass(tonic, 1, 3, 5, isMajor ? 'major' : 'minor', 4);
         const preset = D7_PRESETS[d7KeyId(tonic, mode)];
-        const d7Keys = preset ? preset[0].map(k => shiftVexKeyOctave(k, -1)) : null;
-        const d65Keys = preset ? preset[1].map(k => shiftVexKeyOctave(k, -1)) : null;
-        const d43Keys = preset ? preset[2].map(k => shiftVexKeyOctave(k, -1)) : null;
-        const d2Keys = preset ? preset[3].map(k => shiftVexKeyOctave(k, -1)) : null;
+        const d7Keys = preset ? presetKeys(preset, 0) : null;
+        const d65Keys = preset ? presetKeys(preset, 1) : null;
+        const d43Keys = preset ? presetKeys(preset, 2) : null;
+        const d2Keys = preset ? presetKeys(preset, 3) : null;
         const ii7Keys = seventhCloseBass(tonic, [2, 4, 5, 7], ['minor', 'minor', 'minor', 'minor'], 4);
         const builders = {
             t53: () => ({ keys: t53Keys(), label: 't53' }),
@@ -1064,10 +1066,22 @@
                     ? buildMelodicMinorBothWays(key.tonic)
                     : buildMelodicMajorBothWays(key.tonic);
                 if (data) items.push({ label: ru ? 'Мелодическая гамма' : 'Melodic scale', data });
-            } else if (!wantsAllForms(t) && form !== null) {
+            } else if (wantsAllForms(t) || (!form && /построй|build|сделай|напиши|выведи|draw|show|write/.test(t))) {
+                items.push(...buildAllScaleForms(key.tonic, key.mode, ru, t));
+            } else if (form !== null) {
                 const data = buildScaleExercise(key.tonic, key.mode, form);
                 if (data) items.push({ label: ru ? 'Гамма' : 'Scale', data });
             }
+        }
+
+        if (/характерн\w*\s*интервал|характерные\b|х\.\s*и\.|characteristic\s*interval/i.test(t)) {
+            const data = buildCharacteristic(key.tonic, key.mode);
+            if (data) items.push({ label: ru ? 'Характерные интервалы' : 'Characteristic intervals', data });
+        }
+
+        if (/главн\w*\s*трезвуч|main\s*triads?|tonic.*subdominant.*dominant/i.test(t)) {
+            const data = buildMainTriads(key.tonic, key.mode, wantsInversions(t), form || (key.mode === 'minor' ? 'harmonic' : null));
+            if (data) items.push({ label: ru ? 'Главные трезвучия' : 'Main triads', data });
         }
 
         if (/тритон|tritone/.test(t)) {
@@ -1198,37 +1212,73 @@
         return noteKey({ letter: p.letter, acc: p.acc, octave: oct });
     }
 
-    /** Скрипичный ключ: C4–F5. */
+    /** Скрипичный ключ: удобный диапазон ~E4–G5 (не ниже/additional ledger lines). */
     const OCTAVE_LIMITS = {
-        treble: { top: 65, bottom: 48 },
+        treble: { top: 72, bottom: 47 },
         bass: { top: 55, bottom: 36 }
     };
+    const COMFORT_CENTER = { treble: 60, bass: 43 }; // ~C5 / G3
 
+    function chordAbsRange(keys) {
+        let minA = Infinity;
+        let maxA = -Infinity;
+        (keys || []).forEach(k => {
+            const p = parseVexKey(k);
+            if (!p) return;
+            const a = noteAbs(p);
+            minA = Math.min(minA, a);
+            maxA = Math.max(maxA, a);
+        });
+        if (!Number.isFinite(minA)) return null;
+        return { minA, maxA, center: (minA + maxA) / 2 };
+    }
+
+    /** Каждый аккорд/интервал — в удобном диапазоне; соседние созвучия без скачков > октавы. */
     function normalizeNotationOctaves(notes, clef) {
         if (!Array.isArray(notes) || !notes.length) return notes;
-        const lim = OCTAVE_LIMITS[clef === 'bass' ? 'bass' : 'treble'];
-        let maxA = -Infinity;
-        let minA = Infinity;
-        notes.forEach(n => {
-            (n.keys || []).forEach(k => {
-                const p = parseVexKey(k);
-                if (!p) return;
-                const a = noteAbs(p);
-                maxA = Math.max(maxA, a);
-                minA = Math.min(minA, a);
-            });
+        const isBass = clef === 'bass';
+        const hard = OCTAVE_LIMITS[isBass ? 'bass' : 'treble'];
+        const comfortBottom = isBass ? 38 : 52;
+        const comfortTop = isBass ? 53 : 68;
+        const ideal = COMFORT_CENTER[isBass ? 'bass' : 'treble'];
+        let prevCenter = null;
+
+        return notes.map(n => {
+            const keys = n.keys || [];
+            const range = chordAbsRange(keys);
+            if (!range) return n;
+            let bestShift = 0;
+            let bestScore = Infinity;
+
+            for (let shift = -3; shift <= 3; shift++) {
+                const smin = range.minA + shift * 12;
+                const smax = range.maxA + shift * 12;
+                const scenter = range.center + shift * 12;
+                if (smax > hard.top || smin < hard.bottom) continue;
+
+                let score = Math.abs(scenter - ideal) * 1.5;
+                if (smin < comfortBottom) score += (comfortBottom - smin) * 3;
+                if (smax > comfortTop) score += (smax - comfortTop) * 3;
+                if (prevCenter != null) score += Math.abs(scenter - prevCenter) * 0.6;
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestShift = shift;
+                }
+            }
+
+            prevCenter = range.center + bestShift * 12;
+            if (!bestShift) return n;
+            return {
+                ...n,
+                keys: keys.map(k => shiftVexKeyOctave(k, bestShift))
+            };
         });
-        if (!Number.isFinite(maxA)) return notes;
-        let shift = 0;
-        if (maxA > lim.top) shift = -Math.ceil((maxA - lim.top) / 12);
-        if (shift && minA + shift * 12 < lim.bottom) {
-            while (shift < 0 && minA + shift * 12 < lim.bottom) shift += 1;
-        }
-        if (!shift) return notes;
-        return notes.map(n => ({
-            ...n,
-            keys: (n.keys || []).map(k => shiftVexKeyOctave(k, shift))
-        }));
+    }
+
+    function presetKeys(preset, idx) {
+        if (!preset || !Array.isArray(preset[idx])) return null;
+        return preset[idx].slice();
     }
 
     function finalize(data) {
@@ -1573,6 +1623,48 @@ D65 строится на VII СТУПЕНИ (первая инверсия D7).
 === ЗОЛОТОЕ ПРАВИЛО ТОЧНОСТИ ===
 - Перед выводом КАЖДОГО аккорда/интервала мысленно проверь: (1) буквенный скелет, (2) число полутонов, (3) удвоение по правилам выше, (4) разрешение тяготеющих тонов, (5) отсутствие параллельных квинт/октав. Если что-то не сходится — перестрой ДО вывода. Лучше правильно, чем быстро.`;
 
+    function wantsTritoneRules(t) {
+        return (/правил|rules?|как\s*(?:стро|постро)|объясни|расскаж|напомни|опиш/i.test(t) && /тритон|tritone/i.test(t))
+            || /правил\w*\s*построен\w*\s*тритон/i.test(t);
+    }
+
+    function wantsCharacteristicRules(t) {
+        return (/правил|rules?|как\s*(?:стро|постро)|объясни|расскаж|напомни/i.test(t)
+            && /характерн|х\.\s*и|characteristic/i.test(t));
+    }
+
+    function getTheoryProse(rawQuery) {
+        const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
+        const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+        const parts = [];
+
+        if (wantsTritoneRules(t)) {
+            parts.push(ru
+                ? `**Правила построения тритонов**
+1. Тритон — увеличенная кварта (ув.4, 6 п.т.) или уменьшённая квинта (ум.5, 6 п.т.) между ступенями звукоряда.
+2. **Натуральная форма** — одна пара: ув.4 + ум.5 (4 созвучия с разрешениями).
+3. **Гармоническая форма** — две пары (в миноре с VII#, в мажоре с ♭VI): 8 созвучий.
+4. **Разрешение ув.4** → в **большую сексту** (8–9 п.т., м6 или Б6).
+5. **Разрешение ум.5** → в **малую или большую терцию** (3–4 п.т., м3 или б3).
+6. Направление разрешения — к тонике/терции тонального трезвучия.`
+                : `**Tritone construction rules**
+1. A tritone is an augmented 4th (A4, 6 semitones) or diminished 5th (d5, 6 semitones) between scale degrees.
+2. **Natural form** — one pair: A4 + d5 (4 sonorities with resolutions).
+3. **Harmonic form** — two pairs (with raised VII in minor / ♭VI in major): 8 sonorities.
+4. **A4 resolves** to a **major or minor 6th** (8–9 semitones).
+5. **d5 resolves** to a **minor or major 3rd** (3–4 semitones).
+6. Resolution moves toward the tonic triad (tonic or third).`);
+        }
+
+        if (wantsCharacteristicRules(t)) {
+            parts.push(ru
+                ? `**Характерные интервалы** (4 пары): ув.2, ум.7, ув.5, ум.4 — с разрешениями по правилам секунды/септимы/квинты/кварты.`
+                : `**Characteristic intervals** (4 pairs): A2, d7, A5, d4 — each with standard resolution.`);
+        }
+
+        return parts.join('\n\n');
+    }
+
     function getSystemPrompt() {
         return EXERCISE_OUTPUT_RULES + HARMONY_RULEBOOK;
     }
@@ -1580,6 +1672,7 @@ D65 строится на VII СТУПЕНИ (первая инверсия D7).
     window.SolfTheory = {
         buildNotationForQuery,
         getSystemPrompt,
+        getTheoryProse,
         applyBlock,
         autoLabelNotation,
         setLabelLocale,

@@ -730,12 +730,28 @@ function buildTheoryIntro(q) {
     return null;
 }
 
+function buildTheoryProse(q) {
+    if (typeof window !== 'undefined' && window.SolfTheory?.getTheoryProse) {
+        try {
+            return window.SolfTheory.getTheoryProse(q) || '';
+        } catch (_) {
+            return '';
+        }
+    }
+    return '';
+}
+
 /** Подставляет готовый нотный блок из theory.js, если запрос распознан. */
 function patchAiWithTheory(userQuery, aiText, det) {
     const resolved = det !== undefined ? det : queryTheoryNotation(userQuery);
     if (!resolved?.blockString || !window.SolfTheory?.applyBlock) return aiText;
-    const intro = buildTheoryIntro(stripNotationReminder(userQuery));
-    const prose = intro || stripNotationBlocks(String(aiText || '')).trim();
+    const q = stripNotationReminder(userQuery);
+    const theoryProse = buildTheoryProse(q);
+    const intro = buildTheoryIntro(q);
+    const parts = [theoryProse, intro].filter(Boolean);
+    const prose = parts.length
+        ? parts.join('\n\n')
+        : stripNotationBlocks(String(aiText || '')).trim();
     return window.SolfTheory.applyBlock(prose, resolved.blockString);
 }
 
@@ -816,6 +832,9 @@ function isBuildTask(query) {
     if (/гармониз|harmoniz|harmoni[sz]e|спиш[иь]\s*голос|4[\s-]?голос|четырех\s*голос|четырёх\s*голос|satb|голосоведени/i.test(t)) return true;
     if (/t53\s*[-–—,]/i.test(t)) return true;
     if (/(?:тритон|tritone)/i.test(t) && /(?:д7|d7|цепоч|t53)/i.test(t)) return true;
+    if (/характерн|х\.\s*и\.|characteristic/i.test(t)) return true;
+    if (/мелодическ\w*\s*гамм|гамм\w*\s*мелодическ|построй\s*гамм|build\s*scale|все\s*виды\s*гамм/i.test(t)) return true;
+    if (/главн\w*\s*трезвуч|main\s*triads?/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
     const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
     if (buildVerb.test(t) && buildNoun.test(t)) return true;
@@ -2008,18 +2027,28 @@ function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {
     try {
         if (typeof stave.getBottomY === 'function') labelY = stave.getBottomY() + 20;
     } catch (_) {}
+    const MIN_X_GAP = 36;
+    const ROW_H = 18;
+    const placed = [];
     staveNotes.forEach((sn, i) => {
         const lbl = notesData[i]?.label;
         if (!lbl) return;
-        const x = noteCenterX(sn);
+        let x = noteCenterX(sn);
         if (x == null) return;
+        let y = labelY;
+        for (let guard = 0; guard < 6; guard++) {
+            const hit = placed.some(p => Math.abs(p.x - x) < MIN_X_GAP && Math.abs(p.y - y) < ROW_H - 1);
+            if (!hit) break;
+            y += ROW_H;
+        }
+        placed.push({ x, y });
         const t = document.createElementNS(NS, 'text');
         t.setAttribute('x', String(x));
-        t.setAttribute('y', String(labelY));
+        t.setAttribute('y', String(y));
         t.setAttribute('text-anchor', 'middle');
         t.setAttribute('dominant-baseline', 'hanging');
         t.setAttribute('font-family', NOTATION_LABEL_FONT);
-        t.setAttribute('font-size', '18');
+        t.setAttribute('font-size', '16');
         t.setAttribute('font-weight', '600');
         t.setAttribute('fill', color);
         t.textContent = normalizeIntervalLabel(lbl);
@@ -2436,9 +2465,10 @@ function renderNotationCard(container, data) {
         const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
         const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
         let rawNotes = Array.isArray(data.notes) ? data.notes : [];
-        rawNotes = normalizeNotationOctavesLocal(rawNotes, clef);
         if (window.SolfTheory && typeof window.SolfTheory.normalizeNotationOctaves === 'function') {
             try { rawNotes = window.SolfTheory.normalizeNotationOctaves(rawNotes, clef); } catch (_) {}
+        } else {
+            rawNotes = normalizeNotationOctavesLocal(rawNotes, clef);
         }
 
         const barlinesMode = (['none', 'manual', 'auto'].includes(data.barlines)) ? data.barlines : 'auto';
@@ -2453,6 +2483,7 @@ function renderNotationCard(container, data) {
         const barlineNone = getBarlineNoneType(VF);
 
         const containerW = container.clientWidth || container.parentElement?.clientWidth || 600;
+        const hasLabels = rawNotes.some(n => n && n.label);
         const preferSingleLine = (barlinesMode === 'manual' && measures.length <= 6)
             || (barlinesMode === 'none' && rawNotes.length <= 12);
         const maxW = preferSingleLine
@@ -2461,8 +2492,8 @@ function renderNotationCard(container, data) {
 
         const FIRST_OVERHEAD = 100;
         const NEXT_OVERHEAD = 14;
-        const PER_NOTE = 28;
-        const MIN_MEASURE = 88;
+        const PER_NOTE = hasLabels ? 40 : 28;
+        const MIN_MEASURE = hasLabels ? 100 : 88;
         const measureBaseW = m => Math.max(MIN_MEASURE, m.length * PER_NOTE + 22);
 
         // Раскладка тактов по строкам с переносом
