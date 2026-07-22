@@ -56,10 +56,6 @@ async function apiFetch(url, options = {}, timeoutMs = 25000) {
     return res;
 }
 
-function getLastSyncedPlanKey() {
-    return currentUser?.id ? `solfai_last_synced_plan_${currentUser.id}` : null;
-}
-
 async function syncAppData() {
     if (!currentUser?.id) return;
 
@@ -67,10 +63,7 @@ async function syncAppData() {
         // 12 сек — потолок для GET-запроса к БД. Если бэк за это время не ответил,
         // значит сеть/Cloudflare режут, и зависать дальше бессмысленно. Юзер останется
         // с локально-кэшированными данными (имя/план/счётчик), и UI будет работать.
-        const syncedPlanKey = getLastSyncedPlanKey();
-        const prevPlan = (syncedPlanKey && localStorage.getItem(syncedPlanKey))
-            || currentUser?.plan_type
-            || 'free';
+        const prevPlan = currentUser?.plan_type || 'free';
         const res = await apiFetch(
             `${WORKER_URL}/get-user?id=${currentUser.id}&prev_plan=${encodeURIComponent(prevPlan)}`,
             {},
@@ -88,7 +81,6 @@ async function syncAppData() {
         const quizCount = Number.isFinite(Number(data.quiz_count)) ? Number(data.quiz_count) : 0;
         const planName = planType.charAt(0).toUpperCase() + planType.slice(1);
         const syncedPlan = { type: planType, emoji: PLAN_ICONS[planType] || PLAN_ICONS.free, name: planName };
-        const planUpgraded = !!data.plan_upgraded || (PLAN_TIER[planType] ?? 0) > (PLAN_TIER[prevPlan] ?? 0);
 
         currentUser = {
             ...currentUser,
@@ -108,24 +100,14 @@ async function syncAppData() {
         // эти ключи бы только путали (юзер открыл DevTools → "блин, лимиты в кэше???").
         localStorage.setItem('solfai_user', JSON.stringify(currentUser));
         localStorage.setItem(getPlanStorageKey(), JSON.stringify(syncedPlan));
-        if (syncedPlanKey) localStorage.setItem(syncedPlanKey, planType);
 
         updateUIForUser();
         updatePlanDisplay();
         if (typeof updateQuizCounter === 'function') updateQuizCounter();
-        if (planUpgraded && requestsCount === 0) {
-            showToast(
-                uiText('planUpgradedRefill', { fallback: 'Tariff upgraded — attempts refilled!' }),
-                'success',
-                { dedupeKey: 'plan-upgraded-refill' }
-            );
-        }
     } catch (error) {
         console.error('App data sync failed:', error);
     }
 }
-
-const PLAN_TIER = { free: 0, basic: 1, pro: 2, unlimited: 3 };
 
 const PLAN_LIMITS = {
     free:      { requests: 3, images: 0 },

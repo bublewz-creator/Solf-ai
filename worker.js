@@ -72,6 +72,30 @@ export default {
       return PLAN_LIMITS[planType] || PLAN_LIMITS.free;
     }
 
+    const PLAN_TIER = { free: 0, basic: 1, pro: 2, unlimited: 3 };
+
+    function isPlanUpgrade(oldPlan, newPlan) {
+      return (PLAN_TIER[newPlan] ?? 0) > (PLAN_TIER[oldPlan] ?? 0);
+    }
+
+    /** При апгрейде тарифа сбрасываем счётчики — пользователь получает полный лимит нового плана. */
+    async function refillUsageOnPlanUpgrade(user, previousPlanType) {
+      if (!user?.id || !previousPlanType) return user;
+      const currentPlan = user.plan_type || "free";
+      if (previousPlanType === currentPlan || !isPlanUpgrade(previousPlanType, currentPlan)) return user;
+      const now = Date.now();
+      const refilled = {
+        ...user,
+        requests_count: 0,
+        images_count: 0,
+        quiz_count: 0,
+        requests_window_start: now,
+        images_window_start: now,
+        quiz_window_start: now,
+      };
+      return persistUsageWindows(refilled);
+    }
+
     function usageFields(type) {
       if (type === "image") return { count: "images_count", start: "images_window_start", window: USAGE_WINDOWS_MS.image };
       if (type === "quiz") return { count: "quiz_count", start: "quiz_window_start", window: USAGE_WINDOWS_MS.quiz };
@@ -636,9 +660,34 @@ export default {
         const forbid = forbidSelfOnly(auth.userId, userId);
         if (forbid) return forbid;
 
-        const user = await getUserWithFreshUsage(userId);
+        const prevPlan = url.searchParams.get("prev_plan");
+        let user = await getUserWithFreshUsage(userId);
         if (!user) return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: corsHeaders });
+        if (prevPlan) {
+          user = await refillUsageOnPlanUpgrade(user, prevPlan);
+        }
 
+        return new Response(JSON.stringify(user), { headers: corsHeaders });
+      }
+
+      if (url.pathname === "/update-plan" && request.method === "POST") {
+        const auth = await requireAuth(request, env);
+        if (auth.error) return auth.error;
+
+        const { id, plan_type: planType } = await request.json();
+        if (!id) return new Response(JSON.stringify({ error: "User ID is required" }), { status: 400, headers: corsHeaders });
+        const forbid = forbidSelfOnly(auth.userId, id);
+        if (forbid) return forbid;
+        if (!planType || !PLAN_LIMITS[planType]) {
+          return new Response(JSON.stringify({ error: "Invalid plan_type" }), { status: 400, headers: corsHeaders });
+        }
+
+        const prev = await fetchUserById(id);
+        if (!prev) return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: corsHeaders });
+
+        await neonQuery(`UPDATE users SET plan_type = $2 WHERE id = $1 RETURNING *`, [id, planType]);
+        let user = await getUserWithFreshUsage(id);
+        user = await refillUsageOnPlanUpgrade(user, prev.plan_type || "free");
         return new Response(JSON.stringify(user), { headers: corsHeaders });
       }
 

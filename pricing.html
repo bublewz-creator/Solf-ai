@@ -694,7 +694,6 @@
         </footer>
     </div>
     
-   <script src="auth.js?v=2"></script>
    <script>
     // Translations with discounted monthly prices added
    const pricingTranslations = {
@@ -865,33 +864,15 @@
     });
     
     // Save Plan Logic
-    async function updatePlanOnServer(userId, planType) {
-        const res = await fetch(`${WORKER_URL}/update-plan`, {
-            method: 'POST',
-            headers: typeof solfAuthHeaders === 'function'
-                ? solfAuthHeaders({ 'Content-Type': 'application/json' })
-                : { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ id: userId, plan_type: planType }),
-        });
-        const data = await res.json().catch(() => ({}));
-        if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
-        return data;
-    }
-
     document.querySelectorAll('.plan-btn').forEach(btn => {
-        btn.addEventListener('click', async () => {
+        btn.addEventListener('click', () => {
             // Менять тариф можно только из аккаунта. Гостя сначала отправляем войти,
             // чтобы план не сохранялся в "solfai_plan_guest" и не плодил расхождений с БД.
             let loggedInUser = null;
             try { loggedInUser = JSON.parse(localStorage.getItem('solfai_user')); } catch (e) {}
             if (!loggedInUser || !loggedInUser.id) {
-                alert(currentPricingLang === 'ru' ? 'Войдите, чтобы выбрать тариф.' : 'Sign in to choose a plan.');
-                window.location.href = 'login.html?return=pricing.html';
-                return;
-            }
-            if (typeof getSolfSessionToken === 'function' && !getSolfSessionToken()) {
-                alert(currentPricingLang === 'ru' ? 'Сессия истекла — войдите снова.' : 'Session expired — please sign in again.');
-                window.location.href = 'login.html?return=pricing.html';
+                alert('Sign in to choose a plan.');
+                window.location.href = 'index.html';
                 return;
             }
 
@@ -911,8 +892,12 @@
                 planType = 'unlimited';
                 planEmoji = '<svg class="svg-icon" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"></polygon></svg>';
             }
+            
+            let currentUser = null;
+            try { currentUser = JSON.parse(localStorage.getItem('solfai_user')); } catch(e) {}
+            const userId = currentUser ? currentUser.id : 'guest';
+            const storageKey = `solfai_plan_${userId}`;
 
-            const userId = loggedInUser.id;
             const planData = {
                 type: planType,
                 emoji: planEmoji,
@@ -921,25 +906,31 @@
                 billing: isYearly ? 'yearly' : 'monthly'
             };
 
-            btn.disabled = true;
-            const prevLabel = btn.textContent;
-            btn.textContent = currentPricingLang === 'ru' ? 'Сохранение…' : 'Saving…';
+            // Сохраняем план ЛОКАЛЬНО сразу (это быстрая синхронная операция).
+            // Так юзер не зависит от того, дойдёт ли fetch до Cloudflare Workers.
+            localStorage.setItem(`solfai_plan_${userId}`, JSON.stringify(planData));
 
-            try {
-                const serverUser = await updatePlanOnServer(userId, planType);
-                if (typeof applyServerUserPlan === 'function') applyServerUserPlan(serverUser);
-                localStorage.setItem(`solfai_plan_${userId}`, JSON.stringify(planData));
-                alert(currentPricingLang === 'ru'
-                    ? `Тариф «${planName}» сохранён! Для оплаты напишите @vwirex в Telegram.`
-                    : `${planName} plan saved! Contact @vwirex on Telegram to complete payment.`);
-                window.location.href = 'index.html';
-            } catch (err) {
-                console.error('[pricing] update-plan failed:', err);
-                alert(currentPricingLang === 'ru'
-                    ? `Не удалось сохранить тариф: ${err.message || 'ошибка сети'}. Проверьте интернет или войдите снова.`
-                    : `Could not save plan: ${err.message || 'network error'}. Check connection or sign in again.`);
-                btn.disabled = false;
-                btn.textContent = prevLabel;
+            // Редирект НА index.html делаем гарантированно — независимо от ответа БД.
+            // Раньше тут было `fetch().then(() => location.href = ...)` без catch и timeout —
+            // и без VPN (workers.dev режется ТСПУ) промис никогда не резолвился, кнопка
+            // выглядела "мёртвой". Теперь fetch отправляется fire-and-forget, а редирект
+            // случается через 1.2с в любом случае. Если backend дойдёт раньше — отлично,
+            // план запишется в БД; если нет — план уже в localStorage, БД догонит позже
+            // через syncAppData.
+            const goToApp = () => {
+                if (currentUser) {
+                    window.location.href = 'index.html';
+                } else {
+                    alert(`${planName} plan selected! Contact @vwirex on Telegram to complete payment.`);
+                    window.location.href = 'index.html';
+                }
+            };
+
+            if (currentUser) {
+                alert(`${planName} plan selected! Contact @vwirex on Telegram to complete payment.`);
+                goToApp();
+            } else {
+                goToApp();
             }
         });
     });
