@@ -732,8 +732,7 @@ function queryTheoryNotation(userQuery) {
 }
 
 function buildTheoryIntro(q) {
-    const wantsAll = /(?:во?\s+)?(?:все|всех)|(?:три|3|трёх|трех)\s*(?:вид|форм)|all\s*(?:the\s*)?(?:types?|kinds?|forms?)|in\s*all\s*forms?/i.test(q);
-    const isMultiScale = /гамм|scale/i.test(q) && wantsAll;
+    const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
     if (isMultiScale) {
         return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
             ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
@@ -765,42 +764,8 @@ function buildTheoryProse(q) {
     return '';
 }
 
-/** Билет / несколько пунктов / длинный запрос — не отвечаем мгновенно из theory.js (отдаём модели). */
-function shouldSkipInstantTheoryAnswer(query) {
-    const q = stripNotationReminder(query);
-    if (!q) return false;
-    const t = q.toLowerCase().replace(/ё/g, 'е');
-
-    if (q.length > 240) return true;
-
-    const numberedLines = (q.match(/(?:^|\n)\s*\d+[\.)]\s+/g) || []).length;
-    if (numberedLines >= 2) return true;
-
-    if (/билет|ticket|несколько\s*пункт|пункт\s*\d|также\b|так\s*же|ещё\b|еще\b|\balso\b/i.test(t)) return true;
-
-    const topicHits = [
-        /гамм|scale|звукоряд/.test(t),
-        /тритон|tritone/.test(t),
-        /(?:^|[^a-zа-яё])д\s*7|d7|доминант\w*\s*септ/.test(t),
-        /t53|цепоч|chain|аккордов\w*\s*последов/.test(t),
-        /характерн|х\.\s*и|characteristic/.test(t),
-        /главн\w*\s*трезвуч|main\s*triads?/.test(t),
-        /правил\w*\s*построен/.test(t),
-    ].filter(Boolean).length;
-    if (topicHits >= 2) return true;
-
-    if (window.SolfTheory?.isCompositeExerciseQuery) {
-        try {
-            if (window.SolfTheory.isCompositeExerciseQuery(q)) return true;
-        } catch (_) {}
-    }
-
-    return false;
-}
-
 /** Подставляет готовый нотный блок из theory.js, если запрос распознан. */
 function patchAiWithTheory(userQuery, aiText, det) {
-    if (shouldSkipInstantTheoryAnswer(userQuery)) return aiText;
     const resolved = det !== undefined ? det : queryTheoryNotation(userQuery);
     if (!resolved?.blockString || !window.SolfTheory?.applyBlock) return aiText;
     const q = stripNotationReminder(userQuery);
@@ -845,7 +810,6 @@ function deliverInstantAiReply(text) {
 /** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
 function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
     if (harmonizationTask || hasImage) return false;
-    if (shouldSkipInstantTheoryAnswer(userQuery)) return false;
     if (!notationModeEnabled || !window.SolfTheory?.buildNotationForQuery) return false;
     if (!isBuildTask(userQuery) && !isChainTask(userQuery)) return false;
     return !!queryTheoryNotation(userQuery)?.blockString;
@@ -2824,9 +2788,7 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
-        const theoryQuick = harmonizationTask || imageData || shouldSkipInstantTheoryAnswer(baseUserContent)
-            ? null
-            : queryTheoryQuickAnswer(baseUserContent);
+        const theoryQuick = harmonizationTask || imageData ? null : queryTheoryQuickAnswer(baseUserContent);
         if (theoryQuick?.text) {
             await deliverInstantAiReply(theoryQuick.text);
             return;
