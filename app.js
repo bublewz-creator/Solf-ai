@@ -732,7 +732,8 @@ function queryTheoryNotation(userQuery) {
 }
 
 function buildTheoryIntro(q) {
-    const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
+    const wantsAll = /(?:во?\s+)?(?:все|всех)|(?:три|3|трёх|трех)\s*(?:вид|форм)|all\s*(?:the\s*)?(?:types?|kinds?|forms?)|in\s*all\s*forms?/i.test(q);
+    const isMultiScale = /гамм|scale/i.test(q) && wantsAll;
     if (isMultiScale) {
         return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
             ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'

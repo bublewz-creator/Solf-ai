@@ -361,9 +361,9 @@
         const notes = [];
         for (let i = 0; i < 7; i++) {
             const n = buildIntervalUp(tonic, i + 1, formula[i]);
-            notes.push({ keys: [noteKey(n)], duration: 'q', label: ROMAN_DEGREES[i] });
+            notes.push({ keys: [noteKey(n)], duration: 'q' });
         }
-        notes.push({ keys: [noteKey(buildIntervalUp(tonic, 8, 12))], duration: 'q', label: ROMAN_DEGREES[7] });
+        notes.push({ keys: [noteKey(buildIntervalUp(tonic, 8, 12))], duration: 'q' });
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, mode),
@@ -398,13 +398,13 @@
         const notes = [];
         ascFormula.forEach((s, idx) => {
             const deg = idx + 1;
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q' });
         });
         // нисходящая часть: верхняя «до октавой выше тоники» УЖЕ есть в ascending,
         // дальше идём от VII вниз к I. degree считаем относительно НИЖНЕЙ тоники.
         const descDegs = [7, 6, 5, 4, 3, 2, 1];
         descDegs.forEach((deg, idx) => {
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q' });
         });
         return {
             clef: 'treble',
@@ -425,11 +425,11 @@
         const notes = [];
         ascFormula.forEach((s, idx) => {
             const deg = idx + 1;
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, s))], duration: 'q' });
         });
         const descDegs = [7, 6, 5, 4, 3, 2, 1];
         descDegs.forEach((deg, idx) => {
-            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q', label: ROMAN_DEGREES[deg - 1] });
+            notes.push({ keys: [noteKey(buildIntervalUp(tonic, deg, descFormula[idx]))], duration: 'q' });
         });
         return {
             clef: 'treble',
@@ -1175,10 +1175,13 @@
                     ? buildMelodicMinorBothWays(key.tonic)
                     : buildMelodicMajorBothWays(key.tonic);
                 if (data) items.push({ label: ru ? 'Мелодическая гамма' : 'Melodic scale', data });
-            } else if (wantsAllForms(t) || (!form && /построй|build|сделай|напиши|выведи|draw|show|write/.test(t))) {
+            } else if (wantsAllForms(t)) {
                 items.push(...buildAllScaleForms(key.tonic, key.mode, ru, t));
             } else if (form !== null) {
                 const data = buildScaleExercise(key.tonic, key.mode, form);
+                if (data) items.push({ label: ru ? 'Гамма' : 'Scale', data });
+            } else if (/построй|build|сделай|напиши|выведи|draw|show|write/.test(t)) {
+                const data = buildScaleExercise(key.tonic, key.mode, null);
                 if (data) items.push({ label: ru ? 'Гамма' : 'Scale', data });
             }
         }
@@ -1275,9 +1278,9 @@
                 if (wantsAllForms(t) && !form) {
                     return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru', t));
                 }
-                // «построй гамму X» без уточнения формы — по умолчанию все виды (школьная практика)
-                if (!form && /построй|постро|build|show|draw|сделай|напиши/.test(t)) {
-                    return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru', t));
+                if (/мелодическ|melodic/.test(t)) {
+                    data = buildScaleExercise(key.tonic, key.mode, 'melodic');
+                    break;
                 }
                 data = buildScaleExercise(key.tonic, key.mode, form);
                 break;
@@ -1450,7 +1453,7 @@
     // ---------- Промпт для модели (все правила) ----------
     const EXERCISE_OUTPUT_RULES = `=== ВЫВОД УПРАЖНЕНИЙ (кратко) ===
 При «построй / сделай / напиши / билет» — ПОЛНЫЙ комплект нот в [[NOTATION:...]]. Текст 1–2 предложения.
-«Мелодическая гамма» → только мелодическая (вверх+вниз, 15 нот). Без «мелодическая» при «построй гамму» → нат.+гарм.+мел.
+«Мелодическая гамма» → только мелодическая (вверх+вниз, 15 нот). «Все виды гаммы» → нат.+гарм.+мел. Без уточнения → одна гамма (натуральная).
 «Натуральные и гармонические тритоны» / «нат и гарм» → ОБА набора (4+4 созвучия), barlines:"manual".
 D7 + разрешение → clef:"treble" ONLY, формы D7 с разрешениями. Никогда layout:"satb" для D7/II7/цепочек.
 Цепочка по списку labels (t53-d6-d53-...) → ВСЕ аккорды из списка подряд.
