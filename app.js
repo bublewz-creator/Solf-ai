@@ -3035,17 +3035,27 @@ function restorePendingQueryAfterLogin() {
     } catch (_) {}
 }
 
-function startNewChat() {
+function shouldAutoFocusChatInput() {
+    if (sessionStorage.getItem('solfai_skip_focus_once') === '1') return false;
+    if (isMobileLayout()) return false;
+    if (isBlockingOverlayActive()) return false;
+    return true;
+}
+
+function dismissChatInputFocus() {
+    chatInput?.blur?.();
+    document.activeElement?.blur?.();
+}
+
+function startNewChat(options = {}) {
     closeAllOverlays();
     saveChatToStorage(); currentChatId = null; chatMessages.innerHTML = '';
     chatTitle.textContent = (typeof solfaiGetText === 'function' ? solfaiGetText('newChat') : '') || 'New Chat';
     chatInput.value = '';
-    const skipAutoFocus = sessionStorage.getItem('solfai_skip_focus_once') === '1';
-    if (skipAutoFocus) {
-        document.activeElement?.blur?.();
-        chatInput?.blur?.();
-    } else {
+    if (options.focus === true && shouldAutoFocusChatInput()) {
         chatInput.focus();
+    } else {
+        dismissChatInputFocus();
     }
     attachedFiles = []; chatAttachedFiles.innerHTML = ''; renderChatsList();
     refreshSendButtonState();
@@ -3172,6 +3182,7 @@ function updateUIForUser() {
     chats = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
     updatePlanDisplay(); renderChatsList();
     if (!currentChatId) startNewChat();
+    dismissChatInputFocus();
 
     // НОВОЕ: Асинхронно грузим чаты из БД и обновляем UI.
     // 15 сек хватит даже на медленную мобильную связь; если бэк не отвечает (без VPN),
@@ -3497,7 +3508,7 @@ async function initApp() {
         }
         sendChatMessage();
     });
-    if (newChatBtn) newChatBtn.addEventListener('click', startNewChat);
+    if (newChatBtn) newChatBtn.addEventListener('click', () => startNewChat({ focus: true }));
     
     if (toggleSidebarBtn) toggleSidebarBtn.addEventListener('click', e => {
         e.stopPropagation();
@@ -3637,10 +3648,12 @@ window.addEventListener('load', () => {
         requestAnimationFrame(revealApp);
     }
     scheduleSkipChatInputFocusCleanup();
+    if (isMobileLayout()) dismissChatInputFocus();
 });
 
 window.addEventListener('pageshow', () => {
     scheduleSkipChatInputFocusCleanup();
+    if (isMobileLayout()) dismissChatInputFocus();
 });
 
 function abortGeneration() {
@@ -3651,7 +3664,7 @@ function abortGeneration() {
         chatInput.value = lastUserQuery;
         chatInput.style.height = 'auto';
         chatInput.style.height = Math.min(chatInput.scrollHeight, 120) + 'px';
-        chatInput.focus();
+        if (shouldAutoFocusChatInput()) chatInput.focus();
     }
 }
 
