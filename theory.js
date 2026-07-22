@@ -1342,9 +1342,49 @@
         return { minA, maxA, center: (minA + maxA) / 2 };
     }
 
+    /** Одноголосные линии (гаммы, мелодии): один общий сдвиг октавы, порядок высот сохраняется. */
+    function normalizeSingleLineOctaves(notes, clef) {
+        const isBass = clef === 'bass';
+        const hard = OCTAVE_LIMITS[isBass ? 'bass' : 'treble'];
+        const ideal = COMFORT_CENTER[isBass ? 'bass' : 'treble'];
+        let minA = Infinity;
+        let maxA = -Infinity;
+        for (const n of notes) {
+            const keys = n.keys || [];
+            if (keys.length !== 1) return null;
+            const p = parseVexKey(keys[0]);
+            if (!p) return null;
+            const a = noteAbs(p);
+            minA = Math.min(minA, a);
+            maxA = Math.max(maxA, a);
+        }
+        if (!Number.isFinite(minA)) return notes;
+
+        let bestShift = 0;
+        let bestScore = Infinity;
+        for (let shift = -3; shift <= 3; shift++) {
+            const smin = minA + shift * 12;
+            const smax = maxA + shift * 12;
+            if (smax > hard.top || smin < hard.bottom) continue;
+            const score = Math.abs((smin + smax) / 2 - ideal);
+            if (score < bestScore) {
+                bestScore = score;
+                bestShift = shift;
+            }
+        }
+        if (!bestShift) return notes;
+        return notes.map(n => ({
+            ...n,
+            keys: (n.keys || []).map(k => shiftVexKeyOctave(k, bestShift))
+        }));
+    }
+
     /** Каждый аккорд/интервал — в удобном диапазоне; соседние созвучия без скачков > октавы. */
     function normalizeNotationOctaves(notes, clef) {
         if (!Array.isArray(notes) || !notes.length) return notes;
+        const singleLine = normalizeSingleLineOctaves(notes, clef);
+        if (singleLine) return singleLine;
+
         const isBass = clef === 'bass';
         const hard = OCTAVE_LIMITS[isBass ? 'bass' : 'treble'];
         const comfortBottom = isBass ? 38 : 52;
