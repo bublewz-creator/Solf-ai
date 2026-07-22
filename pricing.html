@@ -694,6 +694,7 @@
         </footer>
     </div>
     
+    <script src="auth.js"></script>
    <script>
     // Translations with discounted monthly prices added
    const pricingTranslations = {
@@ -908,30 +909,34 @@
 
             // Сохраняем план ЛОКАЛЬНО сразу (это быстрая синхронная операция).
             // Так юзер не зависит от того, дойдёт ли fetch до Cloudflare Workers.
-            localStorage.setItem(`solfai_plan_${userId}`, JSON.stringify(planData));
+            localStorage.setItem(storageKey, JSON.stringify(planData));
 
-            // Редирект НА index.html делаем гарантированно — независимо от ответа БД.
-            // Раньше тут было `fetch().then(() => location.href = ...)` без catch и timeout —
-            // и без VPN (workers.dev режется ТСПУ) промис никогда не резолвился, кнопка
-            // выглядела "мёртвой". Теперь fetch отправляется fire-and-forget, а редирект
-            // случается через 1.2с в любом случае. Если backend дойдёт раньше — отлично,
-            // план запишется в БД; если нет — план уже в localStorage, БД догонит позже
-            // через syncAppData.
-            const goToApp = () => {
-                if (currentUser) {
-                    window.location.href = 'index.html';
-                } else {
-                    alert(`${planName} plan selected! Contact @vwirex on Telegram to complete payment.`);
-                    window.location.href = 'index.html';
-                }
-            };
+            // Сразу обновляем кэш пользователя — index.html покажет тариф до ответа БД.
+            currentUser.plan_type = planType;
+            localStorage.setItem('solfai_user', JSON.stringify(currentUser));
 
-            if (currentUser) {
-                alert(`${planName} plan selected! Contact @vwirex on Telegram to complete payment.`);
-                goToApp();
-            } else {
-                goToApp();
+            const alertMsg = currentPricingLang === 'ru'
+                ? `Тариф «${planName}» выбран! Напишите @vwirex в Telegram для оплаты.`
+                : `${planName} plan selected! Contact @vwirex on Telegram to complete payment.`;
+            alert(alertMsg);
+
+            const headers = { 'Content-Type': 'application/json' };
+            if (typeof solfAuthHeaders === 'function') {
+                Object.assign(headers, solfAuthHeaders());
             }
+
+            const savePlan = fetch(`${WORKER_URL}/update-plan`, {
+                method: 'POST',
+                headers,
+                body: JSON.stringify({ id: currentUser.id, plan_type: planType }),
+            }).catch(() => {});
+
+            Promise.race([
+                savePlan,
+                new Promise((resolve) => setTimeout(resolve, 2500)),
+            ]).finally(() => {
+                window.location.href = 'index.html';
+            });
         });
     });
     

@@ -75,7 +75,32 @@ async function syncAppData() {
             throw new Error(data.error || 'Failed to sync app data');
         }
 
-        const planType = PLAN_LIMITS[data.plan_type] ? data.plan_type : 'free';
+        let planType = PLAN_LIMITS[data.plan_type] ? data.plan_type : 'free';
+        const localPlanRaw = localStorage.getItem(getPlanStorageKey());
+        let localPlan = null;
+        try { localPlan = localPlanRaw ? JSON.parse(localPlanRaw) : null; } catch (_) {}
+        const localPlanType = localPlan?.type && PLAN_LIMITS[localPlan.type] ? localPlan.type : null;
+
+        if (localPlanType && localPlanType !== planType) {
+            try {
+                const upRes = await fetchWithTimeout(`${WORKER_URL}/update-plan`, {
+                    method: 'POST',
+                    headers: solfAuthHeaders({ 'Content-Type': 'application/json' }),
+                    body: JSON.stringify({ id: currentUser.id, plan_type: localPlanType }),
+                }, 8000);
+                if (upRes.ok) {
+                    data = await upRes.json();
+                    planType = PLAN_LIMITS[data.plan_type] ? data.plan_type : localPlanType;
+                } else {
+                    planType = localPlanType;
+                    data.plan_type = localPlanType;
+                }
+            } catch (_) {
+                planType = localPlanType;
+                data.plan_type = localPlanType;
+            }
+        }
+
         const requestsCount = Number.isFinite(Number(data.requests_count)) ? Number(data.requests_count) : 0;
         const imagesCount = Number.isFinite(Number(data.images_count)) ? Number(data.images_count) : 0;
         const quizCount = Number.isFinite(Number(data.quiz_count)) ? Number(data.quiz_count) : 0;
