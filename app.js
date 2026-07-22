@@ -94,10 +94,16 @@ async function syncAppData() {
                 } else {
                     planType = localPlanType;
                     data.plan_type = localPlanType;
+                    data.requests_count = 0;
+                    data.images_count = 0;
+                    data.quiz_count = 0;
                 }
             } catch (_) {
                 planType = localPlanType;
                 data.plan_type = localPlanType;
+                data.requests_count = 0;
+                data.images_count = 0;
+                data.quiz_count = 0;
             }
         }
 

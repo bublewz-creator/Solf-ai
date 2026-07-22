@@ -929,6 +929,21 @@
                 method: 'POST',
                 headers,
                 body: JSON.stringify({ id: currentUser.id, plan_type: planType }),
+            }).then(async (res) => {
+                if (!res.ok) return;
+                const user = await res.json().catch(() => null);
+                if (!user) return;
+                currentUser = {
+                    ...currentUser,
+                    plan_type: user.plan_type || planType,
+                    requests_count: Number(user.requests_count) || 0,
+                    images_count: Number(user.images_count) || 0,
+                    quiz_count: Number(user.quiz_count) || 0,
+                    requests_window_start: Number(user.requests_window_start) || Date.now(),
+                    images_window_start: Number(user.images_window_start) || Date.now(),
+                    quiz_window_start: Number(user.quiz_window_start) || Date.now(),
+                };
+                localStorage.setItem('solfai_user', JSON.stringify(currentUser));
             }).catch(() => {});
 
             Promise.race([
