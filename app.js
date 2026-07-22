@@ -1208,6 +1208,15 @@ function renderChatsList() {
 // ===== ТЕМА =====
 function toggleTheme() { setTheme(currentTheme === 'default' ? 'light' : 'default'); }
 
+function refreshVisibleNotations(root) {
+    const scope = root || document.getElementById('chatMessages') || document;
+    scope.querySelectorAll('.solf-notation[data-rendered]').forEach(el => {
+        el.removeAttribute('data-rendered');
+        el.innerHTML = '<div class="notation-loading">♪</div>';
+    });
+    renderAllNotations(scope);
+}
+
 function setTheme(theme) {
     currentTheme = theme;
     localStorage.setItem('solfai_theme', theme);
@@ -1222,8 +1231,24 @@ function setTheme(theme) {
     document.querySelectorAll('#themeIconSvg, #headerThemeIconSvg').forEach(el => {
         if (el) el.innerHTML = theme === 'light' ? sunIcon : moonIcon;
     });
+    refreshVisibleNotations();
 }
-function initTheme() { setTheme(currentTheme); }
+function initTheme() {
+    setTheme(currentTheme);
+    window.addEventListener('storage', (e) => {
+        if (e.key === 'solfai_theme' && e.newValue) {
+            currentTheme = e.newValue;
+            document.documentElement.setAttribute('data-theme', e.newValue === 'default' ? '' : e.newValue);
+            refreshVisibleNotations();
+        }
+        if (e.key === 'solfai_color' && e.newValue) {
+            currentColor = e.newValue;
+            if (e.newValue === 'default') document.documentElement.removeAttribute('data-color');
+            else document.documentElement.setAttribute('data-color', e.newValue);
+            refreshVisibleNotations();
+        }
+    });
+}
 
 function setColor(color) {
     currentColor = color;
@@ -1238,6 +1263,7 @@ function setColor(color) {
     document.querySelectorAll('.color-btn').forEach(btn => {
         btn.classList.toggle('active', btn.dataset.color === color);
     });
+    refreshVisibleNotations();
 }
 
 function initColor() {
@@ -2011,13 +2037,15 @@ function noteCenterX(sn) {
     }
 }
 
-const NOTATION_LABEL_FONT = "'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, 'Roboto', 'Helvetica Neue', Arial, 'Noto Sans', sans-serif";
+const NOTATION_LABEL_FONT = "'Segoe UI', 'Roboto', 'Noto Sans', system-ui, sans-serif";
 
-/** Latin v/y from AI or bad SVG font fallback → Cyrillic у in RU interval abbreviations (ув4, ум5…). */
+/** Latin v/y from AI → capital Cyrillic У (не путается с Latin v). */
 function normalizeIntervalLabel(lbl) {
     if (!lbl) return lbl;
-    // Latin v/y or tick-like fallback glyph → Cyrillic у (ув4, ум5…)
-    return String(lbl).replace(/^[\u0076\u028B\u0079\u2713\u2714](?=[вм\d.])/i, '\u0443');
+    let s = String(lbl);
+    s = s.replace(/^[\u0076\u028B\u0079\u2713\u2714](?=[вмВМ\d.])/i, '\u0423');
+    s = s.replace(/^[\u0443](?=[вм])/i, '\u0423');
+    return s;
 }
 
 function drawChordLabelsBelow(svg, stave, staveNotes, notesData, color) {

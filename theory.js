@@ -113,14 +113,14 @@
 
     // Качественное имя интервала по ступеневой величине + количеству полутонов.
     const INTERVAL_QUALITY_RU = {
-        1: { 0: 'ч1', 1: 'ув1' },
-        2: { 0: 'ум2', 1: 'м2', 2: 'б2', 3: 'ув2' },
-        3: { 2: 'ум3', 3: 'м3', 4: 'б3', 5: 'ув3' },
-        4: { 4: 'ум4', 5: 'ч4', 6: 'ув4' },
-        5: { 6: 'ум5', 7: 'ч5', 8: 'ув5' },
-        6: { 7: 'ум6', 8: 'м6', 9: 'б6', 10: 'ув6' },
-        7: { 9: 'ум7', 10: 'м7', 11: 'б7', 12: 'ув7' },
-        8: { 11: 'ум8', 12: 'ч8', 13: 'ув8' }
+        1: { 0: 'ч1', 1: 'Ув1' },
+        2: { 0: 'Ум2', 1: 'м2', 2: 'б2', 3: 'Ув2' },
+        3: { 2: 'Ум3', 3: 'м3', 4: 'б3', 5: 'Ув3' },
+        4: { 4: 'Ум4', 5: 'ч4', 6: 'Ув4' },
+        5: { 6: 'Ум5', 7: 'ч5', 8: 'Ув5' },
+        6: { 7: 'Ум6', 8: 'м6', 9: 'б6', 10: 'Ув6' },
+        7: { 9: 'Ум7', 10: 'м7', 11: 'б7', 12: 'Ув7' },
+        8: { 11: 'Ум8', 12: 'ч8', 13: 'Ув8' }
     };
     const INTERVAL_QUALITY_EN = {
         1: { 0: 'P1', 1: 'A1' },
@@ -278,7 +278,7 @@
             const uv4hi = buildIntervalUp(uv4lo, 4, 6);
             if (!checkInterval(uv4lo, uv4hi, 4, 6)) return;
             const r1 = resolveInterval(uv4lo, uv4hi, 'aug', triad);
-            notes.push(chord(uv4lo, uv4hi, false, labelLocale === 'ru' ? 'ув4' : 'A4'));
+            notes.push(chord(uv4lo, uv4hi, false, labelLocale === 'ru' ? 'Ув4' : 'A4'));
             notes.push(chord(r1[0], r1[1], true, intervalLabel(r1[0], r1[1])));
 
             // ум.5: lb -> квинта вверх
@@ -286,7 +286,7 @@
             const um5hi = buildIntervalUp(um5lo, 5, 6);
             if (!checkInterval(um5lo, um5hi, 5, 6)) return;
             const r2 = resolveInterval(um5lo, um5hi, 'dim', triad);
-            notes.push(chord(um5lo, um5hi, false, labelLocale === 'ru' ? 'ум5' : 'd5'));
+            notes.push(chord(um5lo, um5hi, false, labelLocale === 'ru' ? 'Ум5' : 'd5'));
             notes.push(chord(r2[0], r2[1], true, intervalLabel(r2[0], r2[1])));
         });
         if (notes.length < 4) return null;
@@ -1640,26 +1640,22 @@ D65 строится на VII СТУПЕНИ (первая инверсия D7).
 
         if (wantsTritoneRules(t)) {
             parts.push(ru
-                ? `**Правила построения тритонов**
-1. Тритон — увеличенная кварта (ув.4, 6 п.т.) или уменьшённая квинта (ум.5, 6 п.т.) между ступенями звукоряда.
-2. **Натуральная форма** — одна пара: ув.4 + ум.5 (4 созвучия с разрешениями).
-3. **Гармоническая форма** — две пары (в миноре с VII#, в мажоре с ♭VI): 8 созвучий.
-4. **Разрешение ув.4** → в **большую сексту** (8–9 п.т., м6 или Б6).
-5. **Разрешение ум.5** → в **малую или большую терцию** (3–4 п.т., м3 или б3).
-6. Направление разрешения — к тонике/терции тонального трезвучия.`
-                : `**Tritone construction rules**
-1. A tritone is an augmented 4th (A4, 6 semitones) or diminished 5th (d5, 6 semitones) between scale degrees.
-2. **Natural form** — one pair: A4 + d5 (4 sonorities with resolutions).
-3. **Harmonic form** — two pairs (with raised VII in minor / ♭VI in major): 8 sonorities.
-4. **A4 resolves** to a **major or minor 6th** (8–9 semitones).
-5. **d5 resolves** to a **minor or major 3rd** (3–4 semitones).
-6. Resolution moves toward the tonic triad (tonic or third).`);
+                ? `Тритоны — неустойчивые интервалы: они строятся на неустойчивых ступенях лада, поэтому обязательно требуют разрешения — неустойчивые ступени тяготеют к устойчивым.
+
+Принцип разрешения прост. **Увеличенная кварта** (ув.4) — двустороннее «расширение»: разрешается в **малую сексту** (м.6). **Уменьшённая квинта** (ум.5) — двустороннее «сужение»: разрешается в **большую терцию** (б.3).
+
+В **натуральной** форме звукоряда — одна пара тритонов (ув.4 + ум.5), в **гармонической** — две пары.`
+                : `Tritones are unstable intervals built on unstable scale degrees, so they must resolve — unstable tones move toward stable ones.
+
+Resolution is straightforward: an **augmented 4th** (A4) expands outward and resolves to a **minor 6th** (m6). A **diminished 5th** (d5) contracts inward and resolves to a **major 3rd** (M3).
+
+In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic** form there are two pairs.`);
         }
 
         if (wantsCharacteristicRules(t)) {
             parts.push(ru
-                ? `**Характерные интервалы** (4 пары): ув.2, ум.7, ув.5, ум.4 — с разрешениями по правилам секунды/септимы/квинты/кварты.`
-                : `**Characteristic intervals** (4 pairs): A2, d7, A5, d4 — each with standard resolution.`);
+                ? `Характерные интервалы — ув.2, ум.7, ув.5 и ум.4 — тоже неустойчивы и разрешаются по тому же принципу тяготения: каждый «схлопывается» в устойчивый интервал (к секунде, сексте, терции или кварте тонического трезвучия).`
+                : `Characteristic intervals — A2, d7, A5, and d4 — are unstable and resolve by the same tendency: each collapses into a stable interval of the tonic triad.`);
         }
 
         return parts.join('\n\n');
