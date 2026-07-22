@@ -715,7 +715,8 @@ function buildTheoryIntro(q) {
             ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
             : 'Natural, harmonic, and melodic forms (ascending and descending):');
     }
-    if (/билет|\b1[\.)]\s|\b2[\.)]\s|\b3[\.)]\s|t53\s*[-–—]/i.test(q)) {
+    if (/билет|\b1[\.)]\s|\b2[\.)]\s|\b3[\.)]\s|t53\s*[-–—]/i.test(q)
+        || (/(?:тритон|tritone)/i.test(q) && /(?:д7|d7|цепоч|t53)/i.test(q))) {
         return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
             ? 'Полное построение по заданию:'
             : 'Full exercise:');
@@ -734,7 +735,16 @@ function patchAiWithTheory(userQuery, aiText, det) {
     const resolved = det !== undefined ? det : queryTheoryNotation(userQuery);
     if (!resolved?.blockString || !window.SolfTheory?.applyBlock) return aiText;
     const intro = buildTheoryIntro(stripNotationReminder(userQuery));
-    return window.SolfTheory.applyBlock(intro || aiText, resolved.blockString);
+    const prose = intro || stripNotationBlocks(String(aiText || '')).trim();
+    return window.SolfTheory.applyBlock(prose, resolved.blockString);
+}
+
+/** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
+function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
+    if (harmonizationTask || hasImage) return false;
+    if (!notationModeEnabled || !window.SolfTheory?.buildNotationForQuery) return false;
+    if (!isBuildTask(userQuery) && !isChainTask(userQuery)) return false;
+    return !!queryTheoryNotation(userQuery)?.blockString;
 }
 
 function buildNotationUserReminder(responseLang) {
@@ -804,6 +814,8 @@ function isBuildTask(query) {
     const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
     if (!t) return false;
     if (/гармониз|harmoniz|harmoni[sz]e|спиш[иь]\s*голос|4[\s-]?голос|четырех\s*голос|четырёх\s*голос|satb|голосоведени/i.test(t)) return true;
+    if (/t53\s*[-–—,]/i.test(t)) return true;
+    if (/(?:тритон|tritone)/i.test(t) && /(?:д7|d7|цепоч|t53)/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
     const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
     if (buildVerb.test(t) && buildNoun.test(t)) return true;
@@ -2188,27 +2200,9 @@ function getBarlineNoneType(VF) {
 
 function normalizeNotationLayout(data) {
     if (!data || typeof data !== 'object') return data;
+    // SATB — только явный layout:"satb" (гармонизация). Не превращаем D7/II7/цепочки
+    // в двухстанную систему: у них 4 звука в одном скрипичном ключе.
     if (data.layout === 'satb' && Array.isArray(data.chords)) return data;
-    if (Array.isArray(data.notes) && data.notes.length) {
-        const satbLike = data.notes.every(n => Array.isArray(n.keys) && n.keys.length >= 4);
-        if (satbLike) {
-            return {
-                layout: 'satb',
-                keySignature: data.keySignature || 'C',
-                timeSignature: data.timeSignature || '4/4',
-                barlines: data.barlines || 'auto',
-                chords: data.notes.map(n => ({
-                    duration: n.duration || 'q',
-                    soprano: n.keys[0],
-                    alto: n.keys[1],
-                    tenor: n.keys[2],
-                    bass: n.keys[3],
-                    label: n.label,
-                    barAfter: n.barAfter
-                }))
-            };
-        }
-    }
     return data;
 }
 
@@ -2460,7 +2454,7 @@ function renderNotationCard(container, data) {
 
         const containerW = container.clientWidth || container.parentElement?.clientWidth || 600;
         const preferSingleLine = (barlinesMode === 'manual' && measures.length <= 6)
-            || (barlinesMode === 'none' && rawNotes.length <= 9);
+            || (barlinesMode === 'none' && rawNotes.length <= 12);
         const maxW = preferSingleLine
             ? Math.max(containerW - 16, 520)
             : Math.min(Math.max(containerW - 16, 280), 960);
@@ -2681,6 +2675,24 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
+        const theoryDet = harmonizationTask ? undefined : queryTheoryNotation(baseUserContent);
+        const deterministicBlock = theoryDet?.blockString || null;
+
+        if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
+            document.getElementById('typingIndicator')?.remove();
+            const aiText = patchAiWithTheory(baseUserContent, '', theoryDet);
+            chat.messages.push({ role: 'ai', content: aiText, time: new Date().toISOString(), id: Date.now().toString() });
+            saveChatToStorage();
+            await addMessageToUI('ai', aiText, [], true);
+            isGenerating = false;
+            userAbortedGeneration = false;
+            currentAbortController = null;
+            chatSendBtn.classList.remove('stop-btn');
+            chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+            refreshSendButtonState();
+            return;
+        }
+
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
         // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
         // isBigNotationTask() / isHarmonizationTask() поднимают лимит до 8192.
@@ -2736,11 +2748,12 @@ async function generateResponse(query, imageData = null) {
         }
 
         // Детерминированная нотация: один lookup theory.js на запрос (ретраи пропускаем, если блок уже есть).
-        const theoryDet = harmonizationTask ? undefined : queryTheoryNotation(baseUserContent);
-        const deterministicBlock = theoryDet?.blockString || null;
+        // theoryDet вычислен выше до API; здесь только подстановка в ответ.
+        const theoryDetFinal = theoryDet;
+        const deterministicBlockFinal = deterministicBlock;
 
         // Silent auto-retry, если режим нотации включён, а модель «забыла» блок.
-        if (notationModeEnabled && !deterministicBlock && !hasNotationBlock(aiText)) {
+        if (notationModeEnabled && !deterministicBlockFinal && !hasNotationBlock(aiText)) {
             const truncated = hasTruncatedNotationStart(aiText);
             const cleanedAiText = truncated ? stripTruncatedNotationTail(aiText) : aiText;
             // Если блок был обрезан — стартуем сразу с "только-JSON" промпта,
@@ -2838,7 +2851,7 @@ async function generateResponse(query, imageData = null) {
         }
 
         // Цепочка: модель часто выдаёт 1–3 аккорда вместо полной схемы — переспрашиваем.
-        if (notationModeEnabled && chainTask && hasNotationBlock(aiText)) {
+        if (notationModeEnabled && chainTask && !deterministicBlockFinal && hasNotationBlock(aiText)) {
             const expectedLen = expectedChainLength(baseUserContent);
             try {
                 for (let ci = 0; ci < 2 && countNotationChords(aiText) < expectedLen; ci++) {
@@ -2876,7 +2889,7 @@ async function generateResponse(query, imageData = null) {
 
         // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
         if (!harmonizationTask) {
-            aiText = patchAiWithTheory(baseUserContent, aiText, theoryDet);
+            aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal);
         }
 
         document.getElementById('typingIndicator')?.remove();
