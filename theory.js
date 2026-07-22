@@ -1774,11 +1774,23 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         return EXERCISE_OUTPUT_RULES + HARMONY_RULEBOOK;
     }
 
+    /** Несколько упражнений в одном сообщении (билет). */
+    function isCompositeExerciseQuery(rawQuery) {
+        if (!rawQuery || typeof rawQuery !== 'string') return false;
+        const t = rawQuery.toLowerCase().replace(/ё/g, 'е');
+        const numbered = (rawQuery.match(/(?:^|\n)\s*\d+[\.)]\s+/g) || []).length;
+        if (numbered >= 2) return true;
+        const key = parseKey(t);
+        if (!key) return false;
+        return collectExerciseItems(t, key).length >= 2;
+    }
+
     window.SolfTheory = {
         buildNotationForQuery,
         buildTheoryQuickAnswer,
         getSystemPrompt,
         getTheoryProse,
+        isCompositeExerciseQuery,
         applyBlock,
         autoLabelNotation,
         setLabelLocale,
