@@ -605,6 +605,10 @@ Block placement rules:
   • ум.7 — на VII (VII→bVI октавой выше): b–ab. Разрешение внутрь в ч.5: b→c, ab→g → c–g.
   • ув.5 — на bVI (bVI→III октавой выше): ab–e. Разрешение наружу в б.6: ab→g, e — устой III, остаётся → g–e.
   • ум.4 — на III (III→bVI): e–ab. Разрешение внутрь в м.3: e — устой, остаётся; ab→g → e–g.
+- Гармонический мажор F-dur (ключ 1♭: только Si♭). КРИТИЧНО для ув.2:
+  • понижается ТОЛЬКО VI ступень (D→D♭); VII ступень остаётся E БЕКАР (не E♭!).
+  • ув.2 = D♭–E (3 полутона), НЕ D♭–E♭ (это была бы б2 = 2 полутона — ОШИБКА).
+  • JSON: keys ["db/4","e/4"] — верхняя нота e/4 без b. Разрешение наружу: db→c/4, e→f/4 → ч.4.
 - ОБЩИЙ ПРИНЦИП РАЗРЕШЕНИЯ: альтерированная ступень (VII# или bVI) движется по полутону в сторону своего тяготения (VII#→I, bVI→V); вторая нота при необходимости тоже движется по полутону к ближайшему устою лада. Ув.интервалы РАСХОДЯТСЯ, ум.интервалы СХОДЯТСЯ.
 
 ВАЖНО: тритоны (ув.4/ум.5) и характерные интервалы (ув.2/ум.7/ув.5/ум.4) — РАЗНЫЕ группы. Не путай их и не называй тритоны характерными.
@@ -659,6 +663,10 @@ CORRECT EXAMPLE (user: "построй характерные интервалы
 В a-moll гарм. четыре характерных интервала с разрешениями: ув.2→ч.4, ум.7→ч.5, ув.5→б.6, ум.4→м.3.
 [[NOTATION:{"clef":"treble","keySignature":"Am","barlines":"manual","notes":[{"keys":["f/4","g#/4"],"duration":"h"},{"keys":["e/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","f/5"],"duration":"h"},{"keys":["a/4","e/5"],"duration":"h","barAfter":true},{"keys":["c/4","g#/4"],"duration":"h"},{"keys":["c/4","a/4"],"duration":"h","barAfter":true},{"keys":["g#/4","c/5"],"duration":"h"},{"keys":["a/4","c/5"],"duration":"h"}]}]]
 
+CORRECT EXAMPLE (user: "ув.2 в фа мажоре" / "augmented 2nd in F major"):
+В F-dur понижена только VI (D→D♭); VII = E бекар. Ув.2: db/4–e/4 (3 полутона). Разрешение наружу в ч.4: db→c/4, e→f/4.
+[[NOTATION:{"clef":"treble","keySignature":"F","barlines":"manual","notes":[{"keys":["db/4","e/4"],"duration":"h","label":"A2"},{"keys":["c/4","f/4"],"duration":"h","label":"P4"}]}]]
+
 WRONG EXAMPLES (do NOT do this):
 - User writes in English but you answer in Russian (or use Russian note names / Cyrillic labels).
 - Replying with text only and no [[NOTATION:...]] block.
@@ -672,6 +680,7 @@ WRONG EXAMPLES (do NOT do this):
 - Построить «характерные интервалы» → нарисовать 1–2 из 4 и остановиться. ВСЕГДА все 4 пары (8 созвучий).
 - Построить «обращения трезвучия» → нарисовать только основной вид. ВСЕГДА все 3 (T5/3, T6, T6/4).
 - Построить «D7 с разрешениями» → нарисовать только D7 без тоники. ВСЕГДА каждое обращение + разрешение (8 аккордов).
+- Ув.2 в гарм. мажоре: поставить bVI и bVII (db/4 + eb/4) — это б2, НЕ ув.2. VII ступень без b: db/4 + e/4.
 - Подписывать доминантсептаккорд кириллицей «Д7» вместо латинской "D7".
 
 REMEMBER:
@@ -866,7 +875,8 @@ function buildNotationUserReminder(responseLang) {
         'JSON PRIORITY: a complete closed JSON block matters more than long prose — shorten TEXT, never truncate JSON. Block must end with ]}]]. ' +
         'TASK COMPLIANCE: do EXACTLY what the user asked in THIS message — full set, every part. Ignore earlier chat mistakes. Dominant labels: D7, D6/5, D4/3, D2 (Latin only). ' +
         'EXERCISE COMPLETENESS: "tritones in key X" (without "natural") = HARMONIC form = 2 pairs = 8 sonorities, barAfter after each resolved pair. "Natural tritones" = 1 pair = 4 sonorities. "Both pairs" / "two pairs" = ALWAYS 8 sonorities. "Characteristic intervals" = ALL 4 pairs (8 sonorities). "Inversions" / "all types" = full set, not one example. "D7 + inversions + resolutions" = 8 chords (4 D7 forms + 4 tonic resolutions). Melodic scale = ascending AND descending when requested. Scales and single chords — barlines:"none" without timeSignature. Chain / цепочка = FULL Chain 1 (9 chords) or Chain 2 (11 chords) per key mode; barlines:"none"; label on EVERY chord; never a 1–3 chord demo. ' +
-        'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth.';
+        'TRITONE RESOLUTIONS: aug4 → SIXTH (m6/M6, 8–9 semitones), dim5 → THIRD (m3/M3, 3–4 semitones). NEVER resolve a tritone to a fourth or fifth. ' +
+        'CHARACTERISTIC aug2 in harmonic MAJOR: ONLY degree VI is lowered (bVI); degree VII stays NATURAL — e.g. F major: db/4+e/4 (NOT eb/4). D♭–E♭ is a major 2nd (WRONG); D♭–E is augmented 2nd (3 semitones, CORRECT).';
 }
 
 /** Жёсткий повторный промпт, если первый ответ всё-таки пришёл без блока. */
@@ -1025,6 +1035,11 @@ function buildFreshTaskReminder(query, lang) {
     }
     if (/характерн|characteristic/i.test(q)) {
         parts.push(ru ? 'ОБЯЗАТЕЛЬНО: все 4 характерных интервала с разрешениями (8 созвучий).' : 'MANDATORY: ALL 4 characteristic intervals with resolutions (8 sonorities).');
+    }
+    if (/ув\.?\s*2|aug\.?\s*2|\bA2\b/i.test(q) && /маjor|dur|маж/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: ув.2 в мажоре = bVI→VII; VII бекар (F-dur: db/4+e/4, НЕ eb/4).'
+            : 'MANDATORY: aug2 in major = bVI→VII; VII natural (F major: db/4+e/4, NOT eb/4).');
     }
     if (/гармониз|harmoniz|harmoni[sz]e|satb|4[\s-]?голос|четырех\s*голос|четырёх\s*голос/i.test(q)) {
         parts.push(ru
@@ -2572,6 +2587,9 @@ function renderSatbNotationCard(container, data) {
 
 function renderNotationCard(container, data) {
     data = normalizeNotationLayout(data);
+    if (window.SolfTheory && typeof window.SolfTheory.sanitizeNotationData === 'function') {
+        try { data = window.SolfTheory.sanitizeNotationData(data); } catch (_) {}
+    }
     if (data.layout === 'satb') {
         renderSatbNotationCard(container, data);
         return;

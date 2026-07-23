@@ -104,6 +104,43 @@
         return intervalDegree(lo, hi) === degree && intervalSemis(lo, hi) === semis;
     }
 
+    function isAug2Label(label) {
+        return /ув\.?\s*2|aug\.?\s*2|\bA2\b|bVI[\s\-–—]*VII/i.test(String(label || ''));
+    }
+
+    /** Исправляет частую ошибку модели: D♭–E♭ (б2) вместо D♭–E (ув.2) в гарм. мажоре. */
+    function tryFixAugmentedSecond(lo, hi) {
+        if (intervalDegree(lo, hi) !== 2) return null;
+        if (intervalSemis(lo, hi) === 3) return [lo, hi];
+        if (intervalSemis(lo, hi) !== 2) return null;
+        const variants = [
+            [lo, { ...hi, acc: hi.acc + 1 }],
+            [{ ...lo, acc: lo.acc - 1 }, hi],
+        ];
+        for (const [a, b] of variants) {
+            if (intervalSemis(a, b) === 3) return [a, b];
+        }
+        return null;
+    }
+
+    /** Подчищает типичные ошибки альтераций в AI-блоках перед рендером. */
+    function sanitizeNotationData(data) {
+        if (!data || !Array.isArray(data.notes)) return data;
+        const notes = data.notes.map(n => {
+            if (!Array.isArray(n.keys) || n.keys.length !== 2) return n;
+            const lo = parseVexKey(n.keys[0]);
+            const hi = parseVexKey(n.keys[1]);
+            if (!lo || !hi) return n;
+            const shouldFix = isAug2Label(n.label)
+                || (intervalDegree(lo, hi) === 2 && intervalSemis(lo, hi) === 2 && lo.acc < 0 && hi.acc < 0);
+            if (!shouldFix) return n;
+            const fixed = tryFixAugmentedSecond(lo, hi);
+            if (!fixed) return n;
+            return { ...n, keys: [noteKey(fixed[0]), noteKey(fixed[1])] };
+        });
+        return { ...data, notes };
+    }
+
     function chord(lo, hi, barAfter, label) {
         const c = { keys: [noteKey(lo), noteKey(hi)], duration: 'h' };
         if (barAfter) c.barAfter = true;
@@ -1433,7 +1470,7 @@
     function finalize(data) {
         if (!data || !Array.isArray(data.notes) || !data.notes.length) return null;
         const clef = data.clef === 'bass' ? 'bass' : 'treble';
-        data = { ...data, notes: normalizeNotationOctaves(data.notes, clef) };
+        data = sanitizeNotationData({ ...data, notes: normalizeNotationOctaves(data.notes, clef) });
         // финальная страховка: каждый key валиден
         for (const n of data.notes) {
             if (!Array.isArray(n.keys) || !n.keys.length) return null;
@@ -1822,6 +1859,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         applyBlock,
         autoLabelNotation,
         setLabelLocale,
-        normalizeNotationOctaves
+        normalizeNotationOctaves,
+        sanitizeNotationData
     };
 })();
