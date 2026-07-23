@@ -808,8 +808,49 @@ function deliverInstantAiReply(text) {
     });
 }
 
+/** Составное задание — theory.js закрывает только первый распознанный шаблон; нужна полная генерация моделью. */
+function isCompositeBuildQuery(query) {
+    const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
+    if (!t) return false;
+
+    if (/энгармон|enharmon/i.test(t)) return true;
+
+    if (/(?:две|two|обе|both|разн\w*)\s*(?:разн\w*\s*)?(?:тональност|tonalit|keys?|лад\w*|modes?)/i.test(t)) return true;
+    if (/в\s+маjor(?:е|у|ную)?\s+и\s+в\s+минor|in\s+major\s+and\s+in\s+minor|major\s+and\s+minor|маjor\s+и\s+минor|минor\s+и\s+маjor/i.test(t)) return true;
+
+    const fromSpecificNote = /(?:от|from)\s+(?:нот[ыаue]|note)?\s*[#♯a-gа-яё]|фа[\s-]*диез|f\s*#|f\s*sharp|соль[\s-]*бемоль|g\s*flat/i.test(t);
+    const wantsResolution = /разреш|resolution|resolv/i.test(t);
+    const wantsBuild = /построй|постро|сделай|build|construct|make\b|create\b|draw|show/i.test(t);
+
+    if (fromSpecificNote && (wantsResolution || /замен|replac|энгармон|enharmon/i.test(t))) return true;
+    if (fromSpecificNote && wantsBuild && /(?:,\s*|\s+и\s+|\s+а\s+также\s+)/.test(t)) return true;
+
+    const exerciseTypes = [
+        /тритон|tritone/i.test(t),
+        /характерн|characteristic/i.test(t),
+        /(?:^|[^a-zа-яё])d\s*7|dominant\s*7|д\s*7/i.test(t),
+        /цепочк|chain/i.test(t),
+        /(?:^|[^a-zа-яё])гамм|scale|звукоряд/i.test(t) && !/тритон|tritone/i.test(t),
+        /энгармон|enharmon/i.test(t),
+        /модуляц|modulat/i.test(t),
+    ].filter(Boolean).length;
+    if (exerciseTypes >= 2) return true;
+
+    if (/\b[1-3][\.)]\s/.test(t) && /\b[2-9][\.)]\s/.test(t)) return true;
+
+    const clauseMarkers = (t.match(/\b(?:и|а\s+также|also|then|затем|плюс)\b|,\s*и\s+/g) || []).length;
+    if (clauseMarkers >= 2 && (wantsBuild || wantsResolution)) return true;
+
+    if (wantsResolution && /(?:две|two|обе|both|разн\w*)\s*(?:тональност|лад|mode|key|context)/i.test(t)) return true;
+
+    if (/ум\.?\s*5|уменьш\w*\s*квинт|diminished\s*fifth|ym/i.test(t) && fromSpecificNote && wantsResolution) return true;
+
+    return false;
+}
+
 /** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
 function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
+    if (isCompositeBuildQuery(userQuery)) return false;
     if (harmonizationTask || hasImage) return false;
     if (!notationModeEnabled || !window.SolfTheory?.buildNotationForQuery) return false;
     if (!isBuildTask(userQuery) && !isChainTask(userQuery)) return false;
@@ -996,6 +1037,21 @@ function buildFreshTaskReminder(query, lang) {
             ? `ОБЯЗАТЕЛЬНО: полная цепочка — ровно ${len} аккордов подряд, все labels по схеме, barlines:"none".`
             : `MANDATORY: FULL chain — exactly ${len} chords in sequence with correct labels, barlines:"none".`);
     }
+    if (isCompositeBuildQuery(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: выполни ВСЕ части задания в одном ответе — построение, каждое разрешение, каждую тональность/лад и энгармонику, если они указаны. Не отвечай только на первый фрагмент.'
+            : 'MANDATORY: complete EVERY part in one answer — construction, each resolution, each key/mode, and enharmonic replacement if requested. Do NOT answer only the first fragment.');
+    }
+    if (/энгармон|enharmon/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: покажи энгармоническую замену (эквивалентное написание/созвучие) явно в нотации.'
+            : 'MANDATORY: show the enharmonic replacement explicitly in notation.');
+    }
+    if (/разреш/i.test(q) && /(?:две|two|обе|both|разн\w*)\s*(?:тональност|лад|mode|key)/i.test(q)) {
+        parts.push(ru
+            ? 'ОБЯЗАТЕЛЬНО: разрешения в КАЖДОЙ указанной тональности/ладе (напр. мажор И минор), не только в одной.'
+            : 'MANDATORY: resolutions in EACH requested key/mode (e.g. major AND minor), not just one.');
+    }
     const header = ru
         ? '[СВЕЖЕЕ ЗАДАНИЕ — игнорируй предыдущие ответы в чате; выполни ТОЛЬКО текущий запрос по правилам системы]'
         : '[FRESH TASK — ignore earlier chat replies; follow system rules for THIS request only]';
@@ -1005,6 +1061,7 @@ function buildFreshTaskReminder(query, lang) {
 function isBigNotationTask(query) {
     const t = String(query || '').toLowerCase();
     if (!t) return false;
+    if (isCompositeBuildQuery(query)) return true;
 
     // Явные ключевые слова «больших» заданий.
     const bigKeywords = /цепочк|прогресс|последовательн|гармониз|гармонизаци|голосоведени|четырёхголос|четырехголос|4-?голос|4\s*голос|s\.?a\.?t\.?b|сопрано.*альт|диктант|модуляц|секвенц|период|каданс|кадансов|оборот|развит|соедин(и|е)ни|harmoniz|harmoni[sz]e|progression|chord\s*chain|voice[- ]?leading|four[- ]?part|four\s*voices|satb|dictation|modulat|sequence|cadence|counterpoint|контрапункт/;
@@ -2762,7 +2819,8 @@ async function generateResponse(query, imageData = null) {
         const baseUserContent = query || 'Analyze image';
         const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
         const chainTask = isChainTask(baseUserContent);
-        const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask || chainTask);
+        const compositeBuildTask = isCompositeBuildQuery(baseUserContent);
+        const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask || chainTask || compositeBuildTask);
 
         if (chat) {
             // ИСКЛЮЧАЕМ самое последнее сообщение из истории (оно уже добавлено в UI, но мы передадим его ниже)
@@ -2790,13 +2848,13 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
-        const theoryQuick = harmonizationTask || imageData ? null : queryTheoryQuickAnswer(baseUserContent);
+        const theoryQuick = harmonizationTask || imageData || compositeBuildTask ? null : queryTheoryQuickAnswer(baseUserContent);
         if (theoryQuick?.text) {
             await deliverInstantAiReply(theoryQuick.text);
             return;
         }
 
-        const theoryDet = harmonizationTask ? undefined : queryTheoryNotation(baseUserContent);
+        const theoryDet = harmonizationTask || compositeBuildTask ? undefined : queryTheoryNotation(baseUserContent);
         const deterministicBlock = theoryDet?.blockString || null;
 
         if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
@@ -2807,7 +2865,7 @@ async function generateResponse(query, imageData = null) {
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
         // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
         // isBigNotationTask() / isHarmonizationTask() поднимают лимит до 8192.
-        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask || chainTask);
+        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask || chainTask || compositeBuildTask);
         const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : (harmonizationTask ? 4096 : 1024);
         const payload = {
             userId: currentUser?.id,
@@ -2999,7 +3057,7 @@ async function generateResponse(query, imageData = null) {
         }
 
         // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
-        if (!harmonizationTask) {
+        if (!harmonizationTask && !compositeBuildTask) {
             aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal);
         }
 
