@@ -3073,9 +3073,37 @@ function shouldAutoFocusChatInput() {
     return true;
 }
 
+function stealFocusWithSink() {
+    const sink = document.createElement('button');
+    sink.type = 'button';
+    sink.setAttribute('tabindex', '-1');
+    sink.setAttribute('aria-hidden', 'true');
+    Object.assign(sink.style, {
+        position: 'fixed',
+        width: '1px',
+        height: '1px',
+        padding: '0',
+        margin: '0',
+        opacity: '0',
+        pointerEvents: 'none',
+        border: 'none',
+        left: '0',
+        bottom: '0',
+    });
+    document.body.appendChild(sink);
+    try {
+        sink.focus({ preventScroll: true });
+    } catch (_) {
+        sink.focus();
+    }
+    sink.blur();
+    sink.remove();
+}
+
 function dismissChatInputFocus() {
     chatInput?.blur?.();
     document.activeElement?.blur?.();
+    if (isMobileLayout()) stealFocusWithSink();
 }
 
 function startNewChat(options = {}) {
@@ -3100,32 +3128,6 @@ function startNewChat(options = {}) {
 function scheduleSkipChatInputFocusCleanup() {
     if (sessionStorage.getItem('solfai_skip_focus_once') !== '1') return;
     let readonlyArmed = false;
-    const stealFocusWithSink = () => {
-        const sink = document.createElement('button');
-        sink.type = 'button';
-        sink.setAttribute('tabindex', '-1');
-        sink.setAttribute('aria-hidden', 'true');
-        Object.assign(sink.style, {
-            position: 'fixed',
-            width: '1px',
-            height: '1px',
-            padding: '0',
-            margin: '0',
-            opacity: '0',
-            pointerEvents: 'none',
-            border: 'none',
-            left: '0',
-            bottom: '0',
-        });
-        document.body.appendChild(sink);
-        try {
-            sink.focus({ preventScroll: true });
-        } catch (_) {
-            sink.focus();
-        }
-        sink.blur();
-        sink.remove();
-    };
     const run = () => {
         const input = document.getElementById('chatInput');
         if (!input) return;
@@ -3165,6 +3167,10 @@ function proceedWithQuery(query, imageData) {
     saveChatToStorage();
     addMessageToUI('user', query || uiText('analyzeImage', { chat: true, fallback: 'Analyze image' }), imageData ? [{ type: 'image/png', data: imageData }] : []);
     generateResponse(query, imageData); attachedFiles = [];
+    if (isMobileLayout()) {
+        dismissChatInputFocus();
+        requestAnimationFrame(dismissChatInputFocus);
+    }
 }
 
 function sendChatMessage() {
