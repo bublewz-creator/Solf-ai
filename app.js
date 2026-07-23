@@ -255,6 +255,17 @@ function shouldPreventButtonFocusSteal(el) {
 function bindAppButtonFocusBehavior() {
     if (!chatInput) return;
 
+    // Mobile: tap outside the input dismisses the keyboard (buttons, sidebar, messages, etc.).
+    document.addEventListener('pointerdown', e => {
+        if (!isMobileLayout()) return;
+        if (e.button != null && e.button !== 0) return;
+        const target = e.target;
+        if (!(target instanceof Element)) return;
+        if (target === chatInput || chatInput.contains(target)) return;
+        if (document.activeElement !== chatInput) return;
+        dismissChatInputFocus();
+    }, true);
+
     // Не даём кнопке забрать фокус — Enter в поле ввода не будет повторно жать кнопку.
     // Намеренно НЕ возвращаем фокус в textarea после клика: на мобилке это выдвигает клавиатуру.
     document.addEventListener('mousedown', e => {
