@@ -255,22 +255,29 @@ function shouldPreventButtonFocusSteal(el) {
 function bindAppButtonFocusBehavior() {
     if (!chatInput) return;
 
-    // Mobile: tap outside the input dismisses the keyboard (buttons, sidebar, messages, etc.).
-    document.addEventListener('pointerdown', e => {
+    const onMobileOutsideInputTap = e => {
         if (!isMobileLayout()) return;
         if (e.button != null && e.button !== 0) return;
         const target = e.target;
         if (!(target instanceof Element)) return;
         if (target === chatInput || chatInput.contains(target)) return;
         if (document.activeElement !== chatInput) return;
-        dismissChatInputFocus();
-    }, true);
+        dismissMobileChatKeyboard();
+    };
+
+    // Mobile: tap outside the input dismisses the keyboard (buttons, sidebar, messages, etc.).
+    document.addEventListener('pointerdown', onMobileOutsideInputTap, true);
+    document.addEventListener('touchstart', onMobileOutsideInputTap, { capture: true, passive: true });
 
     // Не даём кнопке забрать фокус — Enter в поле ввода не будет повторно жать кнопку.
-    // Намеренно НЕ возвращаем фокус в textarea после клика: на мобилке это выдвигает клавиатуру.
+    // На мобилке preventDefault оставляет textarea в фокусе → iOS снова поднимает клавиатуру.
     document.addEventListener('mousedown', e => {
         const btn = e.target.closest('button');
         if (!btn || e.button !== 0) return;
+        if (isMobileLayout()) {
+            if (document.activeElement === chatInput) dismissMobileChatKeyboard();
+            return;
+        }
         if (!shouldPreventButtonFocusSteal(btn)) return;
         e.preventDefault();
     }, true);
@@ -3117,6 +3124,30 @@ function dismissChatInputFocus() {
     if (isMobileLayout()) stealFocusWithSink();
 }
 
+function armChatInputReadonlyUntilInteraction() {
+    if (!chatInput || chatInput.dataset.readonlyArmed === '1') return;
+    chatInput.dataset.readonlyArmed = '1';
+    const prevInputmode = chatInput.getAttribute('inputmode');
+    chatInput.setAttribute('readonly', 'readonly');
+    chatInput.setAttribute('inputmode', 'none');
+    const disarm = () => {
+        delete chatInput.dataset.readonlyArmed;
+        chatInput.removeAttribute('readonly');
+        if (prevInputmode == null || prevInputmode === '') chatInput.removeAttribute('inputmode');
+        else chatInput.setAttribute('inputmode', prevInputmode);
+    };
+    chatInput.addEventListener('pointerdown', disarm, { once: true, capture: true });
+    chatInput.addEventListener('touchstart', disarm, { once: true, passive: true, capture: true });
+    setTimeout(disarm, 8000);
+}
+
+/** Снять фокус и заблокировать подъём клавиатуры на iOS до следующего тапа в поле. */
+function dismissMobileChatKeyboard() {
+    dismissChatInputFocus();
+    armChatInputReadonlyUntilInteraction();
+    requestAnimationFrame(dismissChatInputFocus);
+}
+
 function startNewChat(options = {}) {
     closeAllOverlays();
     saveChatToStorage(); currentChatId = null; chatMessages.innerHTML = '';
@@ -3149,17 +3180,7 @@ function scheduleSkipChatInputFocusCleanup() {
         if (sessionStorage.getItem('solfai_skip_focus_once') !== '1') return;
         readonlyArmed = true;
         sessionStorage.removeItem('solfai_skip_focus_once');
-        const prevInputmode = input.getAttribute('inputmode');
-        input.setAttribute('readonly', 'readonly');
-        input.setAttribute('inputmode', 'none');
-        const disarm = () => {
-            input.removeAttribute('readonly');
-            if (prevInputmode == null || prevInputmode === '') input.removeAttribute('inputmode');
-            else input.setAttribute('inputmode', prevInputmode);
-        };
-        input.addEventListener('pointerdown', disarm, { once: true, capture: true });
-        input.addEventListener('touchstart', disarm, { once: true, passive: true, capture: true });
-        setTimeout(disarm, 8000);
+        armChatInputReadonlyUntilInteraction();
     };
     run();
     requestAnimationFrame(run);
@@ -3178,10 +3199,7 @@ function proceedWithQuery(query, imageData) {
     saveChatToStorage();
     addMessageToUI('user', query || uiText('analyzeImage', { chat: true, fallback: 'Analyze image' }), imageData ? [{ type: 'image/png', data: imageData }] : []);
     generateResponse(query, imageData); attachedFiles = [];
-    if (isMobileLayout()) {
-        dismissChatInputFocus();
-        requestAnimationFrame(dismissChatInputFocus);
-    }
+    if (isMobileLayout()) dismissMobileChatKeyboard();
 }
 
 function sendChatMessage() {
@@ -3662,6 +3680,7 @@ document.addEventListener('DOMContentLoaded', () => {
     })();
     
     if (window.visualViewport) {
+        let lastVisualViewportHeight = window.visualViewport.height;
         const syncViewportCssVar = () => {
             if (window.innerWidth >= 768) {
                 document.documentElement.style.setProperty('--vh', `${window.visualViewport.height * 0.01}px`);
@@ -3671,6 +3690,19 @@ document.addEventListener('DOMContentLoaded', () => {
         };
         window.visualViewport.addEventListener('resize', () => {
             syncViewportCssVar();
+            const vv = window.visualViewport;
+            const currentHeight = vv.height;
+            // Пользователь свернул клавиатуру вручную — фокус в textarea остаётся, iOS поднимет её снова при тапе.
+            if (
+                isMobileLayout() &&
+                chatInput &&
+                document.activeElement === chatInput &&
+                currentHeight > lastVisualViewportHeight + 40 &&
+                currentHeight >= window.innerHeight * 0.92
+            ) {
+                dismissMobileChatKeyboard();
+            }
+            lastVisualViewportHeight = currentHeight;
             if (document.activeElement === chatInput) return;
             setTimeout(() => scrollToBottom(true), 50);
         });
