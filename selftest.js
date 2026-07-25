@@ -648,7 +648,7 @@
         if (b0.label !== 'б3') return 'интервал: ' + b0.label;
         const b1 = blocks[1].notes[0];
         if (b1.keys.length !== 4) return 'аккорд: ' + b1.keys.length + ' звуков';
-        if (b1.label !== 'М.маж7') return 'аккорд: ' + b1.label;
+        if (b1.label !== 'D7') return 'аккорд: ' + b1.label;
         if (blocks[2].notes.length < 12) return 'хроматика: ' + blocks[2].notes.length + ' нот';
         return true;
     });

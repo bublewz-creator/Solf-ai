@@ -878,7 +878,7 @@
         if (seventhKind !== null && !isViiSeventhQuery(t) && !isSecondSeventhQuery(t) && !isD7Query(t)) {
             const data = scaleDeg
                 ? buildSeventhOnDegree(key.tonic, key.mode, scaleDeg, seventhKind, t)
-                : buildSeventhByKind(key.tonic, seventhKind, keySigFor(key.tonic, key.mode));
+                : buildSeventhByKind(key.tonic, seventhKind, keySigFor(key.tonic, key.mode), rawQuery);
             if (data) return finalize(data);
         }
 
@@ -1713,15 +1713,27 @@
         return null;
     }
 
-    function buildSeventhByKind(note, kindIdx, keySig) {
+    /**
+     * Подпись на нотном стане. М.маж7 и D7 — один и тот же аккорд (4+7+10),
+     * но если в запросе явно «D7» / «доминантсепт» — пишем D7 (как в гармонии).
+     */
+    function preferredSeventhLabel(t, kindIdx, def) {
+        const ctx = String(t || '');
+        if (kindIdx === 1 && isD7Query(ctx)) return 'D7';
+        if (kindIdx === 6 && isViiSeventhQuery(ctx)) return 'VII7';
+        if (kindIdx === 5 && /полууменьш|m7b5|ø7/i.test(ctx)) return labelLocale === 'ru' ? 'М.ум7' : 'm7b5';
+        return labelLocale === 'ru' ? def.ru : def.en;
+    }
+
+    function buildSeventhByKind(note, kindIdx, keySig, labelContext) {
         const def = SEVENTH_KIND_DEFS[kindIdx];
         if (!def || !note) return null;
+        const label = preferredSeventhLabel(labelContext, kindIdx, def);
         return fromNoteWithFallback(note, (root) => {
             const base = { ...root, octave: 4 };
             const third = buildIntervalUp(base, 3, def.semis[0]);
             const fifth = buildIntervalUp(base, 5, def.semis[1]);
             const seventh = buildIntervalUp(base, 7, def.semis[2]);
-            const label = labelLocale === 'ru' ? def.ru : def.en;
             return plainBlock(
                 [sonority([base, third, fifth, seventh], label, 'w')],
                 keySig || 'C',
@@ -1734,7 +1746,7 @@
         const form = scaleFormForKey({ tonic, mode }, t);
         const root = scaleDegree(tonic, scaleDeg, form);
         if (!root) return null;
-        return buildSeventhByKind({ ...root, octave: 4 }, kindIdx, keySigFor(tonic, mode));
+        return buildSeventhByKind({ ...root, octave: 4 }, kindIdx, keySigFor(tonic, mode), t);
     }
 
     function buildAllSeventhsFromNote(note) {
@@ -2745,14 +2757,15 @@
             let kind = parseSeventhKind(t);
             if (kind === null && isD7Query(t)) kind = 1;
             if (note == null || kind === null) return null;
-            const data = buildSeventhByKind({ ...note, octave: 4 }, kind, 'C');
+            const data = buildSeventhByKind({ ...note, octave: 4 }, kind, 'C', rawClause);
             if (!data) return null;
             const def = SEVENTH_KIND_DEFS[kind];
             const noteName = noteDisplayRu(note, 'C');
+            const kindLabel = preferredSeventhLabel(rawClause, kind, def);
             return {
                 label: ru
-                    ? `${def.ru} от ${noteName}`
-                    : `${def.en} from ${noteKey(note)}`,
+                    ? `${kindLabel} от ${noteName}`
+                    : `${kindLabel} from ${noteKey(note)}`,
                 data
             };
         }
