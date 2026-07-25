@@ -1597,11 +1597,15 @@
         return null;
     }
 
-    /** Нота после «от» / «from» — чтобы не поймать случайную букву из слова. */
-    function parseNoteAfterFrom(t) {
-        const m = /(?:^|[^а-яa-z])(?:от|from)\s+(?:нот[а-я]*\s+|note\s+|the\s+note\s+)?([\s\S]{0,20})/.exec(t);
+    /** Нота после «от» / «from» в пределах одного фрагмента запроса. */
+    function parseNoteAfterFromIn(text) {
+        const m = /(?:^|[^а-яa-z])(?:от|from)\s+(?:нот[а-я]*\s+|note\s+|the\s+note\s+)?([\s\S]{0,24})/i.exec(String(text || ''));
         if (!m) return null;
-        return parseSingleNote(m[1]);
+        return parseSingleNote(m[1].toLowerCase().replace(/ё/g, 'е'));
+    }
+
+    function parseNoteAfterFrom(t) {
+        return parseNoteAfterFromIn(t);
     }
 
     function wantsIntervalInversion(t) {
@@ -2656,10 +2660,156 @@
         return items.filter(it => it && it.data);
     }
 
+    // ---------- Составные задания (несколько пунктов в одном сообщении) ----------
+    /** Разбивает билет/список задач на отдельные пункты. */
+    function splitCompositeClauses(rawQuery) {
+        const text = String(rawQuery || '').replace(/\r\n/g, '\n').trim();
+        if (!text) return [];
+
+        const tl = text.toLowerCase().replace(/ё/g, 'е');
+        const fromCount = (tl.match(/(?:^|[^а-яa-z])(?:от|from)\s+(?:нот[а-яё]*\s+|note\s+)?/g) || []).length;
+        const typeCount = [
+            /терци|б\.?\s*3|б3|интервал|секунд|кварт|квинт|секст|септим|октав/i.test(tl),
+            /септаккорд|seventh|d7|д7|доминант/i.test(tl),
+            /хроматическ|chromatic/i.test(tl),
+            /трезвуч|triad/i.test(tl)
+        ].filter(Boolean).length;
+        if (fromCount < 2 && typeCount < 2) return [];
+
+        const normalized = text.replace(/\r\n/g, '\n').replace(/\n+/g, '. ');
+        const segments = normalized.split(/\.\s*(?=[А-ЯA-ZЁ«"([])/).map(s => s.trim()).filter(Boolean);
+        const clauses = [];
+        let buf = '';
+
+        function flush() {
+            if (buf.trim()) clauses.push(buf.trim());
+            buf = '';
+        }
+
+        function isInstructionOnly(seg) {
+            if (/(?:от|from)\s+(?:нот|note)/i.test(seg)) return false;
+            if (/хроматическ|chromatic|терци|септаккорд|d7|трезвуч|интервал|б\.?\s*[1-8]/i.test(seg)) return false;
+            return /укажи|располож|используй|не забудь|семпл|sample|vertical|вертикал|sequential|note:/i.test(seg);
+        }
+
+        function isTaskStart(seg) {
+            const s = seg.toLowerCase().replace(/ё/g, 'е');
+            return /(?:от|from)\s+(?:нот|note)/i.test(seg)
+                || /^хроматическ|^chromatic/i.test(s)
+                || /больш[а-яё]*\s*терци|б\.?\s*3\b|малы[а-яё]*\s*мажорн|доминант|d_?\{?\s*7/i.test(s);
+        }
+
+        for (const seg of segments) {
+            if (isInstructionOnly(seg)) {
+                if (buf) buf += '. ' + seg;
+                continue;
+            }
+            if (isTaskStart(seg) && buf) {
+                flush();
+                buf = seg;
+            } else if (buf) {
+                buf += '. ' + seg;
+            } else {
+                buf = seg;
+            }
+        }
+        flush();
+
+        if (clauses.length) {
+            clauses[0] = clauses[0].replace(/^[^:\n]*(?:задач[а-яё]*|tasks?)\s*:?\s*/i, '');
+        }
+        const filtered = clauses.filter(c => c.replace(/\s/g, '').length > 8);
+        return filtered.length >= 2 ? filtered : [];
+    }
+
+    /** Один пункт составного задания → { label, data } | null. */
+    function buildSingleClause(rawClause) {
+        const t = String(rawClause || '').toLowerCase().replace(/ё/g, 'е');
+        const ru = labelLocale === 'ru';
+
+        if (/хроматическ|chromatic/i.test(t)) {
+            const note = parseNoteAfterFromIn(rawClause);
+            if (!note) return null;
+            const dir = /вниз|нисход|down|descend/i.test(t) ? 'down' : 'up';
+            const data = buildChromaticScale({ ...note, octave: 4 }, 'major', dir);
+            if (!data) return null;
+            const noteName = noteDisplayRu(note, 'C');
+            return {
+                label: ru ? `Хроматическая гамма от ${noteName}` : `Chromatic scale from ${noteKey(note)}`,
+                data
+            };
+        }
+
+        if (/септаккорд|seventh|d7|д7|доминант/i.test(t)) {
+            const note = parseNoteAfterFromIn(rawClause);
+            let kind = parseSeventhKind(t);
+            if (kind === null && isD7Query(t)) kind = 1;
+            if (note == null || kind === null) return null;
+            const data = buildSeventhByKind({ ...note, octave: 4 }, kind, 'C');
+            if (!data) return null;
+            const def = SEVENTH_KIND_DEFS[kind];
+            const noteName = noteDisplayRu(note, 'C');
+            return {
+                label: ru
+                    ? `${def.ru} от ${noteName}`
+                    : `${def.en} from ${noteKey(note)}`,
+                data
+            };
+        }
+
+        if (/трезвуч|triad/i.test(t)) {
+            const note = parseNoteAfterFromIn(rawClause);
+            const kind = parseTriadKind(t);
+            if (!note || !kind) return null;
+            const data = buildTriadFromNote({ ...note, octave: 4 }, kind, wantsIntervalInversion(t));
+            if (!data) return null;
+            const def = TRIAD_KIND_DEFS[kind];
+            const noteName = noteDisplayRu(note, 'C');
+            return {
+                label: ru ? `${def.ru}53 от ${noteName}` : `${def.en} triad from ${noteKey(note)}`,
+                data
+            };
+        }
+
+        const note = parseNoteAfterFromIn(rawClause);
+        const spec = parseIntervalSpec(rawClause);
+        if (note && spec && !CHORD_WORDS_RE.test(t)) {
+            const data = buildIntervalFromNote(
+                { ...note, octave: 4 }, spec.degree, spec.semis, intervalDirection(t), wantsIntervalInversion(t)
+            );
+            if (!data) return null;
+            const name = intervalNameFor(spec.degree, spec.semis, ru);
+            const noteName = noteDisplayRu(note, 'C');
+            return {
+                label: ru ? `${name} от ${noteName}` : `${name} from ${noteKey(note)}`,
+                data
+            };
+        }
+
+        return null;
+    }
+
+    /** Билет из нескольких «от ноты …» — все пункты подряд. */
+    function buildCompositeFromQuery(rawQuery) {
+        const clauses = splitCompositeClauses(rawQuery);
+        if (clauses.length < 2) return null;
+        const items = [];
+        for (const clause of clauses) {
+            const built = buildSingleClause(clause);
+            if (!built) return null;
+            items.push(built);
+        }
+        return finalizeMulti(items);
+    }
+
     // ---------- Сборка блока по запросу ----------
     function buildNotationForQuery(rawQuery) {
         if (!rawQuery || typeof rawQuery !== 'string') return null;
         const t = rawQuery.toLowerCase().replace(/ё/g, 'е');
+
+        // Составное задание (билет) — до одиночных «от ноты», иначе возьмётся только первый пункт.
+        const multiClause = buildCompositeFromQuery(rawQuery);
+        if (multiClause) return multiClause;
 
         // "Все виды трезвучий от ноты N" — тональность не нужна.
         if (/(?:все\s*)?виды\s*трезвучи[а-яё]*\s*от|types?\s*of\s*triads?\s*from/.test(t)) {
@@ -3397,6 +3547,8 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
             parseTriadKind,
             parseSeventhKind,
             buildSeventhByKind,
+            splitCompositeClauses,
+            buildCompositeFromQuery,
             buildFromNoteTask,
             simplifyEnharmonic,
             D7_PRESETS,

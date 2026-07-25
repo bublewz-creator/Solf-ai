@@ -634,6 +634,25 @@
         return spec && spec.degree === 7 && spec.semis === 11 ? true : 'получено ' + JSON.stringify(spec);
     });
 
+    check('билет: б3 от ми + D7 от ре + хроматика от до', () => {
+        T.setLabelLocale('ru');
+        const q = 'Твои задачи: Большая терция (б.3) вверх от ноты Ми первой октавы. '
+            + 'Малый мажорный септаккорд (Доминантсептаккорд / D7) в основном виде от ноты Ре первой октавы. '
+            + 'Хроматическая гамма вверх от ноты До первой октавы до ноты До второй октавы.';
+        const res = T.buildNotationForQuery(q);
+        if (!res?.blockString) return 'не построено';
+        const blocks = extractBlocks(res.blockString);
+        if (blocks.length !== 3) return 'блоков ' + blocks.length + ', ожидалось 3';
+        const b0 = blocks[0].notes[0];
+        if (b0.keys.length !== 2) return 'интервал: ' + b0.keys.length + ' звуков';
+        if (b0.label !== 'б3') return 'интервал: ' + b0.label;
+        const b1 = blocks[1].notes[0];
+        if (b1.keys.length !== 4) return 'аккорд: ' + b1.keys.length + ' звуков';
+        if (b1.label !== 'М.маж7') return 'аккорд: ' + b1.label;
+        if (blocks[2].notes.length < 12) return 'хроматика: ' + blocks[2].notes.length + ' нот';
+        return true;
+    });
+
     check('учебник: три вида минора от ля', () => {
         T.setLabelLocale('ru');
         const res = T.buildNotationForQuery('Напишите три вида минора от ля');

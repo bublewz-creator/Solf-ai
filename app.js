@@ -891,13 +891,22 @@ function isCompositeBuildQuery(query) {
     return false;
 }
 
+/** Сколько [[NOTATION:...]] блоков в тексте. */
+function countNotationBlocks(text) {
+    return (String(text || '').match(/\[\[NOTATION:/g) || []).length;
+}
+
 /** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
 function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
-    if (isCompositeBuildQuery(userQuery)) return false;
     if (harmonizationTask || hasImage) return false;
     if (!notationModeEnabled || !window.SolfTheory?.buildNotationForQuery) return false;
     if (!isBuildTask(userQuery) && !isChainTask(userQuery)) return false;
-    return !!queryTheoryNotation(userQuery)?.blockString;
+    const det = queryTheoryNotation(userQuery);
+    if (!det?.blockString) return false;
+    if (isCompositeBuildQuery(userQuery)) {
+        return countNotationBlocks(det.blockString) >= 2;
+    }
+    return true;
 }
 
 function buildNotationUserReminder(responseLang) {
@@ -2916,7 +2925,7 @@ async function generateResponse(query, imageData = null) {
             return;
         }
 
-        const theoryDet = harmonizationTask || compositeBuildTask ? undefined : queryTheoryNotation(baseUserContent);
+        const theoryDet = queryTheoryNotation(baseUserContent);
         const deterministicBlock = theoryDet?.blockString || null;
 
         if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
@@ -3119,8 +3128,8 @@ async function generateResponse(query, imageData = null) {
         }
 
         // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
-        if (!harmonizationTask && !compositeBuildTask) {
-            aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal);
+        if (!harmonizationTask) {
+            aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal ?? queryTheoryNotation(baseUserContent));
         }
 
         document.getElementById('typingIndicator')?.remove();
