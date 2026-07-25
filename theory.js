@@ -520,6 +520,375 @@
         };
     }
 
+    // ---------- Задания «как в учебнике / Калинина» ----------
+    // Один характерный интервал, интервал на ступени, трезвuchие на ступени,
+    // определение интервала/аккорда, обращение интервала с нотацией.
+
+    const CHAR_KIND_DEFS = {
+        aug2: { degree: 2, semis: 3, quality: 'aug', ru: 'ув.2', en: 'A2' },
+        dim7: { degree: 7, semis: 9, quality: 'dim', ru: 'ум.7', en: 'd7' },
+        aug5: { degree: 5, semis: 8, quality: 'aug', ru: 'ув.5', en: 'A5' },
+        dim4: { degree: 4, semis: 4, quality: 'dim', ru: 'ум.4', en: 'd4' }
+    };
+
+    function wrapScaleDegree(d) { return ((d - 1) % 7) + 1; }
+
+    function degreeRomanLabel(deg, altered) {
+        const base = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][deg - 1] || String(deg);
+        if (altered === -1) return '♭' + base;
+        if (altered === 1) return '♯' + base;
+        return base;
+    }
+
+    function noteDisplayRu(note, keySig) {
+        const name = RU_NOTE_NAMES[note.letter] || note.letter;
+        const accSuffix = note.acc === 1 ? '-диез' : note.acc === -1 ? '-бемоль'
+            : note.acc > 1 ? '-диез'.repeat(note.acc) : note.acc < -1 ? '-бемоль'.repeat(-note.acc) : '';
+        // В тональности с бемолями «ми» без знака может требовать бекар в тексте.
+        if (note.acc === 0 && keySig) {
+            const sig = normalizeKeySigName(keySig);
+            const flats = KEY_FLAT_COUNT[sig] ?? 0;
+            const sharps = KEY_SHARP_COUNT[sig] ?? 0;
+            const flatLetters = FLAT_ORDER_EN.slice(0, flats);
+            const sharpLetters = SHARP_ORDER_EN.slice(0, sharps);
+            if (flats && flatLetters.includes(note.letter) && !accSuffix) return `${name} бекар`;
+            if (sharps && sharpLetters.includes(note.letter) && !accSuffix) return `${name} бекар`;
+        }
+        return name + accSuffix;
+    }
+
+    function normalizeKeySigName(sig) {
+        return String(sig || 'C').replace(/m$/i, '');
+    }
+
+    /** ув2 / ум7 / … — один интервал; «все характерные» — null (строим комплект). */
+    function parseCharacteristicKind(t) {
+        if (/все\s*характерн|all\s*characteristic|х\.?\s*и\.(?![а-яё])|характерные\s*интервал/i.test(t)) return null;
+        if (/увеличенн[а-яё]*\s*секунд|ув\.?\s*2|aug\.?\s*2|\ba2\b/i.test(t)) return 'aug2';
+        if (/уменьшенн[а-яё]*\s*септим|ум\.?\s*7|dim\.?\s*7|\bdim7\b/i.test(t)) return 'dim7';
+        if (/увеличенн[а-яё]*\s*квинт|ув\.?\s*5|aug\.?\s*5|\ba5\b/i.test(t)) return 'aug5';
+        if (/уменьшенн[а-яё]*\s*кварт|ум\.?\s*4|dim\.?\s*4|\bd4\b/i.test(t)) return 'dim4';
+        return null;
+    }
+
+    /** Пара звуков характерного интервала в гармоническом ладу + подписи ступеней. */
+    function characteristicPair(tonic, mode, kind) {
+        const def = CHAR_KIND_DEFS[kind];
+        if (!def) return null;
+        const natural = buildScale(tonic, mode);
+        const triad = tonicTriad(tonic, mode);
+        let lo, hi, loLab, hiLab;
+
+        if (mode === 'minor') {
+            const VI = { ...natural[5], octave: 4 };
+            const altVII = { ...natural[6], acc: natural[6].acc + 1, octave: 4 };
+            const III = { ...natural[2], octave: 4 };
+            if (kind === 'aug2') {
+                lo = { ...VI }; hi = buildIntervalUp(VI, 2, 3); loLab = 'VI'; hiLab = 'VII♯';
+            } else if (kind === 'dim7') {
+                lo = { ...altVII }; hi = buildIntervalUp(altVII, 7, 9); loLab = 'VII♯'; hiLab = 'VI';
+            } else if (kind === 'aug5') {
+                lo = { ...III }; hi = buildIntervalUp(III, 5, 8); loLab = 'III'; hiLab = 'VII♯';
+            } else if (kind === 'dim4') {
+                lo = { ...altVII }; hi = buildIntervalUp(altVII, 4, 4); loLab = 'VII♯'; hiLab = 'III';
+            }
+        } else {
+            const altVI = { ...natural[5], acc: natural[5].acc - 1, octave: 4 };
+            const VII = { ...natural[6], octave: 4 };
+            const III = { ...natural[2], octave: 4 };
+            if (kind === 'aug2') {
+                lo = { ...altVI }; hi = buildIntervalUp(altVI, 2, 3); loLab = '♭VI'; hiLab = 'VII';
+            } else if (kind === 'dim7') {
+                lo = { ...VII }; hi = buildIntervalUp(VII, 7, 9); loLab = 'VII'; hiLab = '♭VI';
+            } else if (kind === 'aug5') {
+                lo = { ...altVI }; hi = buildIntervalUp(altVI, 5, 8); loLab = '♭VI'; hiLab = 'III';
+            } else if (kind === 'dim4') {
+                lo = { ...III }; hi = buildIntervalUp(III, 4, 4); loLab = 'III'; hiLab = '♭VI';
+            }
+        }
+        if (!lo || !hi || !checkInterval(lo, hi, def.degree, def.semis)) return null;
+        return { lo, hi, quality: def.quality, def, loLab, hiLab, triad };
+    }
+
+    function buildSingleCharacteristic(tonic, mode, kind, withResolution) {
+        const pair = characteristicPair(tonic, mode, kind);
+        if (!pair) return null;
+        const notes = [chord(pair.lo, pair.hi, false, intervalLabel(pair.lo, pair.hi))];
+        if (withResolution !== false) {
+            const r = resolveInterval(pair.lo, pair.hi, pair.quality, pair.triad);
+            notes.push(chord(r[0], r[1], true, intervalLabel(r[0], r[1])));
+        }
+        if (notes.length) delete notes[notes.length - 1].barAfter;
+        return {
+            clef: 'treble',
+            keySignature: keySigFor(tonic, mode),
+            barlines: withResolution !== false ? 'manual' : 'none',
+            notes,
+            _charPair: pair
+        };
+    }
+
+    function characteristicProse(tonic, mode, kind, ru) {
+        const pair = characteristicPair(tonic, mode, kind);
+        if (!pair) return '';
+        const keyName = tonalityDisplayName(tonic, mode, ru);
+        const sig = keySigFor(tonic, mode);
+        const loName = noteDisplayRu(pair.lo, sig);
+        const hiName = noteDisplayRu(pair.hi, sig);
+        const intName = intervalNameFor(pair.def.degree, pair.def.semis, ru);
+        if (ru) {
+            let resolution = '';
+            if (pair.quality === 'aug') {
+                resolution = pair.def.degree === 2
+                    ? 'Она разрешается **расширением** в устойчивый интервал (часто в чистую кварту).'
+                    : 'Он разрешается **расширением** наружу в устойчивый интервал лада.';
+            } else {
+                resolution = 'Он разрешается **сужением** в устойчивый интервал тонического трезвучия.';
+            }
+            return `В **${keyName}** ${intName} (${pair.def.ru}) строится на **${pair.loLab}** (${loName}) — **${pair.hiLab}** (${hiName}). ${resolution}`;
+        }
+        return `In **${keyName}**, ${pair.def.en} is built on **${pair.loLab}** (${loName}) to **${pair.hiLab}** (${hiName}). It resolves according to the tendency of ${pair.quality === 'aug' ? 'augmented' : 'diminished'} intervals in the mode.`;
+    }
+
+    function parseScaleDegree(t) {
+        let m = t.match(/(?:на\s+)?([1-7])\s*(?:-?(?:й|ю|ей|ой|ую|я|e|nd|rd|th|st))\s*ступен/i);
+        if (m) return parseInt(m[1], 10);
+        m = t.match(/(?:на\s+)?(vii|vi|iv|iii|ii|i|v)\s*ступен/i);
+        if (m) {
+            const map = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7 };
+            return map[m[1]] || null;
+        }
+        m = t.match(/(?:^|[^a-zа-яё])(i{1,3}|iv|vi{0,2}|vii|v)(?![a-zа-яё])\s*ступен/i);
+        if (m) {
+            const map = { i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7 };
+            return map[m[1].toLowerCase()] || null;
+        }
+        return null;
+    }
+
+    function scaleFormForKey(key, t) {
+        const form = detectForm(t);
+        if (form === 'harmonic') return key.mode === 'minor' ? 'harmonicMinor' : 'harmonicMajor';
+        if (form === 'natural') return key.mode === 'minor' ? 'minor' : 'major';
+        if (form === 'melodic') return key.mode === 'minor' ? 'melodicMinor' : 'major';
+        // Для интервалов/аккордов на ступени в миноре школа обычно берёт гармонический лад.
+        return key.mode === 'minor' ? 'harmonicMinor' : 'major';
+    }
+
+    function buildIntervalOnDegree(tonic, mode, scaleDeg, spec, t, withResolution) {
+        const form = mode === 'minor' ? 'harmonicMinor' : 'major';
+        const base = scaleDegree(tonic, scaleDeg, form);
+        if (!base) return null;
+        const lo = { ...base, octave: 4 };
+        const hi = buildIntervalUp(lo, spec.degree, spec.semis);
+        if (!checkInterval(lo, hi, spec.degree, spec.semis)) return null;
+        const quality = spec.semis === 3 && spec.degree === 2 ? 'aug'
+            : spec.semis === 9 && spec.degree === 7 ? 'dim'
+            : spec.semis === 8 && spec.degree === 5 ? 'aug'
+            : spec.semis === 4 && spec.degree === 4 ? 'dim'
+            : spec.semis <= 6 ? 'dim' : 'aug';
+        const triad = tonicTriad(tonic, mode);
+        const notes = [chord(lo, hi, false, intervalLabel(lo, hi))];
+        const doRes = withResolution !== false && (wantsResolution(t) || /разреш|resolve/i.test(t));
+        if (doRes) {
+            const r = resolveInterval(lo, hi, quality, triad);
+            notes.push(chord(r[0], r[1], true, intervalLabel(r[0], r[1])));
+        }
+        return plainBlock(notes, keySigFor(tonic, mode), notes.length > 1 ? 'manual' : 'none');
+    }
+
+    function parseTriadInversion(t) {
+        if (/квартсекст|64|6\/4|\b64\b/.test(t)) return '64';
+        if (/секстаккорд|секста|6\/3|\b6\b(?![4])/.test(t) && !/септ/.test(t)) return '6';
+        return '53';
+    }
+
+    function diatonicTriadSemis(tonic, mode, deg, form) {
+        const r = scaleDegree(tonic, deg, form);
+        const t = scaleDegree(tonic, wrapScaleDegree(deg + 2), form);
+        const f = scaleDegree(tonic, wrapScaleDegree(deg + 4), form);
+        if (!r || !t || !f) return null;
+        return { root: r, thirdSemi: intervalSemis(r, t), fifthSemi: intervalSemis(r, f) };
+    }
+
+    function buildTriadOnDegree(tonic, mode, scaleDeg, t, triadKindOverride) {
+        const form = scaleFormForKey({ tonic, mode }, t);
+        let thirdSemi, fifthSemi, prefix, root;
+        const kind = triadKindOverride || parseTriadKind(t);
+        if (kind && TRIAD_KIND_DEFS[kind]) {
+            const def = TRIAD_KIND_DEFS[kind];
+            root = scaleDegree(tonic, scaleDeg, form);
+            thirdSemi = def.third;
+            fifthSemi = def.fifth;
+            prefix = labelLocale === 'ru' ? def.ru : def.en;
+        } else {
+            const dia = diatonicTriadSemis(tonic, mode, scaleDeg, form);
+            if (!dia) return null;
+            root = dia.root;
+            thirdSemi = dia.thirdSemi;
+            fifthSemi = dia.fifthSemi;
+            const qKey = `${thirdSemi},${fifthSemi}`;
+            prefix = labelLocale === 'ru'
+                ? ({ '4,7': 'Б', '3,7': 'М', '3,6': 'Ум', '4,8': 'Ув' }[qKey] || '')
+                : ({ '4,7': 'M', '3,7': 'm', '3,6': 'd', '4,8': 'A' }[qKey] || '');
+        }
+        if (!root) return null;
+        const inv = parseTriadInversion(t);
+        const v = triadVoicings({ ...root, octave: 4 }, thirdSemi, fifthSemi);
+        const fig = inv === '64' ? '64' : inv === '6' ? '6' : '53';
+        return plainBlock([{ keys: v[fig], duration: 'w', label: prefix + fig }], keySigFor(tonic, mode), 'none');
+    }
+
+    /** «Определите интервал: до ми» / «до — ми» */
+    function parseTwoNotes(t) {
+        const cleaned = t.replace(/определи[а-яё]*\s*интервал|определи[а-яё]*\s*аккорд|identify\s*(?:the\s*)?interval|identify\s*(?:the\s*)?chord/gi, ' ');
+        const sep = cleaned.split(/[:\-–—,]|(?:\s+и\s+)|(?:\s+to\s+)/i);
+        if (sep.length >= 2) {
+            const a = parseSingleNote(sep[0]);
+            const b = parseSingleNote(sep.slice(1).join(' '));
+            if (a && b) return [a, b];
+        }
+        const notes = [];
+        let s = cleaned;
+        for (let i = 0; i < 4; i++) {
+            const n = parseSingleNote(s) || findRuNote(s);
+            if (!n) break;
+            notes.push({ ...n, octave: 4 });
+            s = s.replace(new RegExp(findRuNoteWord(s) || ''), '');
+        }
+        return notes.length >= 2 ? notes.slice(0, 2) : null;
+    }
+
+    function findRuNoteWord(s) {
+        for (const [word] of RU_NOTES) {
+            if (s.includes(word)) return word;
+        }
+        return null;
+    }
+
+    function parseChordNotes(t) {
+        const cleaned = t.replace(/определи[а-яё]*\s*аккорд|identify\s*(?:the\s*)?chord/gi, ' ');
+        const parts = cleaned.split(/[:\-–—,\s]+/).filter(Boolean);
+        const notes = [];
+        for (const p of parts) {
+            const n = parseSingleNote(p) || findRuNote(p);
+            if (n) notes.push({ ...n, octave: 4 });
+            if (notes.length >= 4) break;
+        }
+        if (notes.length >= 3) return notes;
+        // «соль си ре фа» подряд в строке
+        let s = cleaned;
+        while (notes.length < 4) {
+            const n = findRuNote(s);
+            if (!n) break;
+            notes.push({ ...n, octave: 4 });
+            const w = findRuNoteWord(s);
+            s = s.replace(w, '');
+        }
+        return notes.length >= 3 ? notes : null;
+    }
+
+    function answerIdentifyInterval(t, rawQuery, ru) {
+        if (!/определи[а-яё]*\s*интервал|identify\s*(?:the\s*)?interval|какой\s*интервал|what\s*interval/i.test(t)) return null;
+        const pair = parseTwoNotes(t);
+        if (!pair) return null;
+        const [a, b] = pair;
+        const lo = noteAbs(a) <= noteAbs(b) ? a : b;
+        const hi = noteAbs(a) <= noteAbs(b) ? b : a;
+        const deg = intervalDegree(lo, hi);
+        const sem = intervalSemis(lo, hi);
+        const name = intervalNameFor(deg, sem, ru);
+        if (!name) return null;
+        return {
+            text: ru
+                ? `Между **${noteDisplayRu(lo, 'C')}** и **${noteDisplayRu(hi, 'C')}** — **${name}** (${deg}-я ступень, ${sem} ${ruPlural(sem, 'полутон', 'полутона', 'полутонов')}).`
+                : `From **${noteKey(lo)}** to **${noteKey(hi)}**: **${name}** (size ${deg}, ${sem} semitones).`
+        };
+    }
+
+    function answerIdentifyChord(t, rawQuery, ru) {
+        if (!/определи[а-яё]*\s*аккорд|identify\s*(?:the\s*)?chord|какой\s*аккорд|what\s*chord/i.test(t)) return null;
+        const notes = parseChordNotes(t);
+        if (!notes || notes.length < 3) return null;
+        const parsed = notes.map(n => parseVexKey(noteKey(n))).filter(Boolean);
+        const label = describeKeys(parsed.map(n => noteKey(n)));
+        if (!label) return null;
+        return {
+            text: ru
+                ? `Аккорд **${parsed.map(n => noteDisplayRu(n, 'C')).join(' — ')}** — **${label}**.`
+                : `The chord **${parsed.map(n => noteKey(n)).join(' — ')}** is **${label}**.`
+        };
+    }
+
+    function answerCharacteristicDegrees(t, key, ru) {
+        if (!/какие\s*ступен|на\s*каких\s*ступен|образуют|which\s*degree|what\s*degree/i.test(t)) return null;
+        const kind = parseCharacteristicKind(t);
+        if (!kind || !key) return null;
+        const pair = characteristicPair(key.tonic, key.mode, kind);
+        if (!pair) return null;
+        const keyName = tonalityDisplayName(key.tonic, key.mode, ru);
+        const intName = intervalNameFor(pair.def.degree, pair.def.semis, ru);
+        return {
+            text: ru
+                ? `В **${keyName}** **${intName}** (${pair.def.ru}) образуют ступени **${pair.loLab}** и **${pair.hiLab}**.`
+                : `In **${keyName}**, **${pair.def.en}** is formed by degrees **${pair.loLab}** and **${pair.hiLab}**.`
+        };
+    }
+
+    function buildIntervalInversionExercise(spec) {
+        const base = { letter: 'c', acc: 0, octave: 4 };
+        const hi = buildIntervalUp(base, spec.degree, spec.semis);
+        const invDeg = 9 - spec.degree;
+        const invSemis = 12 - spec.semis;
+        const top = buildIntervalUp(hi, invDeg, invSemis);
+        if (!checkInterval(base, hi, spec.degree, spec.semis)) return null;
+        if (!checkInterval(hi, top, invDeg, invSemis)) return null;
+        const notes = [
+            sonority([base, hi], intervalLabel(base, hi), 'w', true),
+            sonority([hi, top], intervalLabel(hi, top), 'w')
+        ];
+        return plainBlock(notes, 'C', 'manual');
+    }
+
+    function buildThreeMinorsExercise(tonic) {
+        const items = [
+            { label: labelLocale === 'ru' ? 'Натуральный минор' : 'Natural minor', data: buildScaleData(tonic, 'minor', 'minor') },
+            { label: labelLocale === 'ru' ? 'Гармонический минор' : 'Harmonic minor', data: buildScaleData(tonic, 'minor', 'harmonicMinor') },
+            { label: labelLocale === 'ru' ? 'Мелодический минор (вверх)' : 'Melodic minor (ascending)', data: buildScaleData(tonic, 'minor', 'melodicMinor') }
+        ];
+        return items;
+    }
+
+    /** Сборка «учебникового» задания в тональности (до общего parseExercise). */
+    function buildTextbookInKey(rawQuery, t, key) {
+        const withRes = wantsResolution(t) || /разреш/i.test(t);
+
+        // Один характерный интервал (ув.2 в фа мажоре …)
+        const charKind = parseCharacteristicKind(t);
+        if (charKind && /интервал|секунд|септим|квинт|кварт|построй|постро|build|draw|напиш|сделай/i.test(t)) {
+            const built = buildSingleCharacteristic(key.tonic, key.mode, charKind, withRes);
+            if (!built) return null;
+            const { _charPair, ...data } = built;
+            return finalize(data);
+        }
+
+        const scaleDeg = parseScaleDegree(t);
+        const intSpec = parseIntervalSpec(rawQuery);
+        if (scaleDeg && intSpec && /интервал|секунд|терци|кварт|квинт|септим|построй|build/i.test(t)) {
+            return finalize(buildIntervalOnDegree(key.tonic, key.mode, scaleDeg, intSpec, t, withRes));
+        }
+
+        if (scaleDeg && (/трезвуч|аккорд|секстаккорд|квартсекст|ум53|ув53|б53|м53|triad|chord/i.test(t))) {
+            return finalize(buildTriadOnDegree(key.tonic, key.mode, scaleDeg, t));
+        }
+
+        if (/три\s*вида\s*минор|three\s*(?:forms?\s*of\s*)?minor|все\s*виды\s*минор/i.test(t)) {
+            return finalizeMulti(buildThreeMinorsExercise(key.tonic));
+        }
+
+        return null;
+    }
+
     // ---------- Гаммы ----------
     // Римские цифры ступеней — для подписи нот гаммы (I … VIII).
     const ROMAN_DEGREES = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII'];
@@ -1772,12 +2141,21 @@
 
     /** «Какая тональность с 3 диезами?» */
     function answerKeyByAccidentals(t, ru) {
-        const m = t.match(/(\d|один|одн[а-яё]*|два|две|три|четыре|пять|шесть|семь|ноль)\s*(диез|бемол|sharp|flat)/);
+        const words = {
+            'ноль': 0, 'один': 1, 'одна': 1, 'одним': 1, 'одну': 1,
+            'два': 2, 'две': 2, 'двум': 2, 'двух': 2,
+            'три': 3, 'трем': 3, 'трех': 3,
+            'четыре': 4, 'четырем': 4, 'четырех': 4,
+            'пять': 5, 'пяти': 5, 'пяти': 5,
+            'шесть': 6, 'шести': 6,
+            'семь': 7, 'семи': 7
+        };
+        let m = t.match(/(?:по|с)\s*(\d+|один|одна|одним|одну|два|две|двум|двух|три|трем|трех|четыре|четырем|четырех|пять|пяти|шесть|шести|семь|семи|ноль)\s*(?:знаков?\s*)?(диез(?:а|ов|ам|ами)?|бемол(?:я|ей|ам|ами)?|sharps?|flats?)/);
+        if (!m) m = t.match(/(\d+|один|одна|одним|одну|два|две|двум|двух|три|трем|трех|четыре|четырем|четырех|пять|пяти|шесть|шести|семь|семи|ноль)\s*(?:знаков?\s*)?(диез(?:а|ов|ам|ами)?|бемол(?:я|ей|ам|ами)?|sharps?|flats?)/);
         if (!m) return null;
-        const words = { 'ноль': 0, 'один': 1, 'одна': 1, 'одним': 1, 'два': 2, 'две': 2, 'три': 3, 'четыре': 4, 'пять': 5, 'шесть': 6, 'семь': 7 };
-        const count = /^\d$/.test(m[1]) ? parseInt(m[1], 10) : (words[m[1]] != null ? words[m[1]] : null);
+        const count = /^\d+$/.test(m[1]) ? parseInt(m[1], 10) : (words[m[1]] != null ? words[m[1]] : null);
         if (count == null || count < 0 || count > 7) return null;
-        const isSharp = /диез|sharp/.test(m[2]);
+        const isSharp = /диез|sharp/i.test(m[2]);
         const pair = (isSharp ? KEYS_BY_SHARPS : KEYS_BY_FLATS)[count];
         if (!pair) return null;
         const majTonic = tonicFromId(pair[0]);
@@ -1898,6 +2276,15 @@
             return { text: formatKeySignatureAnswer(key, ru) };
         }
         if (!isBuildRequest) {
+            const identInt = answerIdentifyInterval(t, rawQuery, ru);
+            if (identInt) return identInt;
+            const identChord = answerIdentifyChord(t, rawQuery, ru);
+            if (identChord) return identChord;
+            const keyForDeg = parseKey(t);
+            if (keyForDeg) {
+                const charDeg = answerCharacteristicDegrees(t, keyForDeg, ru);
+                if (charDeg) return charDeg;
+            }
             const related = answerRelatedKey(t, rawQuery, ru);
             if (related) return related;
             const byAcc = answerKeyByAccidentals(t, ru);
@@ -2081,6 +2468,7 @@
         const form = detectForm(t);
         const chromatic = isChromaticScaleQuery(t);
         const modeName = parseModeName(t);
+        const charKind = parseCharacteristicKind(t);
 
         // Хроматическая гамма — отдельное правописание, обычная гамма здесь не строится.
         if (chromatic) {
@@ -2126,7 +2514,16 @@
             }
         }
 
-        if (/характерн[а-яё]*\s*интервал|характерные(?![а-яё])|(?:^|[^а-яё])х\.\s*и\.|characteristic\s*interval/i.test(t)) {
+        if (charKind) {
+            const built = buildSingleCharacteristic(key.tonic, key.mode, charKind, wantsResolution(t));
+            if (built) {
+                const { _charPair, ...data } = built;
+                items.push({
+                    label: ru ? `Характерный интервал ${CHAR_KIND_DEFS[charKind].ru}` : `Characteristic ${CHAR_KIND_DEFS[charKind].en}`,
+                    data
+                });
+            }
+        } else if (/характерн[а-яё]*\s*интервал|характерные(?![а-яё])|(?:^|[^а-яё])х\.\s*и\.|characteristic\s*interval/i.test(t)) {
             const data = buildCharacteristic(key.tonic, key.mode);
             if (data) items.push({ label: ru ? 'Характерные интервалы' : 'Characteristic intervals', data });
         }
@@ -2211,8 +2608,16 @@
         const fromNote = buildFromNoteTask(rawQuery, t);
         if (fromNote) return fromNote;
 
+        if (/обратите|обрати|invert/i.test(t) && !CHORD_WORDS_RE.test(t)) {
+            const invSpec = parseIntervalSpec(rawQuery);
+            if (invSpec) return finalize(buildIntervalInversionExercise(invSpec));
+        }
+
         const key = parseKey(t);
         if (!key) return null;
+
+        const textbook = buildTextbookInKey(rawQuery, t, key);
+        if (textbook) return textbook;
 
         const composite = collectExerciseItems(t, key);
         if (composite.length >= 1) return finalizeMulti(composite);
@@ -2799,6 +3204,14 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         const pick = (r, e) => (ru ? r : e);
 
         if (isChromaticScaleQuery(t)) return pick('Хроматическая гамма по правилам правописания:', 'Chromatic scale with standard spelling:');
+        const charKind = parseCharacteristicKind(t);
+        if (charKind) {
+            const key = parseKey(t);
+            if (key) {
+                const prose = characteristicProse(key.tonic, key.mode, charKind, ru);
+                if (prose) return prose;
+            }
+        }
         const modeName = parseModeName(t);
         if (modeName) return pick(`${modeLabel(modeName)} лад:`, `${modeLabel(modeName)}:`);
         if (isViiSeventhQuery(t)) return pick('Вводный септаккорд с разрешением через D6/5 в тонику:', 'Leading-tone seventh resolving through D6/5 to the tonic:');

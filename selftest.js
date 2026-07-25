@@ -561,6 +561,50 @@
         return p.length > 500 || 'промпт слишком короткий';
     });
 
+    check('учебник: ув.2 в фа мажоре с разрешением (как на скрине)', () => {
+        T.setLabelLocale('ru');
+        const q = 'Постройте увеличенную секунду (ув.2) в тональности фа мажор, разрешите её по правилам лада и укажите, на каких ступенях она строится';
+        const res = T.buildNotationForQuery(q);
+        if (!res?.blockString) return 'не построено';
+        const blocks = extractBlocks(res.blockString);
+        if (blocks.length !== 1 || blocks[0].notes.length !== 2) return 'ожидалось 2 созвучия';
+        const n0 = blocks[0].notes[0].keys.sort().join('+');
+        const n1 = blocks[0].notes[1].keys.sort().join('+');
+        if (n0 !== 'db/4+e/4' && !(n0.includes('db/') && n0.includes('e/') && I.pc(I.parseVexKey(n0.split('+')[0])) === I.pc({ letter: 'd', acc: -1, octave: 4 }))) return 'ув.2: ' + n0;
+        if (n1 !== 'c/4+f/4' && !(n1.includes('c/') && n1.includes('f/'))) return 'разрешение: ' + n1;
+        const intro = T.getExerciseIntro(q);
+        if (!intro || !/VI/i.test(intro) || !/VII/i.test(intro)) return 'нет указания ступеней: ' + intro;
+        return true;
+    });
+
+    check('учебник: определите интервал до-ми', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildTheoryQuickAnswer('Определите интервал: до ми');
+        if (!res?.text) return 'нет ответа';
+        return res.text.includes('б.3') || res.text.includes('Б.3') || res.text.includes('б3') ? true : res.text;
+    });
+
+    check('учебник: тональность по двум бемолям', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildTheoryQuickAnswer('Определите тональность по двум бемолям');
+        if (!res?.text) return 'нет ответа';
+        return (res.text.includes('си-бемоль') || res.text.includes('Bb')) && res.text.includes('минор') ? true : res.text;
+    });
+
+    check('учебник: обратите большую терцию — нотация', () => {
+        const res = T.buildNotationForQuery('Обратите большую терцию');
+        if (!res?.blockString) return 'не построено';
+        const blocks = extractBlocks(res.blockString);
+        return blocks[0]?.notes?.length === 2 ? true : 'созвучий ' + (blocks[0]?.notes?.length || 0);
+    });
+
+    check('учебник: три вида минора от ля', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('Напишите три вида минора от ля');
+        if (!res?.blockString) return 'не построено';
+        return (res.blockString.match(/\[\[NOTATION:/g) || []).length >= 3 ? true : 'мало блоков';
+    });
+
     check('обычный чат: теория подключается по теме, а не всегда', () => {
         if (T.getTheoryRules('привет, как дела')) return 'болтовня тянет за собой базу правил';
         const p = T.getTheoryRules('что такое синкопа');
