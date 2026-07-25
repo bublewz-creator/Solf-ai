@@ -873,9 +873,24 @@
         }
 
         const scaleDeg = parseScaleDegree(t);
+
+        const seventhKind = parseSeventhKind(t);
+        if (seventhKind !== null && !isViiSeventhQuery(t) && !isSecondSeventhQuery(t) && !isD7Query(t)) {
+            const data = scaleDeg
+                ? buildSeventhOnDegree(key.tonic, key.mode, scaleDeg, seventhKind, t)
+                : buildSeventhByKind(key.tonic, seventhKind, keySigFor(key.tonic, key.mode));
+            if (data) return finalize(data);
+        }
+
         const intSpec = parseIntervalSpec(rawQuery);
         if (scaleDeg && intSpec && /интервал|секунд|терци|кварт|квинт|септим|построй|build/i.test(t)) {
             return finalize(buildIntervalOnDegree(key.tonic, key.mode, scaleDeg, intSpec, t, withRes));
+        }
+
+        // «большую септиму в ми минор» — интервал от тоники, без «на N ступени».
+        if (!scaleDeg && intSpec && !CHORD_WORDS_RE.test(t)
+            && /интервал|секунд|терци|кварт|квинт|секст|септим|октав|построй|постро|build|draw|напиш|сделай/i.test(t)) {
+            return finalize(buildIntervalOnDegree(key.tonic, key.mode, 1, intSpec, t, withRes));
         }
 
         if (scaleDeg && (/трезвуч|аккорд|секстаккорд|квартсекст|ум53|ув53|б53|м53|triad|chord/i.test(t))) {
@@ -1511,6 +1526,16 @@
         ['прим', 1], ['секунд', 2], ['терци', 3], ['кварт', 4],
         ['квинт', 5], ['секст', 6], ['септим', 7], ['октав', 8]
     ];
+
+    /** Ступень интервала по русскому слову — с границами слова и от длинных к коротким. */
+    function matchRuIntervalDegree(t) {
+        const sorted = [...RU_DEGREE_WORDS].sort((a, b) => b[0].length - a[0].length);
+        for (const [stem, degree] of sorted) {
+            const re = new RegExp(`(?:^|[^а-яё])${stem}[а-яё]*(?=[^а-яё]|$)`, 'i');
+            if (re.test(t)) return degree;
+        }
+        return null;
+    }
     const EN_DEGREE_WORDS = [
         ['unison', 1], ['second', 2], ['2nd', 2], ['third', 3], ['3rd', 3],
         ['fourth', 4], ['4th', 4], ['fifth', 5], ['5th', 5], ['sixth', 6], ['6th', 6],
@@ -1539,12 +1564,12 @@
 
         // Русская словесная запись: «большая терция», «уменьшённая квинта».
         const ruQual = t.match(/(чист|мал|больш|увелич|уменьш)[а-я]*/);
-        for (const [word, degree] of RU_DEGREE_WORDS) {
-            if (!t.includes(word)) continue;
+        const ruDegree = matchRuIntervalDegree(t);
+        if (ruDegree != null) {
             const qmap = { 'чист': 'perfect', 'мал': 'minor', 'больш': 'major', 'увелич': 'aug', 'уменьш': 'dim' };
-            const quality = ruQual ? qmap[ruQual[1]] : (PERFECT_DEG_SEMIS[degree] != null ? 'perfect' : 'major');
-            const semis = intervalSemisFor(quality, degree);
-            if (semis != null) return { degree, semis };
+            const quality = ruQual ? qmap[ruQual[1]] : (PERFECT_DEG_SEMIS[ruDegree] != null ? 'perfect' : 'major');
+            const semis = intervalSemisFor(quality, ruDegree);
+            if (semis != null) return { degree: ruDegree, semis };
         }
 
         // Английская краткая запись: P5, M3, m6, A4, d5 (регистр значим).
@@ -1667,6 +1692,46 @@
         { semis: [3, 6, 10], ru: 'М.ум7', en: 'm7b5' },
         { semis: [3, 6, 9], ru: 'Ум7', en: 'dim7' }
     ];
+
+    /**
+     * Вид септаккорда по школьным названиям → индекс в SEVENTH_KIND_DEFS.
+     * «Малый мажорный» = доминантсепт (4+7+10), «большой мажорный» = maj7 (4+7+11) и т.д.
+     */
+    function parseSeventhKind(t) {
+        if (/уменьшенн[а-яё]*\s*септ|(?:^|[^а-яё])ум\.?\s*7(?![0-9])|\bdim7\b|(?:^|[^а-яё])ум7\b/i.test(t)) return 6;
+        if (/полууменьш|(?:^|[^а-яё])м\.?\s*ум|m7b5|ø7|half[\s-]?dim/i.test(t)) return 5;
+        if (/увеличенн[а-яё]*\s*септ|(?:^|[^а-яё])ув\.?\s*7|\baug7\b/i.test(t)) return 4;
+        if (/больш[а-яё]*\s*минорн|(?:^|[^а-яё])б\.?\s*мин\.?\s*7|mm7|m\s*maj7/i.test(t)) return 2;
+        if (/малы[а-яё]*\s*минорн|(?:^|[^а-яё])м\.?\s*мин\.?\s*7|\bm7\b(?![b5/])|минорн[а-яё]*\s*септ/i.test(t)) return 3;
+        if (/больш[а-яё]*\s*мажорн|(?:^|[^а-яё])б\.?\s*маж\.?\s*7|\bmaj7\b/i.test(t)) return 0;
+        if (/малы[а-яё]*\s*мажорн|(?:^|[^а-яё])м\.?\s*маж\.?\s*7|доминант[а-яё]*\s*септ|\bd7\b|dominant\s*7/i.test(t)) return 1;
+        if (/септаккорд|seventh\s*chord|\b7th\b/i.test(t)) return 1;
+        return null;
+    }
+
+    function buildSeventhByKind(note, kindIdx, keySig) {
+        const def = SEVENTH_KIND_DEFS[kindIdx];
+        if (!def || !note) return null;
+        return fromNoteWithFallback(note, (root) => {
+            const base = { ...root, octave: 4 };
+            const third = buildIntervalUp(base, 3, def.semis[0]);
+            const fifth = buildIntervalUp(base, 5, def.semis[1]);
+            const seventh = buildIntervalUp(base, 7, def.semis[2]);
+            const label = labelLocale === 'ru' ? def.ru : def.en;
+            return plainBlock(
+                [sonority([base, third, fifth, seventh], label, 'w')],
+                keySig || 'C',
+                'none'
+            );
+        });
+    }
+
+    function buildSeventhOnDegree(tonic, mode, scaleDeg, kindIdx, t) {
+        const form = scaleFormForKey({ tonic, mode }, t);
+        const root = scaleDegree(tonic, scaleDeg, form);
+        if (!root) return null;
+        return buildSeventhByKind({ ...root, octave: 4 }, kindIdx, keySigFor(tonic, mode));
+    }
 
     function buildAllSeventhsFromNote(note) {
         return fromNoteWithFallback(note, (root) => {
@@ -3221,7 +3286,29 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         if (/все\s*(?:простые\s*)?интервал|all\s*(?:simple\s*)?intervals/i.test(t)) return pick('Все простые интервалы от заданного звука:', 'All simple intervals from the given note:');
         if (/септаккорд|seventh/i.test(t) && /все|all/i.test(t)) return pick('Все виды септаккордов от заданного звука:', 'All seventh-chord types from the given note:');
         if (/трезвуч|triad/i.test(t)) return pick('Готовое построение:', 'Here is the chord:');
-        if (parseIntervalSpec(rawQuery)) {
+        if (parseSeventhKind(t)) {
+            const key = parseKey(t);
+            if (key) {
+                const def = SEVENTH_KIND_DEFS[parseSeventhKind(t)];
+                const kindName = def ? (ru ? def.ru : def.en) : '';
+                const keyName = tonalityDisplayName(key.tonic, key.mode, ru);
+                return pick(
+                    `${kindName || 'Септаккорд'} в ${keyName} (основной вид от тоники):`,
+                    `${kindName || 'Seventh chord'} in ${keyName} (root position from tonic):`
+                );
+            }
+        }
+        const keyForInt = parseKey(t);
+        const intSpecIntro = parseIntervalSpec(rawQuery);
+        if (keyForInt && intSpecIntro && !parseScaleDegree(t) && !CHORD_WORDS_RE.test(t)) {
+            const name = intervalNameFor(intSpecIntro.degree, intSpecIntro.semis, ru);
+            const keyName = tonalityDisplayName(keyForInt.tonic, keyForInt.mode, ru);
+            return pick(
+                `${name} от тоники (${keyName}):`,
+                `${name} from the tonic of ${keyName}:`
+            );
+        }
+        if (intSpecIntro) {
             return wantsIntervalInversion(t)
                 ? pick('Интервал и его обращение:', 'The interval and its inversion:')
                 : pick('Интервал от заданного звука:', 'The interval from the given note:');
@@ -3308,6 +3395,8 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
             parseModeName,
             parseNoteAfterFrom,
             parseTriadKind,
+            parseSeventhKind,
+            buildSeventhByKind,
             buildFromNoteTask,
             simplifyEnharmonic,
             D7_PRESETS,

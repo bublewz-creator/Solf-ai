@@ -98,6 +98,8 @@
         ['построй ум7 от соль', 7, 9],
         ['построй большую сексту от ми', 6, 9],
         ['построй малую септиму от до', 7, 10],
+        ['построй большую септиму в ми минор', 7, 11],
+        ['большую септиму', 7, 11],
         ['построй уменьшенную квинту от си', 5, 6],
         ['построй чистую кварту от ля', 4, 5],
         ['build M3 from C', 3, 4],
@@ -596,6 +598,40 @@
         if (!res?.blockString) return 'не построено';
         const blocks = extractBlocks(res.blockString);
         return blocks[0]?.notes?.length === 2 ? true : 'созвучий ' + (blocks[0]?.notes?.length || 0);
+    });
+
+    check('учебник: большая септима в ми минор — не терция', () => {
+        T.setLabelLocale('ru');
+        const q = 'построй большую септиму в ми минор';
+        const spec = I.parseIntervalSpec(q);
+        if (!spec || spec.degree !== 7 || spec.semis !== 11) {
+            return 'разбор: ' + (spec ? spec.degree + '/' + spec.semis : 'null');
+        }
+        const res = T.buildNotationForQuery(q);
+        if (!res?.blockString) return 'не построено';
+        const blocks = extractBlocks(res.blockString);
+        if (!blocks[0] || blocks[0].notes.length !== 1) return 'ожидалось 1 созвучие';
+        const label = blocks[0].notes[0].label || '';
+        if (label !== 'б7') return 'подпись ' + label + ', ожидалось б7';
+        const keys = blocks[0].notes[0].keys.sort().join('+');
+        if (keys !== 'd#/4+e/4') return 'ноты ' + keys;
+        return true;
+    });
+
+    check('учебник: малый мажорный септаккорд в ре мажор — 4 звука', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('построй малый мажорный септаккорд в ре мажор');
+        if (!res?.blockString) return 'не построено';
+        const blocks = extractBlocks(res.blockString);
+        const n = blocks[0]?.notes?.[0];
+        if (!n || n.keys.length !== 4) return 'звуков ' + (n?.keys?.length || 0);
+        if (n.label !== 'М.маж7') return 'подпись ' + n.label;
+        return n.keys.slice().sort().join('+') === 'a/4+c/4+d/4+f#/4' ? true : n.keys.join('+');
+    });
+
+    check('«септим» не путается с «терци»', () => {
+        const spec = I.parseIntervalSpec('большую септиму');
+        return spec && spec.degree === 7 && spec.semis === 11 ? true : 'получено ' + JSON.stringify(spec);
     });
 
     check('учебник: три вида минора от ля', () => {
