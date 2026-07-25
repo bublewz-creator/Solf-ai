@@ -693,7 +693,12 @@ REMEMBER:
 - Метрическая музыка (диктант, гармонизация, кадансы) → barlines:"auto" с реальным timeSignature.
 - «Тритоны» = ВСЕГДА обе пары (ув.4+разр., ум.5+разр.). «Характерные» = ВСЕГДА все 4 пары. Никогда не урезай комплект до одного примера.`;
 
-function getSystemInstruction(responseLang) {
+/**
+ * Системный промпт. userQuery нужен, чтобы подтянуть из базы знаний ТОЛЬКО
+ * относящиеся к запросу разделы теории: чем меньше конкурирующих правил в
+ * промпте, тем точнее модель следует каждому из них.
+ */
+function getSystemInstruction(responseLang, userQuery) {
     const lang = responseLang || detectResponseLanguage('', []);
     let prompt = SYSTEM_PROMPT + getLanguageInstruction(lang);
     if (currentAiMode === 'berserk' && !notationModeEnabled) {
@@ -701,17 +706,41 @@ function getSystemInstruction(responseLang) {
             ? `\n\nStyle: Be максимально прямолинейным и резким по тону, но без мата, унижений и личных оскорблений. Коротко, по делу, с сарказмом допускается, но всегда давай корректный и полезный ответ.`
             : `\n\nStyle: Be blunt and direct, but no slurs or personal insults. Short, useful answers; light sarcasm is fine.`;
     }
+    const cleanQuery = stripNotationReminder(userQuery);
     if (notationModeEnabled) {
         prompt += NOTATION_PROMPT_INSTRUCTION;
-        if (typeof window !== 'undefined' && window.SolfTheory && typeof window.SolfTheory.getSystemPrompt === 'function') {
-            prompt += window.SolfTheory.getSystemPrompt();
+        if (window.SolfTheory && typeof window.SolfTheory.getSystemPrompt === 'function') {
+            prompt += window.SolfTheory.getSystemPrompt(cleanQuery);
         }
+    } else if (window.SolfTheory && typeof window.SolfTheory.getTheoryRules === 'function') {
+        // Правила теории нужны и в обычном чате: вопросы «что такое синкопа»,
+        // «сколько знаков в ре мажоре» приходят без режима нотации.
+        prompt += window.SolfTheory.getTheoryRules(cleanQuery);
     }
-    return prompt;
+    return dedupePromptSections(prompt);
 }
 
-const CHAIN2_QUERY_RE = /цепочка\s*2\b|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор\w*\s*цепоч/i;
-const CHAIN1_EXPLICIT_RE = /цепочка\s*1\b|chain\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв\w*\s*цепоч/i;
+/**
+ * Защита от наслоений в системном промпте: если один и тот же абзац правил попал
+ * в промпт дважды (например, и из базы знаний, и из старого свода), оставляем первый.
+ * Короткие строки не трогаем — они законно повторяются в примерах.
+ */
+function dedupePromptSections(prompt) {
+    const seen = new Set();
+    const out = [];
+    for (const part of String(prompt || '').split(/\n{2,}/)) {
+        const key = part.trim();
+        if (key.length > 40) {
+            if (seen.has(key)) continue;
+            seen.add(key);
+        }
+        out.push(part);
+    }
+    return out.join('\n\n');
+}
+
+const CHAIN2_QUERY_RE = /цепочка\s*2(?![0-9])|chain\s*2\b|2[\s-]*(?:ю|я|й|nd)\s*цепоч|втор[а-яё]*\s*цепоч/i;
+const CHAIN1_EXPLICIT_RE = /цепочка\s*1(?![0-9])|chain\s*1\b|1[\s-]*(?:ю|я|й|st)\s*цепоч|перв[а-яё]*\s*цепоч/i;
 const CHAIN_MINOR_RE = /min|moll|mol\b|минор/i;
 const CHAIN1_LABELS = 'T53 – S64 – VII7 – D65 – T53 – S6 – K64 – D7 – T53';
 const CHAIN2_LABELS = 't53 – d6 – s6 – D53 – D2 – t6 – II7 – D43 – t53 – s64 – t53';
@@ -782,9 +811,14 @@ function patchAiWithTheory(userQuery, aiText, det) {
     const theoryProse = buildTheoryProse(q);
     const intro = buildTheoryIntro(q);
     const parts = [theoryProse, intro].filter(Boolean);
-    const prose = parts.length
+    let prose = parts.length
         ? parts.join('\n\n')
         : stripNotationBlocks(String(aiText || '')).trim();
+    // Мгновенный ответ движка без участия модели: без этой подводки на экран
+    // попал бы «голый» нотный стан без единого слова.
+    if (!prose && window.SolfTheory.getExerciseIntro) {
+        try { prose = window.SolfTheory.getExerciseIntro(q) || ''; } catch (_) { prose = ''; }
+    }
     return window.SolfTheory.applyBlock(prose, resolved.blockString);
 }
 
@@ -824,7 +858,7 @@ function isCompositeBuildQuery(query) {
 
     if (/энгармон|enharmon/i.test(t)) return true;
 
-    if (/(?:две|two|обе|both|разн\w*)\s*(?:разн\w*\s*)?(?:тональност|tonalit|keys?|лад\w*|modes?)/i.test(t)) return true;
+    if (/(?:две|two|обе|both|разн[а-яё]*)\s*(?:разн[а-яё]*\s*)?(?:тональност|tonalit|keys?|лад[а-яё]*|modes?)/i.test(t)) return true;
     if (/в\s+маjor(?:е|у|ную)?\s+и\s+в\s+минor|in\s+major\s+and\s+in\s+minor|major\s+and\s+minor|маjor\s+и\s+минor|минor\s+и\s+маjor/i.test(t)) return true;
 
     const fromSpecificNote = /(?:от|from)\s+(?:нот[ыаue]|note)?\s*[#♯a-gа-яё]|фа[\s-]*диез|f\s*#|f\s*sharp|соль[\s-]*бемоль|g\s*flat/i.test(t);
@@ -850,9 +884,9 @@ function isCompositeBuildQuery(query) {
     const clauseMarkers = (t.match(/\b(?:и|а\s+также|also|then|затем|плюс)\b|,\s*и\s+/g) || []).length;
     if (clauseMarkers >= 2 && (wantsBuild || wantsResolution)) return true;
 
-    if (wantsResolution && /(?:две|two|обе|both|разн\w*)\s*(?:тональност|лад|mode|key|context)/i.test(t)) return true;
+    if (wantsResolution && /(?:две|two|обе|both|разн[а-яё]*)\s*(?:тональност|лад|mode|key|context)/i.test(t)) return true;
 
-    if (/ум\.?\s*5|уменьш\w*\s*квинт|diminished\s*fifth|ym/i.test(t) && fromSpecificNote && wantsResolution) return true;
+    if (/ум\.?\s*5|уменьш[а-яё]*\s*квинт|diminished\s*fifth|ym/i.test(t) && fromSpecificNote && wantsResolution) return true;
 
     return false;
 }
@@ -937,12 +971,12 @@ function isBuildTask(query) {
     if (/t53\s*[-–—,]/i.test(t)) return true;
     if (/(?:тритон|tritone)/i.test(t) && /(?:д7|d7|цепоч|t53)/i.test(t)) return true;
     if (/характерн|х\.\s*и\.|characteristic/i.test(t)) return true;
-    if (/мелодическ\w*\s*гамм|гамм\w*\s*мелодическ|построй\s*гамм|build\s*scale|все\s*виды\s*гамм/i.test(t)) return true;
-    if (/главн\w*\s*трезвуч|main\s*triads?/i.test(t)) return true;
+    if (/мелодическ[а-яё]*\s*гамм|гамм[а-яё]*\s*мелодическ|построй\s*гамм|build\s*scale|все\s*виды\s*гамм/i.test(t)) return true;
+    if (/главн[а-яё]*\s*трезвуч|main\s*triads?/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
-    const buildNoun = /тритон|характерн\w*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
+    const buildNoun = /тритон|характерн[а-яё]*\s*интервал|гамм|звукоряд|трезвуч|аккорд|интервал|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
     if (buildVerb.test(t) && buildNoun.test(t)) return true;
-    if (/\bd\s*7\b|dominant\s*7|доминант\w*\s*септ|д\s*7\b/i.test(t) && buildVerb.test(t)) return true;
+    if (/\bd\s*7\b|dominant\s*7|доминант[а-яё]*\s*септ|(?:^|[^а-яё])д\s*7(?![0-9])/i.test(t) && buildVerb.test(t)) return true;
     if (/^d7\b|^\s*d7[\s,]/i.test(t.trim())) return true;
     return false;
 }
@@ -958,7 +992,7 @@ function isHarmonizationTask(query, hasImage = false) {
 /** Запрос на цепочку аккордов (Chain 1 / Chain 2). */
 function isChainTask(query) {
     const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
-    return /цепочк|chain|chord\s*chain|аккордн\w*\s*цепоч/i.test(t);
+    return /цепочк|chain|chord\s*chain|аккордн[а-яё]*\s*цепоч/i.test(t);
 }
 
 /** Ожидаемое число аккордов: Chain 1 = 9, Chain 2 = 11. */
@@ -1062,7 +1096,7 @@ function buildFreshTaskReminder(query, lang) {
             ? 'ОБЯЗАТЕЛЬНО: покажи энгармоническую замену (эквивалентное написание/созвучие) явно в нотации.'
             : 'MANDATORY: show the enharmonic replacement explicitly in notation.');
     }
-    if (/разреш/i.test(q) && /(?:две|two|обе|both|разн\w*)\s*(?:тональност|лад|mode|key)/i.test(q)) {
+    if (/разреш/i.test(q) && /(?:две|two|обе|both|разн[а-яё]*)\s*(?:тональност|лад|mode|key)/i.test(q)) {
         parts.push(ru
             ? 'ОБЯЗАТЕЛЬНО: разрешения в КАЖДОЙ указанной тональности/ладе (напр. мажор И минор), не только в одной.'
             : 'MANDATORY: resolutions in EACH requested key/mode (e.g. major AND minor), not just one.');
@@ -1087,7 +1121,7 @@ function isBigNotationTask(query) {
     if (numMatch && parseInt(numMatch[1], 10) >= 6) return true;
 
     // «Длинная / большая» цепочка/пример без числа.
-    if (/(длинн|больш|развёрнут|развернут|подробн|long|large|full)\w*\s+(цепочк|пример|прогресс|гармониз|задани|progression|example|harmoniz)/.test(t)) return true;
+    if (/(длинн|больш|развёрнут|развернут|подробн|long|large|full)[а-яёa-z]*\s+(цепочк|пример|прогресс|гармониз|задани|progression|example|harmoniz)/.test(t)) return true;
 
     return false;
 }
@@ -2588,8 +2622,18 @@ function renderSatbNotationCard(container, data) {
 function renderNotationCard(container, data) {
     data = normalizeNotationLayout(data);
     if (window.SolfTheory && typeof window.SolfTheory.sanitizeNotationData === 'function') {
-        try { data = window.SolfTheory.sanitizeNotationData(data); } catch (_) {}
+        try {
+            const cleaned = window.SolfTheory.sanitizeNotationData(data);
+            // null = после чистки рисовать нечего (мусорные ноты). Лучше аккуратное
+            // сообщение, чем упавший рендер или ноты друг на друге.
+            if (!cleaned) {
+                container.innerHTML = `<div class="notation-error">⚠️ ${uiText('notationRenderFailed', { chat: true, fallback: 'Could not render notation' })}</div>`;
+                return;
+            }
+            data = cleaned;
+        } catch (_) { }
     }
+    if (!data || typeof data !== 'object') return;
     if (data.layout === 'satb') {
         renderSatbNotationCard(container, data);
         return;
@@ -2832,7 +2876,7 @@ async function generateResponse(query, imageData = null) {
             window.SolfTheory.setLabelLocale(responseLang);
         }
 
-        const messages = [{ role: 'system', content: getSystemInstruction(responseLang) }];
+        const messages = [{ role: 'system', content: getSystemInstruction(responseLang, query) }];
         
         const baseUserContent = query || 'Analyze image';
         const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);

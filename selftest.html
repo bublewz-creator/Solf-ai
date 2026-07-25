@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <title>Solf.ai — самопроверка теории</title>
+    <style>
+        body { font-family: 'Segoe UI', system-ui, sans-serif; background: #14161a; color: #e6e8ec; margin: 0; padding: 24px; }
+        h1 { font-size: 20px; margin: 0 0 4px; }
+        p.hint { color: #8b929e; font-size: 13px; margin: 0 0 18px; }
+        .summary { font-size: 18px; font-weight: 700; padding: 10px 14px; border-radius: 10px; display: inline-block; margin-bottom: 18px; }
+        .summary.pass { background: #123a24; color: #6ee7a0; }
+        .summary.fail { background: #3d1620; color: #ff8497; }
+        .row { display: grid; grid-template-columns: 58px 1fr; gap: 10px; padding: 6px 10px; border-radius: 8px; font-size: 13px; align-items: start; }
+        .row + .row { margin-top: 2px; }
+        .row.ok { background: #171b1f; }
+        .row.bad { background: #2a151b; }
+        .row.info { background: #17202a; }
+        .mark { font-weight: 700; font-size: 11px; letter-spacing: .04em; }
+        .row.ok .mark { color: #5fd693; }
+        .row.bad .mark { color: #ff8497; }
+        .row.info .mark { color: #7fb6ff; }
+        .detail { grid-column: 2; color: #ffb4a2; font-size: 12px; margin-top: 3px; display: block; }
+        .row.info .detail { color: #8b929e; }
+    </style>
+</head>
+<body>
+    <h1>Solf.ai — самопроверка теоретического движка</h1>
+    <p class="hint">Страница не входит в приложение. Она прогоняет все построения по всем 30 тональностям и проверяет их арифметикой: ступеневые величины, полутоны, правописание, валидность нотных блоков.</p>
+    <div id="summary" class="summary">выполняется…</div>
+    <div id="results"></div>
+
+    <script src="theory-kb.js"></script>
+    <script src="theory.js"></script>
+    <script src="selftest.js"></script>
+</body>
+</html>
