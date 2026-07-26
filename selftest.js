@@ -496,22 +496,23 @@
         return total === 8 || 'аккордов ' + total;
     });
 
-    check('D7 в фа минор: т3 — не одна нота (утроение примы видно)', () => {
+    check('D7 в фа минор: т3 — утроенная прима сохраняется в keys', () => {
         T.setLabelLocale('ru');
         const res = T.buildNotationForQuery('построй д7 в фа минор');
         if (!res) return 'не распознано';
         const blocks = extractBlocks(res.blockString);
         if (!blocks.length) return 'блоков нет';
-        const notes = blocks[0].notes;
-        // D7, т3, D6/5, т53, ...
-        const t3 = notes.find(n => /т3|t3/i.test(n.label || ''));
-        if (!t3) return 'нет аккорда т3, labels: ' + notes.map(n => n.label).join(',');
-        if (t3.keys.length < 3) {
-            return 'т3 должно быть ≥3 нот (утроенная прима + терция), получено '
-                + t3.keys.length + ': ' + t3.keys.join(',');
+        const t3 = blocks[0].notes.find(n => /т3|t3/i.test(n.label || ''));
+        if (!t3) return 'нет аккорда т3, labels: ' + blocks[0].notes.map(n => n.label).join(',');
+        const fCount = t3.keys.filter(k => /^f\//i.test(k)).length;
+        if (fCount < 3) {
+            return 'т3 должно хранить 3×фа (для дорисовки унисонов), фа='
+                + fCount + ': ' + t3.keys.join(',');
         }
-        const roots = t3.keys.filter(k => /^f\//i.test(k));
-        if (roots.length < 2) return 'мало удвоений фа: ' + t3.keys.join(',');
+        if (!t3.keys.some(k => /^ab\//i.test(k))) return 'нет терции as: ' + t3.keys.join(',');
+        // Не разъезжать по октавам: все фа на одной высоте (как в эталоне)
+        const fOcts = new Set(t3.keys.filter(k => /^f\//i.test(k)).map(k => k.split('/')[1]));
+        if (fOcts.size !== 1) return 'фа разъехались по октавам: ' + t3.keys.join(',');
         return true;
     });
 

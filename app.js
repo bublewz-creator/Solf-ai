@@ -2689,10 +2689,12 @@ function renderNotationCard(container, data) {
         const keySig = normalizeKeySignature(typeof data.keySignature === 'string' ? data.keySignature : 'C');
         const rawTimeSig = typeof data.timeSignature === 'string' ? data.timeSignature.trim() : '4/4';
         let rawNotes = Array.isArray(data.notes) ? data.notes : [];
-        if (window.SolfTheory && typeof window.SolfTheory.normalizeNotationOctaves === 'function') {
-            try { rawNotes = window.SolfTheory.normalizeNotationOctaves(rawNotes, clef); } catch (_) {}
-        } else {
-            rawNotes = normalizeNotationOctavesLocal(rawNotes, clef);
+        if (!data.lockOctaves) {
+            if (window.SolfTheory && typeof window.SolfTheory.normalizeNotationOctaves === 'function') {
+                try { rawNotes = window.SolfTheory.normalizeNotationOctaves(rawNotes, clef); } catch (_) {}
+            } else {
+                rawNotes = normalizeNotationOctavesLocal(rawNotes, clef);
+            }
         }
 
         const barlinesMode = (['none', 'manual', 'auto'].includes(data.barlines)) ? data.barlines : 'auto';
