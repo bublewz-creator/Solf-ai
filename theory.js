@@ -3543,6 +3543,25 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
     function getBuildDescription(rawQuery) {
         const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
         const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+
+        if (isChromaticScaleQuery(t)) {
+            const note = parseNoteAfterFrom(t) || parseKey(t)?.tonic;
+            const bothWays = /вверх\s*и\s*вниз|вниз\s*и\s*вверх|up\s*and\s*down|в\s*обе\s*сторон/i.test(t);
+            const onlyDown = !bothWays && /вниз|нисход|down|descend/i.test(t);
+            const dir = bothWays
+                ? (ru ? 'вверх и вниз' : 'up and down')
+                : (onlyDown ? (ru ? 'вниз' : 'down') : (ru ? 'вверх' : 'up'));
+            if (note) {
+                const name = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+                return ru
+                    ? `Хроматическая гамма от **${name}** (${dir}) по правилам правописания:`
+                    : `Chromatic scale from **${name}** (${dir}) with standard spelling:`;
+            }
+            return ru
+                ? `Хроматическая гамма (${dir}) по правилам правописания:`
+                : `Chromatic scale (${dir}) with standard spelling:`;
+        }
+
         const note = parseNoteAfterFrom(t);
         if (!note) return '';
 
@@ -3616,7 +3635,17 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         const ru = labelLocale === 'ru' || /[а-яе]/i.test(rawQuery);
         const pick = (r, e) => (ru ? r : e);
 
-        if (isChromaticScaleQuery(t)) return pick('Хроматическая гамма по правилам правописания:', 'Chromatic scale with standard spelling:');
+        if (isChromaticScaleQuery(t)) {
+            const note = parseNoteAfterFrom(t) || parseKey(t)?.tonic;
+            if (note) {
+                const name = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+                return pick(
+                    `Хроматическая гамма от ${name} по правилам правописания:`,
+                    `Chromatic scale from ${noteKey(note)} with standard spelling:`
+                );
+            }
+            return pick('Хроматическая гамма по правилам правописания:', 'Chromatic scale with standard spelling:');
+        }
         const charKind = parseCharacteristicKind(t);
         if (charKind) {
             const key = parseKey(t);

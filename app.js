@@ -813,15 +813,14 @@ function patchAiWithTheory(userQuery, aiText, det) {
         try { return window.SolfTheory.getBuildDescription?.(q) || ''; } catch (_) { return ''; }
     })();
     const intro = buildDesc ? null : buildTheoryIntro(q);
-    const parts = [theoryProse, buildDesc || intro].filter(Boolean);
-    let prose = parts.length
-        ? parts.join('\n\n')
-        : stripNotationBlocks(String(aiText || '')).trim();
-    // Мгновенный ответ движка без участия модели: без этой подводки на экран
-    // попал бы «голый» нотный стан без единого слова.
-    if (!prose && window.SolfTheory.getExerciseIntro) {
-        try { prose = window.SolfTheory.getExerciseIntro(q) || ''; } catch (_) { prose = ''; }
+    let exerciseIntro = '';
+    if (!buildDesc && !intro && window.SolfTheory.getExerciseIntro) {
+        try { exerciseIntro = window.SolfTheory.getExerciseIntro(q) || ''; } catch (_) { exerciseIntro = ''; }
     }
+    const parts = [theoryProse, buildDesc || intro || exerciseIntro].filter(Boolean);
+    // Если движок построил ноты — текст ТОЛЬКО от движка.
+    // Иначе модель пишет про доминанту рядом с хроматической гаммой и т.п.
+    const prose = parts.length ? parts.join('\n\n') : '';
     return window.SolfTheory.applyBlock(prose, resolved.blockString);
 }
 
@@ -984,6 +983,7 @@ function isBuildTask(query) {
     if (/(?:тритон|tritone)/i.test(t) && /(?:д7|d7|цепоч|t53)/i.test(t)) return true;
     if (/характерн|х\.\s*и\.|characteristic/i.test(t)) return true;
     if (/мелодическ[а-яё]*\s*гамм|гамм[а-яё]*\s*мелодическ|построй\s*гамм|build\s*scale|все\s*виды\s*гамм/i.test(t)) return true;
+    if (/хроматическ|chromatic/i.test(t) && /гамм|scale|звукоряд|(?:от|from)\s+/i.test(t)) return true;
     if (/главн[а-яё]*\s*трезвуч|main\s*triads?/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
     const buildNoun = /тритон|характерн[а-яё]*\s*интервал|ув\.?\s*[2457]|ум\.?\s*[47]|увеличенн[а-яё]*\s*(?:секунд|квинт|квар)|уменьшенн[а-яё]*\s*(?:септим|кварт)|гамм|звукоряд|трезвуч|аккорд|интервал|секунд|терци|кварт|квинт|септим|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody|\bmaj7\b|\bdim7\b|\bm7b5\b|\baug7\b|\bmm7\b/i;
