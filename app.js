@@ -2304,14 +2304,18 @@ function drawExtraUnisonOval(svg, x, y, color) {
 }
 
 /**
- * VexFlow даёт максимум 2 смещённые головки на линии; 3+ унисона (т3 = ми×3+соль)
- * нужно дорисовать. notesData.keys сохраняет полные удвоения, в StaveNote — unique.
+ * VexFlow даёт максимум 2 смещённые головки на линии; 3+ унисона (Т3 = до×3+ми)
+ * нужно дорисовать. notesData.keys — полные удвоения, в StaveNote — unique.
+ *
+ * Важно: между головками на одной линии оставляем небольшой зазор
+ * (раньше SHIFT≈11 ≈ ширине овала → «слипались»).
  */
 function expandUnisonHeads(staveNotes, notesData, clef, svg, color, stave) {
     if (!svg || !staveNotes || !notesData) return;
     const VF = getVexFlowNamespace();
     if (!VF) return;
-    const SHIFT = 11;
+    // Центр-к-центру: овал ~10–11px + маленький просвет ~3–4px.
+    const HEAD_STEP = 15;
 
     staveNotes.forEach((sn, idx) => {
         const rawKeys = notesData[idx]?.keys;
@@ -2335,38 +2339,50 @@ function expandUnisonHeads(staveNotes, notesData, clef, svg, color, stave) {
         });
 
         lineWant.forEach((want, line) => {
-            if (want < 3) return;
+            if (want < 2) return;
             const lineHeads = byLine.get(line) || [];
             if (!lineHeads.length) return;
 
             lineHeads.sort((a, b) => (a.getAbsoluteX?.() || 0) - (b.getAbsoluteX?.() || 0));
-            const xs = [];
-            lineHeads.forEach(h => {
-                const x = Math.round(h.getAbsoluteX?.() || 0);
-                if (!xs.includes(x)) xs.push(x);
-            });
-
-            let missing = want - xs.length;
-            if (missing <= 0 && want >= 3 && xs.length === 2) missing = 1;
-            if (missing <= 0) return;
-
-            const leftmost = lineHeads[0];
-            const baseX = leftmost.getAbsoluteX?.() || xs[0] || 0;
+            const anchor = lineHeads[lineHeads.length - 1];
+            const anchorX = anchor.getAbsoluteX?.() || 0;
             let y = null;
             try {
                 if (stave && typeof stave.getYForLine === 'function') y = stave.getYForLine(line);
             } catch (_) {}
             if (y == null) {
-                try { y = leftmost.getAbsoluteY?.() ?? leftmost.y ?? null; } catch (_) { y = null; }
+                try { y = anchor.getAbsoluteY?.() ?? anchor.y ?? null; } catch (_) { y = null; }
             }
 
-            const svgEl = noteHeadSvgEl(leftmost);
+            // Целевые X: влево от основной головки, с равным шагом и зазором.
+            const targets = [];
+            for (let i = 0; i < want; i++) {
+                targets.push(anchorX - HEAD_STEP * (want - 1 - i));
+            }
+
+            // Существующие головки VF расставляем по targets (справа → якорь).
+            const usable = lineHeads.slice(0, Math.min(lineHeads.length, want));
+            usable.forEach((h, i) => {
+                const el = noteHeadSvgEl(h);
+                if (!el) return;
+                const curX = h.getAbsoluteX?.() || anchorX;
+                const dx = targets[targets.length - usable.length + i] - curX;
+                if (Math.abs(dx) < 0.5) return;
+                const prev = el.getAttribute('transform') || '';
+                el.setAttribute('transform', `${prev} translate(${dx}, 0)`.trim());
+            });
+
+            const missing = want - usable.length;
+            if (missing <= 0) return;
+
+            const template = noteHeadSvgEl(anchor);
             for (let m = 0; m < missing; m++) {
-                const dx = -SHIFT * (m + 1);
-                if (svgEl && svgEl.parentNode) {
-                    const clone = svgEl.cloneNode(true);
+                const tx = targets[m];
+                const dx = tx - anchorX;
+                if (template && template.parentNode) {
+                    const clone = template.cloneNode(true);
                     clone.setAttribute('transform', `translate(${dx}, 0)`);
-                    svgEl.parentNode.insertBefore(clone, svgEl);
+                    template.parentNode.insertBefore(clone, template);
                     clone.querySelectorAll('path, rect, ellipse, polygon').forEach(el => {
                         const fill = el.getAttribute('fill');
                         if (fill && fill !== 'none') el.setAttribute('fill', color);
@@ -2374,7 +2390,7 @@ function expandUnisonHeads(staveNotes, notesData, clef, svg, color, stave) {
                         if (stroke && stroke !== 'none') el.setAttribute('stroke', color);
                     });
                 } else if (y != null) {
-                    drawExtraUnisonOval(svg, baseX + dx, y, color);
+                    drawExtraUnisonOval(svg, tx, y, color);
                 }
             }
         });
