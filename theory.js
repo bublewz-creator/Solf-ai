@@ -1697,37 +1697,24 @@
         { semis: [3, 6, 9], ru: 'Ум7', en: 'dim7' }
     ];
 
-    /** Символ минорного септаккорда: латинское m7 или кириллическое м7 / м.7 (не м.маж7, не м.ум7). */
-    function isMinorSeventhChordSymbol(t) {
-        const s = String(t || '');
-        // Латиница: m7, но не m7b5 / mMaj7
-        if (/(?:^|[^A-Za-zА-Яа-яЁё])m7(?![bB5/\w])/i.test(s) && !/m\s*maj7/i.test(s)) return true;
-        // Кириллица: м7 / м.7 — только если сразу (опц. точка/пробел) и 7, без «мин/маж/ум» между ними
-        if (/(?:^|[^A-Za-zА-Яа-яЁё])м\.?\s*7(?![0-9])/i.test(s)
-            && !/(?:^|[^A-Za-zА-Яа-яЁё])м\.?\s*(?:мин|маж|ум)/i.test(s)) return true;
-        return false;
-    }
-
     /**
      * Вид септаккорда по школьным названиям → индекс в SEVENTH_KIND_DEFS.
      * «Малый мажорный» = доминантсепт (4+7+10), «большой мажорный» = maj7 (4+7+11) и т.д.
+     *
+     * Важно: голое «м7» / «m7» в сольфеджио — это ИНТЕРВАЛ (малая септима), не аккорд.
+     * Аккорд только при явном «малый минорный», «м.мин7», «минорный септаккорд».
      */
     function parseSeventhKind(t) {
         if (/уменьшенн[а-яё]*\s*септ|(?:^|[^а-яё])ум\.?\s*7(?![0-9])|\bdim7\b|(?:^|[^а-яё])ум7\b/i.test(t)) return 6;
-        // Полууменшённый: «м.ум7» / m7b5 — до голого m7/м7
         if (/полууменьш|(?:^|[^а-яё])м\.?\s*ум\.?\s*7|m7b5|ø7|half[\s-]?dim/i.test(t)) return 5;
         if (/увеличенн[а-яё]*\s*септ|(?:^|[^а-яё])ув\.?\s*7|\baug7\b/i.test(t)) return 4;
         if (/больш[а-яё]*\s*минорн|(?:^|[^а-яё])б\.?\s*мин\.?\s*7|mm7|m\s*maj7/i.test(t)) return 2;
-        // m7 / м7 — явно минорный септ (не путать с D7 / М.маж7)
-        if (isMinorSeventhChordSymbol(t)
-            || /малы[а-яё]*\s*минорн|(?:^|[^а-яё])м\.?\s*мин\.?\s*7|минорн[а-яё]*\s*септ/i.test(t)) return 3;
+        // Только явный минорный СЕПТАККОРД — не голое м7/m7 (это малая септима)
+        if (/малы[а-яё]*\s*минорн|(?:^|[^а-яё])м\.?\s*мин\.?\s*7|минорн[а-яё]*\s*септаккорд/i.test(t)) return 3;
         if (/больш[а-яё]*\s*мажорн|(?:^|[^а-яё])б\.?\s*маж\.?\s*7|\bmaj7\b/i.test(t)) return 0;
-        // D7 / малый мажорный — только явный доминант, никогда m7/м7
-        if (!isMinorSeventhChordSymbol(t)
-            && /малы[а-яё]*\s*мажорн|(?:^|[^а-яё])м\.?\s*маж\.?\s*7|доминант[а-яё]*\s*септ|\bd7\b|dominant\s*7|(?:^|[^а-яё])д\s*7(?![0-9])/i.test(t)) {
-            return 1;
-        }
-        if (/септаккорд|seventh\s*chord|\b7th\b/i.test(t)) return 1;
+        if (/малы[а-яё]*\s*мажорн|(?:^|[^а-яё])м\.?\s*маж\.?\s*7|доминант[а-яё]*\s*септ|\bd7\b|dominant\s*7|(?:^|[^а-яё])д\s*7(?![0-9])/i.test(t)) return 1;
+        // Голое «септаккорд» без уточнения вида — по умолчанию доминант; м7/m7 сюда не попадают
+        if (/септаккорд|seventh\s*chord|\b7th\b/i.test(t) && !/(?:^|[^а-яёa-z])м\.?\s*7(?![0-9])|\bm7\b(?![b5/])/i.test(t)) return 1;
         return null;
     }
 
@@ -2183,6 +2170,28 @@
         return (table[degree] && table[degree][semis]) || '';
     }
 
+    /** Полное имя интервала для текста ответа («малая септима (м7)»). */
+    function intervalProseName(degree, semis, ru) {
+        const short = intervalNameFor(degree, semis, ru);
+        if (!short) return '';
+        if (!ru) {
+            const enFull = {
+                m2: 'Minor second', M2: 'Major second', m3: 'Minor third', M3: 'Major third',
+                P4: 'Perfect fourth', A4: 'Augmented fourth', d5: 'Diminished fifth', P5: 'Perfect fifth',
+                m6: 'Minor sixth', M6: 'Major sixth', m7: 'Minor seventh', M7: 'Major seventh',
+                P8: 'Perfect octave', d7: 'Diminished seventh', A2: 'Augmented second'
+            };
+            return enFull[short] ? `${enFull[short]} (${short})` : short;
+        }
+        const ruFull = {
+            'м2': 'Малая секунда', 'б2': 'Большая секунда', 'м3': 'Малая терция', 'б3': 'Большая терция',
+            'ч4': 'Чистая кварта', 'Ув4': 'Увеличенная кварта', 'Ум5': 'Уменьшённая квинта', 'ч5': 'Чистая квинта',
+            'м6': 'Малая секста', 'б6': 'Большая секста', 'м7': 'Малая септима', 'б7': 'Большая септима',
+            'ч8': 'Чистая октава', 'Ум7': 'Уменьшённая септима', 'Ув2': 'Увеличенная секунда'
+        };
+        return ruFull[short] ? `${ruFull[short]} (${short})` : short;
+    }
+
     function relativeKeyOf(key) {
         const base = { ...key.tonic, octave: 4 };
         return key.mode === 'major'
@@ -2395,7 +2404,8 @@
     }
 
     /** Слова, из-за которых «терцию/сексту» нельзя понимать как интервал (это аккорд). */
-    const CHORD_WORDS_RE = /трезвуч|секстаккорд|квартсекст|терцкварт|квинтсекст|секундаккорд|септаккорд|аккорд|triad|chord|seventh|\bm7\b|\bmaj7\b|\bdim7\b|(?:^|[^а-яёa-z])м\.?\s*7(?![0-9])/i;
+    // Голое м7/m7 — интервал (малая септима), не аккорд; в этот список не входит.
+    const CHORD_WORDS_RE = /трезвуч|секстаккорд|квартсекст|терцкварт|квинтсекст|секундаккорд|септаккорд|аккорд|triad|chord|seventh|\bmaj7\b|\bdim7\b|\bm7b5\b|\bmm7\b/i;
 
     function isChromaticScaleQuery(t) {
         return /хроматическ[а-яё]*\s*(?:гамм|звукоряд|последовательн|вверх|вниз)|chromatic\s*scale/i.test(t);
@@ -2442,10 +2452,10 @@
             return finalize(buildAllSeventhsFromNote(noteAfterFrom));
         }
 
-        // Септаккорд конкретного вида от звука (m7/м7, maj7, D7 …).
-        // m7/м7 — всегда минорный септ; не подменяем на D7 через isD7Query.
+        // Септаккорд конкретного вида от звука (м.мин7, maj7, D7 …).
+        // Голое м7/m7 сюда НЕ относится — это малая септима (интервал ниже).
         let seventhKind = parseSeventhKind(t);
-        if (seventhKind === null && isD7Query(t) && !isMinorSeventhChordSymbol(t)) seventhKind = 1;
+        if (seventhKind === null && isD7Query(t)) seventhKind = 1;
         if (seventhKind !== null) {
             return finalize(buildSeventhByKind(
                 { ...noteAfterFrom, octave: 4 }, seventhKind, 'C', rawQuery
@@ -2780,10 +2790,10 @@
             };
         }
 
-        if (/септаккорд|seventh|d7|д7|доминант|\bm7\b|(?:^|[^а-яёa-z])м\.?\s*7(?![0-9])/i.test(t)) {
+        if (/септаккорд|seventh|d7|д7|доминант|maj7|m7b5|mm7|dim7|м\.?\s*мин\.?\s*7|м\.?\s*маж\.?\s*7/i.test(t)) {
             const note = parseNoteAfterFromIn(rawClause);
             let kind = parseSeventhKind(t);
-            if (kind === null && isD7Query(t) && !isMinorSeventhChordSymbol(t)) kind = 1;
+            if (kind === null && isD7Query(t)) kind = 1;
             if (note == null || kind === null) return null;
             const data = buildSeventhByKind({ ...note, octave: 4 }, kind, 'C', rawClause);
             if (!data) return null;
@@ -3478,6 +3488,26 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         const note = parseNoteAfterFrom(t);
         if (!note) return '';
 
+        // Сначала интервал: голое м7/m7 = малая септима, не септаккорд.
+        const spec = parseIntervalSpec(rawQuery);
+        if (spec && !CHORD_WORDS_RE.test(t) && !isD7Query(t) && parseSeventhKind(t) === null) {
+            const data = buildIntervalFromNote(
+                note, spec.degree, spec.semis, intervalDirection(t), wantsIntervalInversion(t)
+            );
+            const keys = data?.notes?.[0]?.keys;
+            if (keys?.length) {
+                const names = keys.map(k => {
+                    const p = parseVexKey(k);
+                    return p ? (ru ? noteDisplayRu(p, 'C') : noteKey(p)) : k;
+                });
+                const intName = intervalProseName(spec.degree, spec.semis, ru);
+                const rootName = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+                return ru
+                    ? `${intName} от **${rootName}** — **${names.join('**, **')}**:`
+                    : `${intName} from **${rootName}** — **${names.join('**, **')}**:`;
+            }
+        }
+
         let seventhKind = parseSeventhKind(t);
         if (seventhKind === null && isD7Query(t)) seventhKind = 1;
         if (seventhKind !== null) {
@@ -3513,24 +3543,6 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
             return ru
                 ? `${kindLabel}53 от ноты **${rootName}** — **${names.join('**, **')}**:`
                 : `${kindLabel} triad from **${rootName}** — **${names.join('**, **')}**:`;
-        }
-
-        const spec = parseIntervalSpec(rawQuery);
-        if (spec && !CHORD_WORDS_RE.test(t) && !isD7Query(t)) {
-            const data = buildIntervalFromNote(
-                note, spec.degree, spec.semis, intervalDirection(t), wantsIntervalInversion(t)
-            );
-            const keys = data?.notes?.[0]?.keys;
-            if (!keys?.length) return '';
-            const names = keys.map(k => {
-                const p = parseVexKey(k);
-                return p ? (ru ? noteDisplayRu(p, 'C') : noteKey(p)) : k;
-            });
-            const intName = intervalNameFor(spec.degree, spec.semis, ru);
-            const rootName = ru ? noteDisplayRu(note, 'C') : noteKey(note);
-            return ru
-                ? `${intName} от **${rootName}** — **${names.join('**, **')}**:`
-                : `${intName} from **${rootName}** — **${names.join('**, **')}**:`;
         }
 
         return '';
@@ -3677,7 +3689,6 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
             parseNoteAfterFrom,
             parseTriadKind,
             parseSeventhKind,
-            isMinorSeventhChordSymbol,
             buildSeventhByKind,
             splitCompositeClauses,
             buildCompositeFromQuery,

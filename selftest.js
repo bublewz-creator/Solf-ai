@@ -474,58 +474,40 @@
         return total === 8 || 'аккордов ' + total;
     });
 
-    check('m7 от ми — септаккорд, не интервал', () => {
+    check('м7 от си — малая септима (интервал), не септаккорд', () => {
         T.setLabelLocale('ru');
-        const res = T.buildNotationForQuery('построй m7 от ми');
-        if (!res) return 'не распознано';
-        const blocks = extractBlocks(res.blockString);
-        if (!blocks.length) return 'блоков нет';
-        const keys = blocks[0].notes[0].keys.sort().join(',');
-        const expected = ['e/4', 'g/4', 'b/4', 'd/5'].sort().join(',');
-        return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
-    });
-
-    check('кириллическое м7 от ля — минорный септ, не D7', () => {
-        T.setLabelLocale('ru');
-        const res = T.buildNotationForQuery('построй м7 от ля');
+        const res = T.buildNotationForQuery('построй м7 от си');
         if (!res) return 'не распознано';
         const blocks = extractBlocks(res.blockString);
         if (!blocks.length) return 'блоков нет';
         const note = blocks[0].notes[0];
-        if (note.keys.length !== 4) return 'ожидался аккорд из 4 нот, получено ' + note.keys.length;
-        const keys = note.keys.sort().join(',');
-        const expected = ['a/4', 'c/5', 'e/5', 'g/5'].sort().join(',');
-        if (keys !== expected) return 'ноты ' + keys + ', ожидалось ' + expected;
-        if (/d7|д7|м\.маж7|maj7/i.test(note.label || '')) return 'лейбл D7/мажорный: ' + note.label;
-        return true;
+        if (note.keys.length !== 2) return 'ожидались 2 ноты интервала, получено ' + note.keys.length + ': ' + note.keys.join(',');
+        const keys = note.keys.slice().sort().join(',');
+        const expected = ['a/5', 'b/4'].sort().join(',');
+        return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
     });
 
-    check('латинское m7 не путается с D7', () => {
+    check('m7 от ми — тоже малая септима', () => {
         T.setLabelLocale('ru');
-        const kind = T._internals.parseSeventhKind('построй m7 от ре');
-        return kind === 3 || 'kind=' + kind + ' (ожидался 3 = m7)';
+        const res = T.buildNotationForQuery('построй m7 от ми');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        const keys = blocks[0].notes[0].keys.slice().sort().join(',');
+        const expected = ['d/5', 'e/4'].sort().join(',');
+        return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
     });
 
-    check('описание m7 от ре совпадает с нотами на стане', () => {
-        T.setLabelLocale('ru');
-        const q = 'построй m7 от ре';
-        const desc = T.getBuildDescription(q);
-        if (!desc.includes('ре') || !desc.includes('фа') || !desc.includes('ля') || !desc.includes('до')) {
-            return 'в описании нет ре-фа-ля-до: ' + desc;
-        }
-        if (desc.includes('ми') || desc.includes('соль') || desc.includes('си')) {
-            return 'в описании лишние ноты Em7: ' + desc;
-        }
-        return true;
+    check('голое m7/м7 не парсится как септаккорд', () => {
+        const kind = T._internals.parseSeventhKind('построй м7 от ре');
+        return kind === null || 'kind=' + kind + ' (ожидался null — это интервал)';
     });
 
-    check('описание m7 от ми — ми соль си ре', () => {
+    check('описание м7 от си — малая септима си–ля', () => {
         T.setLabelLocale('ru');
-        const desc = T.getBuildDescription('построй m7 от ми');
-        if (!desc.includes('ми') || !desc.includes('соль') || !desc.includes('си')) return 'нет ми-соль-си: ' + desc;
-        if (desc.includes('фа') && desc.includes('ля') && desc.includes('до') && !desc.includes('ми')) {
-            return 'перепутано с Dm7: ' + desc;
-        }
+        const desc = T.getBuildDescription('построй м7 от си');
+        if (!/мал/i.test(desc) || !/септим/i.test(desc)) return 'нет «малая септима»: ' + desc;
+        if (!desc.includes('си') || !desc.includes('ля')) return 'нет си–ля: ' + desc;
+        if (desc.includes('фа-диез') || desc.includes('септаккорд')) return 'это не аккорд: ' + desc;
         return true;
     });
 
