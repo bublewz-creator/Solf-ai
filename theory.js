@@ -98,19 +98,57 @@
             return out;
         }
 
-        const seen = new Set();
-        const keys = [];
         const raw = Array.isArray(entry.keys) ? entry.keys : [entry.keys];
-        for (const k of raw) {
-            const fixed = repairKey(k);
-            if (!fixed || seen.has(fixed)) continue; // дубль звука = наслоение нотных головок
-            seen.add(fixed);
-            keys.push(fixed);
-        }
+        // Удвоения/утроения (т3 = три примы + терция) нельзя просто схлопывать —
+        // на стане останется одна нота. Разводим унисоны по соседним октавам.
+        const keys = spreadUnisonKeys(raw);
         if (!keys.length) return null;
-        keys.sort((a, b) => noteAbs(parseVexKey(a)) - noteAbs(parseVexKey(b)));
         out.keys = keys;
         return out;
+    }
+
+    /** Смещения октав для n голосов на одном звуке (чтобы все были видны на стане). */
+    function unisonOctaveOffsets(count) {
+        if (count <= 1) return [0];
+        if (count === 2) return [0, 1];
+        if (count === 3) return [-1, 0, 1];
+        const out = [];
+        const lo = -Math.floor((count - 1) / 2);
+        for (let i = 0; i < count; i++) out.push(lo + i);
+        return out;
+    }
+
+    /**
+     * Сохраняет число голосов при удвоениях: f/4,f/4,f/4,ab/4 → f/3,f/4,f/5,ab/4.
+     * Иначе sanitize раньше оставлял одну головку, и «т3» рисовался как одна нота.
+     */
+    function spreadUnisonKeys(rawKeys) {
+        const counts = new Map();
+        for (const k of rawKeys) {
+            const fixed = repairKey(k);
+            if (!fixed) continue;
+            counts.set(fixed, (counts.get(fixed) || 0) + 1);
+        }
+        const out = [];
+        for (const [key, count] of counts) {
+            const p = parseVexKey(key);
+            if (!p) continue;
+            for (const off of unisonOctaveOffsets(count)) {
+                let oct = p.octave + off;
+                if (oct < 1) oct = 1;
+                if (oct > 7) oct = 7;
+                out.push(noteKey({ ...p, octave: oct }));
+            }
+        }
+        const seen = new Set();
+        const unique = [];
+        for (const k of out) {
+            if (seen.has(k)) continue;
+            seen.add(k);
+            unique.push(k);
+        }
+        unique.sort((a, b) => noteAbs(parseVexKey(a)) - noteAbs(parseVexKey(b)));
+        return unique;
     }
 
     /**
@@ -3789,6 +3827,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
             keySigFor,
             repairKey,
             sanitizeNoteEntry,
+            spreadUnisonKeys,
             parseModeName,
             parseNoteAfterFrom,
             parseTriadKind,
