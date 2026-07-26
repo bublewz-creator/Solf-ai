@@ -543,6 +543,27 @@
         return true;
     });
 
+    check('D7 в до мажор: D4/3 и D2 не улетают на 6-ю октаву', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('построй д7 в до мажор');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        if (!blocks.length) return 'блоков нет';
+        const notes = blocks[0].notes || [];
+        const d43 = notes.find(n => /D4\/3/i.test(n.label || ''));
+        const d2 = notes.find(n => /^D2$/i.test(n.label || ''));
+        if (!d43) return 'нет D4/3';
+        if (!d2) return 'нет D2';
+        const maxOf = keys => Math.max(...keys.map(k => parseInt(String(k).split('/')[1], 10) || 0));
+        if (maxOf(d43.keys) >= 6) return 'D4/3 слишком высоко: ' + d43.keys.join(',');
+        if (maxOf(d2.keys) >= 6) return 'D2 слишком высоко: ' + d2.keys.join(',');
+        // Все формы — без нот 6-й октавы
+        for (const n of notes) {
+            if (maxOf(n.keys || []) >= 6) return (n.label || '?') + ' на 6-й: ' + n.keys.join(',');
+        }
+        return true;
+    });
+
     check('м7 от си — малая септима (интервал), не септаккорд', () => {
         T.setLabelLocale('ru');
         const res = T.buildNotationForQuery('построй м7 от си');

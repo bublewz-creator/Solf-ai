@@ -1381,6 +1381,55 @@
         return `${tonic.letter}${acc}-${mode}`;
     }
 
+    /**
+     * D7 с обращениями в close position сам «ползёт» вверх (до D6 и выше).
+     * Сдвигаем каждый аккорд в удобный диапазон целиком (унисоны не разъезжаются),
+     * с мягкой связностью соседних созвучий — без скачков ради красоты стана.
+     */
+    function normalizeD7Octaves(notes) {
+        if (!Array.isArray(notes) || !notes.length) return notes;
+        // Жёстко: не выше B5 (одна добавочная), не ниже G3.
+        const hardTop = 71;
+        const hardBottom = 43;
+        // Удобно: примерно D4–G5. Всё выше G5 — сильный штраф.
+        const comfortTop = 67;
+        const comfortBottom = 50;
+        const ideal = 58;
+        let prevCenter = null;
+
+        return notes.map(n => {
+            const keys = n.keys || [];
+            const range = chordAbsRange(keys);
+            if (!range) return n;
+            let bestShift = 0;
+            let bestScore = Infinity;
+
+            for (let shift = -3; shift <= 3; shift++) {
+                const smin = range.minA + shift * 12;
+                const smax = range.maxA + shift * 12;
+                const scenter = range.center + shift * 12;
+                if (smax > hardTop || smin < hardBottom) continue;
+
+                let score = Math.abs(scenter - ideal);
+                if (smax > comfortTop) score += (smax - comfortTop) * 10;
+                if (smin < comfortBottom) score += (comfortBottom - smin) * 2;
+                if (prevCenter != null) score += Math.abs(scenter - prevCenter) * 0.35;
+
+                if (score < bestScore) {
+                    bestScore = score;
+                    bestShift = shift;
+                }
+            }
+
+            prevCenter = range.center + bestShift * 12;
+            if (!bestShift) return n;
+            return {
+                ...n,
+                keys: keys.map(k => shiftVexKeyOctave(k, bestShift))
+            };
+        });
+    }
+
     function buildDominantSeventh(tonic, mode, withInversions, withResolutions) {
         const preset = D7_PRESETS[d7KeyId(tonic, mode)];
         if (!preset) return null;
@@ -1389,7 +1438,7 @@
             ? (mode === 'minor' ? 'т' : 'Т')
             : (mode === 'minor' ? 't' : 'T');
         const tonicSuffix = ['3', '53', '53', '6'];
-        const notes = [];
+        let notes = [];
         for (let i = 0; i < forms; i++) {
             const d7Keys = presetKeys(preset, i * 2);
             const resKeys = presetKeys(preset, i * 2 + 1);
@@ -1405,12 +1454,13 @@
             }
         }
         if (withResolutions && notes.length) delete notes[notes.length - 1].barAfter;
+        notes = normalizeD7Octaves(notes);
         return {
             clef: 'treble',
             keySignature: keySigFor(tonic, mode),
             timeSignature: '',
             barlines: withResolutions ? 'manual' : 'none',
-            // Эталонные аппликатуры уже в удобном диапазоне — нормализатор не поднимает обратно.
+            // Уже подогнано normalizeD7Octaves — общий нормализатор не поднимает обратно.
             lockOctaves: true,
             notes
         };
