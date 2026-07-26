@@ -458,6 +458,28 @@
         return true;
     });
 
+    check('«гамму хроматическую от фа» — хроматика, не нат/гарм/мел', () => {
+        T.setLabelLocale('ru');
+        const q = 'Привет, построй мне гамму хроматическую от фа';
+        const res = T.buildNotationForQuery(q);
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        if (blocks.length !== 1) return 'ожидался 1 блок хроматики, получено ' + blocks.length;
+        if (blocks[0].notes.length !== 13) return 'ожидалось 13 звуков, получено ' + blocks[0].notes.length;
+        const first = blocks[0].notes[0].keys[0];
+        if (!/^f\/\d$/.test(first)) return 'должна начинаться с фа, а не ' + first;
+        if (/натуральн|гармоническ|мелодическ/i.test(res.blockString)) return 'попали обычные формы гаммы';
+        return true;
+    });
+
+    check('«хроматическую гамму от ре» тоже хроматика', () => {
+        const res = T.buildNotationForQuery('построй хроматическую гамму от ре');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        return (blocks.length === 1 && blocks[0].notes.length === 13)
+            || 'блоков ' + blocks.length + ', нот ' + (blocks[0] && blocks[0].notes.length);
+    });
+
     check('«построй гамму» не подменяется хроматической', () => {
         const res = T.buildNotationForQuery('построй гамму до мажор');
         if (!res) return 'не распознано';

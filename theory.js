@@ -2416,7 +2416,9 @@
     const CHORD_WORDS_RE = /трезвуч|секстаккорд|квартсекст|терцкварт|квинтсекст|секундаккорд|септаккорд|аккорд|triad|chord|seventh|\bmaj7\b|\bdim7\b|\bm7b5\b|\bmm7\b/i;
 
     function isChromaticScaleQuery(t) {
-        return /хроматическ[а-яё]*\s*(?:гамм|звукоряд|последовательн|вверх|вниз)|chromatic\s*scale/i.test(t);
+        // Любой порядок: «хроматическая гамма», «гамму хроматическую», «хроматическую от фа»
+        if (!/хроматическ|chromatic/i.test(t)) return false;
+        return /гамм|звукоряд|\bscale\b|последовательн|(?:^|[^а-яa-z])(?:от|from)\s+/i.test(t);
     }
 
     function isViiSeventhQuery(t) {
@@ -2441,6 +2443,41 @@
      */
     function buildFromNoteTask(rawQuery, t) {
         const noteAfterFrom = parseNoteAfterFrom(t);
+
+        // Хроматическая гамма от ноты / в тональности — раньше ладов и обычных гамм.
+        if (isChromaticScaleQuery(t)) {
+            const tonic = noteAfterFrom || parseKey(t)?.tonic || parseSingleNote(t);
+            if (!tonic) return null;
+            const mode = parseKey(t)?.mode || 'major';
+            const ru = labelLocale === 'ru';
+            const bothWays = /вверх\s*и\s*вниз|вниз\s*и\s*вверх|up\s*and\s*down|в\s*обе\s*сторон|ascending\s*and\s*descending/i.test(t);
+            const onlyDown = !bothWays && /вниз|нисход|down|descend/i.test(t);
+            const root = { ...tonic, octave: 4 };
+            if (bothWays) {
+                return finalizeMulti([
+                    {
+                        label: ru ? 'Хроматическая гамма (вверх)' : 'Chromatic scale (ascending)',
+                        data: buildChromaticScale(root, mode, 'up')
+                    },
+                    {
+                        label: ru ? 'Хроматическая гамма (вниз)' : 'Chromatic scale (descending)',
+                        data: buildChromaticScale(root, mode, 'down')
+                    }
+                ]);
+            }
+            const data = buildChromaticScale(root, mode, onlyDown ? 'down' : 'up');
+            const noteName = noteDisplayRu(tonic, 'C');
+            const single = finalize(data);
+            if (!single) return null;
+            const label = ru
+                ? (noteAfterFrom
+                    ? `Хроматическая гамма от ${noteName}`
+                    : (onlyDown ? 'Хроматическая гамма (вниз)' : 'Хроматическая гамма (вверх)'))
+                : (noteAfterFrom
+                    ? `Chromatic scale from ${noteKey(tonic)}`
+                    : (onlyDown ? 'Chromatic scale (descending)' : 'Chromatic scale (ascending)'));
+            return finalizeMulti([{ label, data }]) || single;
+        }
 
         // Лады народной музыки / пентатоника — тоника берётся после «от» или из тональности.
         const modeName = parseModeName(t);
@@ -2921,6 +2958,19 @@
                 data = buildCharacteristic(key.tonic, key.mode);
                 break;
             case 'scale':
+                // Хроматическая уже обработана выше; сюда не пускаем.
+                if (isChromaticScaleQuery(t)) {
+                    const bothWays = /вверх\s*и\s*вниз|вниз\s*и\s*вверх|up\s*and\s*down|в\s*обе\s*сторон|ascending\s*and\s*descending/i.test(t);
+                    const onlyDown = !bothWays && /вниз|нисход|down|descend/i.test(t);
+                    if (bothWays) {
+                        return finalizeMulti([
+                            { label: labelLocale === 'ru' ? 'Хроматическая гамма (вверх)' : 'Chromatic scale (ascending)', data: buildChromaticScale(key.tonic, key.mode, 'up') },
+                            { label: labelLocale === 'ru' ? 'Хроматическая гамма (вниз)' : 'Chromatic scale (descending)', data: buildChromaticScale(key.tonic, key.mode, 'down') }
+                        ]);
+                    }
+                    data = buildChromaticScale(key.tonic, key.mode, onlyDown ? 'down' : 'up');
+                    break;
+                }
                 if (wantsAllForms(t) && !form) {
                     return finalizeMulti(buildAllScaleForms(key.tonic, key.mode, labelLocale === 'ru', t));
                 }
