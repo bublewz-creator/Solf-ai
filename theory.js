@@ -1719,14 +1719,16 @@
     }
 
     /**
-     * Подпись на нотном стане. М.маж7 и D7 — один и тот же аккорд (4+7+10),
-     * но если в запросе явно «D7» / «доминантсепт» — пишем D7 (как в гармонии).
+     * Подпись на нотном стане / в тексте. М.маж7 и D7 — один аккорд (4+7+10).
+     * В гармонии (д7 / D7 / доминантсепт) всегда пишем D7, не «М.маж7».
      */
     function preferredSeventhLabel(t, kindIdx, def) {
         const ctx = String(t || '');
-        if (kindIdx === 1 && isD7Query(ctx)) return 'D7';
+        if (kindIdx === 1 && (isD7Query(ctx) || /доминант|dominant/i.test(ctx))) return 'D7';
         if (kindIdx === 6 && isViiSeventhQuery(ctx)) return 'VII7';
         if (kindIdx === 5 && /полууменьш|m7b5|ø7/i.test(ctx)) return labelLocale === 'ru' ? 'М.ум7' : 'm7b5';
+        // «Малый мажорный» в тональности = доминантсепт → D7
+        if (kindIdx === 1 && parseKey(ctx.toLowerCase().replace(/ё/g, 'е'))) return 'D7';
         return labelLocale === 'ru' ? def.ru : def.en;
     }
 
@@ -3665,15 +3667,30 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         const buildDesc = getBuildDescription(rawQuery);
         if (buildDesc) return buildDesc;
         if (/трезвуч|triad/i.test(t)) return pick('Готовое построение:', 'Here is the chord:');
-        if (parseSeventhKind(t)) {
+        if (parseSeventhKind(t) !== null || isD7Query(t)) {
             const key = parseKey(t);
             if (key) {
-                const def = SEVENTH_KIND_DEFS[parseSeventhKind(t)];
-                const kindName = def ? (ru ? def.ru : def.en) : '';
+                const kindIdx = parseSeventhKind(t) !== null ? parseSeventhKind(t) : 1;
+                const def = SEVENTH_KIND_DEFS[kindIdx];
+                const kindName = preferredSeventhLabel(rawQuery, kindIdx, def);
                 const keyName = tonalityDisplayName(key.tonic, key.mode, ru);
+                if (isD7Query(t) || kindName === 'D7') {
+                    const withInv = wantsInversions(t);
+                    const withRes = wantsResolution(t);
+                    if (withInv && withRes) {
+                        return pick(
+                            `D7 с обращениями и разрешениями в ${keyName}:`,
+                            `D7 with inversions and resolutions in ${keyName}:`
+                        );
+                    }
+                    if (withInv) {
+                        return pick(`D7 с обращениями в ${keyName}:`, `D7 with inversions in ${keyName}:`);
+                    }
+                    return pick(`D7 в ${keyName}:`, `D7 in ${keyName}:`);
+                }
                 return pick(
-                    `${kindName || 'Септаккорд'} в ${keyName} (основной вид от тоники):`,
-                    `${kindName || 'Seventh chord'} in ${keyName} (root position from tonic):`
+                    `${kindName || 'Септаккорд'} в ${keyName}:`,
+                    `${kindName || 'Seventh chord'} in ${keyName}:`
                 );
             }
         }
