@@ -485,6 +485,27 @@
         return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
     });
 
+    check('кириллическое м7 от ля — минорный септ, не D7', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('построй м7 от ля');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        if (!blocks.length) return 'блоков нет';
+        const note = blocks[0].notes[0];
+        if (note.keys.length !== 4) return 'ожидался аккорд из 4 нот, получено ' + note.keys.length;
+        const keys = note.keys.sort().join(',');
+        const expected = ['a/4', 'c/5', 'e/5', 'g/5'].sort().join(',');
+        if (keys !== expected) return 'ноты ' + keys + ', ожидалось ' + expected;
+        if (/d7|д7|м\.маж7|maj7/i.test(note.label || '')) return 'лейбл D7/мажорный: ' + note.label;
+        return true;
+    });
+
+    check('латинское m7 не путается с D7', () => {
+        T.setLabelLocale('ru');
+        const kind = T._internals.parseSeventhKind('построй m7 от ре');
+        return kind === 3 || 'kind=' + kind + ' (ожидался 3 = m7)';
+    });
+
     check('описание m7 от ре совпадает с нотами на стане', () => {
         T.setLabelLocale('ru');
         const q = 'построй m7 от ре';
