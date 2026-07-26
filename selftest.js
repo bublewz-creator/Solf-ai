@@ -516,6 +516,33 @@
         return true;
     });
 
+    check('D7 в ми минор: удобные октавы, т3 с утроенным ми', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('построй д7 в ми минор');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        if (!blocks.length) return 'блоков нет';
+        const notes = blocks[0].notes || [];
+        const d7 = notes.find(n => /^D7$/i.test(n.label || ''));
+        const t3 = notes.find(n => /т3|t3/i.test(n.label || ''));
+        if (!d7) return 'нет D7';
+        if (!t3) return 'нет т3';
+        if (d7.keys.join(',') !== 'b/3,d#/4,f#/4,a/4') {
+            return 'D7 должен быть на удобных октавах b3–a4, получено: ' + d7.keys.join(',');
+        }
+        const eCount = t3.keys.filter(k => /^e\//i.test(k)).length;
+        if (eCount < 3) return 'т3 должно хранить 3×ми: ' + t3.keys.join(',');
+        const eOcts = new Set(t3.keys.filter(k => /^e\//i.test(k)).map(k => k.split('/')[1]));
+        if (eOcts.size !== 1) return 'ми разъехались по октавам: ' + t3.keys.join(',');
+        let maxOct = 0;
+        notes.forEach(n => (n.keys || []).forEach(k => {
+            const o = parseInt(String(k).split('/')[1], 10);
+            if (Number.isFinite(o)) maxOct = Math.max(maxOct, o);
+        }));
+        if (maxOct >= 6) return 'слишком высоко (октава ' + maxOct + ')';
+        return true;
+    });
+
     check('м7 от си — малая септима (интервал), не септаккорд', () => {
         T.setLabelLocale('ru');
         const res = T.buildNotationForQuery('построй м7 от си');

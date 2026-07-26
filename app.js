@@ -2276,8 +2276,38 @@ function vfKeyLine(VF, key, clef) {
     }
 }
 
-/** VexFlow даёт только 2 позиции на одной линии (обычная / смещённая); 3+ унисона накладываются. */
-function expandUnisonHeads(staveNotes, notesData, clef, svg, color) {
+function noteHeadSvgEl(head) {
+    if (!head) return null;
+    try {
+        if (typeof head.getSVGElement === 'function') {
+            const el = head.getSVGElement();
+            if (el) return el;
+        }
+    } catch (_) {}
+    return head.attrs?.el || head.el || null;
+}
+
+/** Дорисовывает овалы унисона, если clone SVG-головки недоступен (VexFlow 4). */
+function drawExtraUnisonOval(svg, x, y, color) {
+    if (!svg || !Number.isFinite(x) || !Number.isFinite(y)) return;
+    const NS = 'http://www.w3.org/2000/svg';
+    const g = document.createElementNS(NS, 'g');
+    g.setAttribute('transform', `translate(${x}, ${y}) rotate(-20)`);
+    const oval = document.createElementNS(NS, 'ellipse');
+    oval.setAttribute('cx', '0');
+    oval.setAttribute('cy', '0');
+    oval.setAttribute('rx', '5.2');
+    oval.setAttribute('ry', '3.8');
+    oval.setAttribute('fill', color);
+    g.appendChild(oval);
+    svg.appendChild(g);
+}
+
+/**
+ * VexFlow даёт максимум 2 смещённые головки на линии; 3+ унисона (т3 = ми×3+соль)
+ * нужно дорисовать. notesData.keys сохраняет полные удвоения, в StaveNote — unique.
+ */
+function expandUnisonHeads(staveNotes, notesData, clef, svg, color, stave) {
     if (!svg || !staveNotes || !notesData) return;
     const VF = getVexFlowNamespace();
     if (!VF) return;
@@ -2321,20 +2351,31 @@ function expandUnisonHeads(staveNotes, notesData, clef, svg, color) {
             if (missing <= 0) return;
 
             const leftmost = lineHeads[0];
-            const svgEl = leftmost.getSVGElement?.();
-            if (!svgEl || !svgEl.parentNode) return;
+            const baseX = leftmost.getAbsoluteX?.() || xs[0] || 0;
+            let y = null;
+            try {
+                if (stave && typeof stave.getYForLine === 'function') y = stave.getYForLine(line);
+            } catch (_) {}
+            if (y == null) {
+                try { y = leftmost.getAbsoluteY?.() ?? leftmost.y ?? null; } catch (_) { y = null; }
+            }
 
+            const svgEl = noteHeadSvgEl(leftmost);
             for (let m = 0; m < missing; m++) {
                 const dx = -SHIFT * (m + 1);
-                const clone = svgEl.cloneNode(true);
-                clone.setAttribute('transform', `translate(${dx}, 0)`);
-                svgEl.parentNode.insertBefore(clone, svgEl);
-                clone.querySelectorAll('path, rect, ellipse, polygon').forEach(el => {
-                    const fill = el.getAttribute('fill');
-                    if (fill && fill !== 'none') el.setAttribute('fill', color);
-                    const stroke = el.getAttribute('stroke');
-                    if (stroke && stroke !== 'none') el.setAttribute('stroke', color);
-                });
+                if (svgEl && svgEl.parentNode) {
+                    const clone = svgEl.cloneNode(true);
+                    clone.setAttribute('transform', `translate(${dx}, 0)`);
+                    svgEl.parentNode.insertBefore(clone, svgEl);
+                    clone.querySelectorAll('path, rect, ellipse, polygon').forEach(el => {
+                        const fill = el.getAttribute('fill');
+                        if (fill && fill !== 'none') el.setAttribute('fill', color);
+                        const stroke = el.getAttribute('stroke');
+                        if (stroke && stroke !== 'none') el.setAttribute('stroke', color);
+                    });
+                } else if (y != null) {
+                    drawExtraUnisonOval(svg, baseX + dx, y, color);
+                }
             }
         });
     });
@@ -2344,8 +2385,21 @@ function buildStaveNote(VF, clef, n, keySig) {
     const duration = String(n.duration || 'q').toLowerCase();
     const isRest = duration.includes('r');
     const rawKeys = Array.isArray(n.keys) && n.keys.length ? n.keys : ['c/4'];
+    // VexFlow 4 с 3× одинаковым key часто теряет головки — в движок отдаём unique,
+    // полные удвоения остаются в n.keys для expandUnisonHeads.
+    const keysForVf = [];
+    if (!isRest) {
+        const seen = new Set();
+        for (const k of rawKeys) {
+            if (seen.has(k)) continue;
+            seen.add(k);
+            keysForVf.push(k);
+        }
+    }
     const ks = normalizeKeySignature(keySig || 'C');
-    const prepared = isRest ? rawKeys.map(k => ({ key: k, modifier: null })) : rawKeys.map(k => prepareKeyForKeySig(k, ks));
+    const prepared = isRest
+        ? rawKeys.map(k => ({ key: k, modifier: null }))
+        : keysForVf.map(k => prepareKeyForKeySig(k, ks));
     const keys = prepared.map(p => p.key);
     const note = new VF.StaveNote({
         clef,
@@ -2620,7 +2674,7 @@ function renderSatbNotationCard(container, data) {
 
         const svg = container.querySelector('svg');
         unisonBatch.forEach(({ staveNotes, notesData, stave, clef }) => {
-            try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor); } catch (_) {}
+            try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor, stave); } catch (_) {}
             try { drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor); } catch (_) {}
         });
 
@@ -2821,7 +2875,7 @@ function renderNotationCard(container, data) {
             });
             const svg = container.querySelector('svg');
             unisonBatch.forEach(({ staveNotes, notesData, stave }) => {
-                try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor); } catch (_) {}
+                try { expandUnisonHeads(staveNotes, notesData, clef, svg, noteColor, stave); } catch (_) {}
                 try { drawChordLabelsBelow(svg, stave, staveNotes, notesData, noteColor); } catch (_) {}
             });
         });
