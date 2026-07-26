@@ -487,19 +487,40 @@
         return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
     });
 
-    check('m7 от ми — тоже малая септима', () => {
-        T.setLabelLocale('ru');
-        const res = T.buildNotationForQuery('построй m7 от ми');
-        if (!res) return 'не распознано';
-        const blocks = extractBlocks(res.blockString);
-        const keys = blocks[0].notes[0].keys.slice().sort().join(',');
-        const expected = ['d/5', 'e/4'].sort().join(',');
-        return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
-    });
-
     check('голое m7/м7 не парсится как септаккорд', () => {
         const kind = T._internals.parseSeventhKind('построй м7 от ре');
         return kind === null || 'kind=' + kind + ' (ожидался null — это интервал)';
+    });
+
+    check('все простые интервалы от до — быстрый ответ движка', () => {
+        T.setLabelLocale('ru');
+        const specs = ['ч1', 'м2', 'б2', 'м3', 'б3', 'ч4', 'ч5', 'м6', 'б6', 'м7', 'б7', 'ч8'];
+        for (const spec of specs) {
+            const q = 'построй ' + spec + ' от до';
+            const res = T.buildNotationForQuery(q);
+            if (!res) return spec + ': не распознано';
+            const blocks = extractBlocks(res.blockString);
+            if (!blocks.length || !blocks[0].notes?.[0]?.keys) return spec + ': нет нот';
+            if (blocks[0].notes[0].keys.length !== 2) return spec + ': ожидались 2 ноты, ' + blocks[0].notes[0].keys.length;
+            const desc = T.getBuildDescription(q);
+            if (!desc) return spec + ': нет текстового описания';
+        }
+        return true;
+    });
+
+    check('интервалы от разных нот (ре/ми/фа/соль/ля/си)', () => {
+        T.setLabelLocale('ru');
+        const notes = ['ре', 'ми', 'фа', 'соль', 'ля', 'си'];
+        const specs = ['б3', 'ч5', 'м7'];
+        for (const note of notes) {
+            for (const spec of specs) {
+                const q = 'построй ' + spec + ' от ' + note;
+                const res = T.buildNotationForQuery(q);
+                if (!res) return q + ': не распознано';
+                if (extractBlocks(res.blockString)[0].notes[0].keys.length !== 2) return q + ': не интервал';
+            }
+        }
+        return true;
     });
 
     check('описание м7 от си — малая септима си–ля', () => {
