@@ -809,8 +809,11 @@ function patchAiWithTheory(userQuery, aiText, det) {
     if (!resolved?.blockString || !window.SolfTheory?.applyBlock) return aiText;
     const q = stripNotationReminder(userQuery);
     const theoryProse = buildTheoryProse(q);
-    const intro = buildTheoryIntro(q);
-    const parts = [theoryProse, intro].filter(Boolean);
+    const buildDesc = (() => {
+        try { return window.SolfTheory.getBuildDescription?.(q) || ''; } catch (_) { return ''; }
+    })();
+    const intro = buildDesc ? null : buildTheoryIntro(q);
+    const parts = [theoryProse, buildDesc || intro].filter(Boolean);
     let prose = parts.length
         ? parts.join('\n\n')
         : stripNotationBlocks(String(aiText || '')).trim();
@@ -983,8 +986,9 @@ function isBuildTask(query) {
     if (/мелодическ[а-яё]*\s*гамм|гамм[а-яё]*\s*мелодическ|построй\s*гамм|build\s*scale|все\s*виды\s*гамм/i.test(t)) return true;
     if (/главн[а-яё]*\s*трезвуч|main\s*triads?/i.test(t)) return true;
     const buildVerb = /построй|постро|построи|сделай|напиши|выведи|нарисуй|покажи|build|draw|show|write|construct|make\b|create\b|harmoniz/i;
-    const buildNoun = /тритон|характерн[а-яё]*\s*интервал|ув\.?\s*[2457]|ум\.?\s*[47]|увеличенн[а-яё]*\s*(?:секунд|квинт|квар)|уменьшенн[а-яё]*\s*(?:септим|кварт)|гамм|звукоряд|трезвуч|аккорд|интервал|секунд|терци|кварт|квинт|септим|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody/i;
+    const buildNoun = /тритон|характерн[а-яё]*\s*интервал|ув\.?\s*[2457]|ум\.?\s*[47]|увеличенн[а-яё]*\s*(?:секунд|квинт|квар)|уменьшенн[а-яё]*\s*(?:септим|кварт)|гамм|звукоряд|трезвуч|аккорд|интервал|секунд|терци|кварт|квинт|септим|цепочк|задач|упражнен|мелоди|cadence|scale|triad|chord|interval|tritone|inversion|resolution|dominant|sept|exercise|melody|\bm7\b|\bmaj7\b|\bdim7\b|\bm7b5\b|\baug7\b|\bmm7\b/i;
     if (buildVerb.test(t) && buildNoun.test(t)) return true;
+    if (/\b(m7|maj7|dim7|m7b5|aug7|mm7)\b/i.test(t) && /(?:от|from)\s+/i.test(t)) return true;
     if (/\bd\s*7\b|dominant\s*7|доминант[а-яё]*\s*септ|(?:^|[^а-яё])д\s*7(?![0-9])/i.test(t) && buildVerb.test(t)) return true;
     if (/^d7\b|^\s*d7[\s,]/i.test(t.trim())) return true;
     return false;
@@ -3311,6 +3315,27 @@ function sendChatMessage() {
     proceedWithQuery(query, imageData);
 }
 
+function suggestionQueryFromChip(btn) {
+    const key = btn.getAttribute('data-i18n');
+    if (!key) return btn.textContent.trim();
+    const raw = typeof solfaiGetText === 'function' ? solfaiGetText(key) : btn.textContent.trim();
+    return raw.replace(/^[\u{1F300}-\u{1FAFF}\u2600-\u27BF]\s*/u, '').trim();
+}
+
+function initQuickSuggestions() {
+    document.querySelectorAll('.suggestion-chip').forEach(btn => {
+        if (btn.dataset.suggestionBound === '1') return;
+        btn.dataset.suggestionBound = '1';
+        btn.addEventListener('click', () => {
+            const query = suggestionQueryFromChip(btn);
+            if (!query || isGenerating) return;
+            if (getRemainingRequests() <= 0) { showNoRequestsToast(); return; }
+            if (!currentUser) { pendingQuery = { query, imageData: null }; showLoginPrompt(); return; }
+            proceedWithQuery(query, null);
+        });
+    });
+}
+
 function updateUIForUser() {
     if (currentUser) {
         document.documentElement.classList.add('is-logged-in');
@@ -3622,6 +3647,7 @@ async function initApp() {
     if (typeof setLanguage === 'function' && typeof currentLang !== 'undefined') {
         setLanguage(currentLang); 
     }
+    initQuickSuggestions();
     
     // ВСЕГДА вызываем updateUIForUser, не только для гостей. Раньше тут было
     // `if (!currentUser) updateUIForUser()` — и если юзер залогинен, аватарка/имя/email

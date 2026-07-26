@@ -2424,6 +2424,15 @@
             return finalize(buildAllSeventhsFromNote(noteAfterFrom));
         }
 
+        // Септаккорд конкретного вида от звука (m7, maj7, D7 …).
+        let seventhKind = parseSeventhKind(t);
+        if (seventhKind === null && isD7Query(t)) seventhKind = 1;
+        if (seventhKind !== null) {
+            return finalize(buildSeventhByKind(
+                { ...noteAfterFrom, octave: 4 }, seventhKind, 'C', rawQuery
+            ));
+        }
+
         // Трезвучие конкретного вида от звука (+ обращения).
         if (/трезвуч|triad/i.test(t)) {
             const kind = parseTriadKind(t);
@@ -3421,6 +3430,93 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         return parts.join('\n\n');
     }
 
+    const SEVENTH_KIND_FULL_RU = [
+        'Большой мажорный септаккорд',
+        'Малый мажорный септаккорд',
+        'Большой минорный септаккорд',
+        'Малый минорный септаккорд',
+        'Увеличенный септаккорд',
+        'Полуумалённый септаккорд',
+        'Уменьшённый септаккорд'
+    ];
+    const SEVENTH_KIND_FULL_EN = [
+        'Major seventh chord',
+        'Dominant seventh chord',
+        'Minor-major seventh chord',
+        'Minor seventh chord',
+        'Augmented seventh chord',
+        'Half-diminished seventh chord',
+        'Diminished seventh chord'
+    ];
+
+    /**
+     * Точное текстовое описание построения «от ноты» — ноты берутся из движка,
+     * а не из ответа модели (иначе текст и стан расходятся).
+     */
+    function getBuildDescription(rawQuery) {
+        const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
+        const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+        const note = parseNoteAfterFrom(t);
+        if (!note) return '';
+
+        let seventhKind = parseSeventhKind(t);
+        if (seventhKind === null && isD7Query(t)) seventhKind = 1;
+        if (seventhKind !== null) {
+            const data = buildSeventhByKind({ ...note, octave: 4 }, seventhKind, 'C', rawQuery);
+            const keys = data?.notes?.[0]?.keys;
+            if (!keys?.length) return '';
+            const names = keys.map(k => {
+                const p = parseVexKey(k);
+                return p ? (ru ? noteDisplayRu(p, 'C') : noteKey(p)) : k;
+            });
+            const def = SEVENTH_KIND_DEFS[seventhKind];
+            const rootName = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+            const kindLabel = preferredSeventhLabel(rawQuery, seventhKind, def);
+            const kindFull = ru ? SEVENTH_KIND_FULL_RU[seventhKind] : SEVENTH_KIND_FULL_EN[seventhKind];
+            return ru
+                ? `${kindFull} (${kindLabel}) от ноты **${rootName}** состоит из нот **${names.join('**, **')}**:`
+                : `${kindFull} (${kindLabel}) from **${rootName}** consists of **${names.join('**, **')}**:`;
+        }
+
+        if (/трезвуч|triad/i.test(t)) {
+            const kind = parseTriadKind(t);
+            if (!kind) return '';
+            const data = buildTriadFromNote({ ...note, octave: 4 }, kind, wantsIntervalInversion(t));
+            const keys = data?.notes?.[0]?.keys;
+            if (!keys?.length) return '';
+            const names = keys.map(k => {
+                const p = parseVexKey(k);
+                return p ? (ru ? noteDisplayRu(p, 'C') : noteKey(p)) : k;
+            });
+            const def = TRIAD_KIND_DEFS[kind];
+            const rootName = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+            const kindLabel = ru ? def.ru : def.en;
+            return ru
+                ? `${kindLabel}53 от ноты **${rootName}** — **${names.join('**, **')}**:`
+                : `${kindLabel} triad from **${rootName}** — **${names.join('**, **')}**:`;
+        }
+
+        const spec = parseIntervalSpec(rawQuery);
+        if (spec && !CHORD_WORDS_RE.test(t) && !isD7Query(t)) {
+            const data = buildIntervalFromNote(
+                note, spec.degree, spec.semis, intervalDirection(t), wantsIntervalInversion(t)
+            );
+            const keys = data?.notes?.[0]?.keys;
+            if (!keys?.length) return '';
+            const names = keys.map(k => {
+                const p = parseVexKey(k);
+                return p ? (ru ? noteDisplayRu(p, 'C') : noteKey(p)) : k;
+            });
+            const intName = intervalNameFor(spec.degree, spec.semis, ru);
+            const rootName = ru ? noteDisplayRu(note, 'C') : noteKey(note);
+            return ru
+                ? `${intName} от **${rootName}** — **${names.join('**, **')}**:`
+                : `${intName} from **${rootName}** — **${names.join('**, **')}**:`;
+        }
+
+        return '';
+    }
+
     /**
      * Короткая подводка к готовому построению. Используется ТОЛЬКО когда другого
      * текста нет (мгновенный ответ движка без обращения к модели), чтобы на экране
@@ -3448,6 +3544,8 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         if (isOpevanieQuery(t)) return pick('Опевание устойчивых ступеней — соседняя сверху, соседняя снизу, устой:', 'Surrounding each stable degree — upper neighbour, lower neighbour, the degree itself:');
         if (/все\s*(?:простые\s*)?интервал|all\s*(?:simple\s*)?intervals/i.test(t)) return pick('Все простые интервалы от заданного звука:', 'All simple intervals from the given note:');
         if (/септаккорд|seventh/i.test(t) && /все|all/i.test(t)) return pick('Все виды септаккордов от заданного звука:', 'All seventh-chord types from the given note:');
+        const buildDesc = getBuildDescription(rawQuery);
+        if (buildDesc) return buildDesc;
         if (/трезвуч|triad/i.test(t)) return pick('Готовое построение:', 'Here is the chord:');
         if (parseSeventhKind(t)) {
             const key = parseKey(t);
@@ -3520,6 +3618,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         getSystemPrompt,
         getTheoryRules,
         getTheoryProse,
+        getBuildDescription,
         getExerciseIntro,
         applyBlock,
         autoLabelNotation,

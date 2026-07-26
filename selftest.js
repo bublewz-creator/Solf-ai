@@ -474,6 +474,40 @@
         return total === 8 || 'аккордов ' + total;
     });
 
+    check('m7 от ми — септаккорд, не интервал', () => {
+        T.setLabelLocale('ru');
+        const res = T.buildNotationForQuery('построй m7 от ми');
+        if (!res) return 'не распознано';
+        const blocks = extractBlocks(res.blockString);
+        if (!blocks.length) return 'блоков нет';
+        const keys = blocks[0].notes[0].keys.sort().join(',');
+        const expected = ['e/4', 'g/4', 'b/4', 'd/5'].sort().join(',');
+        return keys === expected || 'ноты ' + keys + ', ожидалось ' + expected;
+    });
+
+    check('описание m7 от ре совпадает с нотами на стане', () => {
+        T.setLabelLocale('ru');
+        const q = 'построй m7 от ре';
+        const desc = T.getBuildDescription(q);
+        if (!desc.includes('ре') || !desc.includes('фа') || !desc.includes('ля') || !desc.includes('до')) {
+            return 'в описании нет ре-фа-ля-до: ' + desc;
+        }
+        if (desc.includes('ми') || desc.includes('соль') || desc.includes('си')) {
+            return 'в описании лишние ноты Em7: ' + desc;
+        }
+        return true;
+    });
+
+    check('описание m7 от ми — ми соль си ре', () => {
+        T.setLabelLocale('ru');
+        const desc = T.getBuildDescription('построй m7 от ми');
+        if (!desc.includes('ми') || !desc.includes('соль') || !desc.includes('си')) return 'нет ми-соль-си: ' + desc;
+        if (desc.includes('фа') && desc.includes('ля') && desc.includes('до') && !desc.includes('ми')) {
+            return 'перепутано с Dm7: ' + desc;
+        }
+        return true;
+    });
+
     check('запрос без ноты после «от» не ломает движок', () => {
         const res = T.buildNotationForQuery('построй б3');
         return res === null || (res.blockString ? validateBlockString(res.blockString, 'б3') : true);
