@@ -63,9 +63,9 @@ async function syncAppData() {
         // 12 сек — потолок для GET-запроса к БД. Если бэк за это время не ответил,
         // значит сеть/Cloudflare режут, и зависать дальше бессмысленно. Юзер останется
         // с локально-кэшированными данными (имя/план/счётчик), и UI будет работать.
-        const prevPlan = currentUser?.plan_type || 'free';
+        // prev_plan больше НЕ передаём: refill при sync ломал квоту между устройствами.
         const res = await apiFetch(
-            `${WORKER_URL}/get-user?id=${currentUser.id}&prev_plan=${encodeURIComponent(prevPlan)}`,
+            `${WORKER_URL}/get-user?id=${currentUser.id}`,
             {},
             12000
         );
@@ -1513,11 +1513,15 @@ function getRemainingRequests() {
     if (limit === Infinity) return 9999;
 
     if (isUserLoggedIn()) {
-        // Только БД — никакого localStorage. Если syncAppData ещё не отработал
-        // (currentUser.requests_count = undefined) — считаем 0 потраченных, после первого
-        // sync значение перезапишется. Это безопасно: бэк всё равно проверит лимит сам.
+        // Только БД / currentUser. Если sync ещё не подтянул requests_count —
+        // НЕ считаем usage=0 (иначе мигает полный лимит 50/50 и путает с реальным сбросом).
         const dbUsage = Number(currentUser?.requests_count);
-        return Math.max(0, limit - (Number.isFinite(dbUsage) ? dbUsage : 0));
+        if (!Number.isFinite(dbUsage)) {
+            const cached = Number(JSON.parse(localStorage.getItem('solfai_user') || '{}')?.requests_count);
+            if (Number.isFinite(cached)) return Math.max(0, limit - cached);
+            return limit; // неизвестно — показываем лимит, бэк всё равно проверит
+        }
+        return Math.max(0, limit - dbUsage);
     }
 
     return Math.max(0, limit - getUsageData().count);
@@ -3358,26 +3362,54 @@ function updateUIForUser() {
     if (!currentChatId) startNewChat();
     dismissChatInputFocus();
 
-    // НОВОЕ: Асинхронно грузим чаты из БД и обновляем UI.
+    // Асинхронно грузим чаты из БД и СЛИВАЕМ с локальными (не затираем одни другими).
     // 15 сек хватит даже на медленную мобильную связь; если бэк не отвечает (без VPN),
     // юзер останется со списком из localStorage и сможет продолжать работу.
     if (currentUser) {
         apiFetch(`${WORKER_URL}/get-chats?user_id=${currentUser.id}`, {}, 15000)
             .then(res => res.json())
             .then(data => {
-                if (data.chats && data.chats.length > 0) {
-                    const local = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
-                    const pinnedLocal = new Map(local.filter(c => c.pinned).map(c => [c.id, true]));
-                    chats = data.chats.map(c => ({
-                        ...c,
-                        pinned: !!(c.pinned || pinnedLocal.get(c.id))
-                    }));
-                    // Срезаем «лишние» чаты сверх MAX_SAVED_CHATS и удаляем их с сервера,
-                    // чтобы БД не раздувалась.
-                    enforceChatLimit();
-                    localStorage.setItem(getChatsStorageKey(), JSON.stringify(chats.slice(0, MAX_SAVED_CHATS)));
-                    renderChatsList();
+                const serverChats = Array.isArray(data.chats) ? data.chats : [];
+                if (!serverChats.length) return;
+                const local = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
+                const byId = new Map();
+                const chatScore = (c) => {
+                    const t = Date.parse(c.updatedAt || c.createdAt || 0) || 0;
+                    const n = Array.isArray(c.messages) ? c.messages.length : 0;
+                    return t * 1000 + n;
+                };
+                for (const c of [...local, ...serverChats]) {
+                    if (!c?.id) continue;
+                    const prev = byId.get(c.id);
+                    if (!prev) {
+                        byId.set(c.id, c);
+                        continue;
+                    }
+                    const richer = chatScore(c) >= chatScore(prev) ? c : prev;
+                    const other = richer === c ? prev : c;
+                    byId.set(c.id, {
+                        ...other,
+                        ...richer,
+                        pinned: !!(c.pinned || prev.pinned),
+                        messages: (richer.messages?.length || 0) >= (other.messages?.length || 0)
+                            ? (richer.messages || [])
+                            : (other.messages || []),
+                    });
                 }
+                chats = [...byId.values()].sort((a, b) => {
+                    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+                    return chatScore(b) - chatScore(a);
+                });
+                // Чаты, которые есть только локально (ещё не улетели в БД) — дожимаем на сервер.
+                for (const localChat of local) {
+                    if (!localChat?.id) continue;
+                    if (!serverChats.some(s => s.id === localChat.id)) {
+                        saveChatToServer(localChat);
+                    }
+                }
+                enforceChatLimit();
+                localStorage.setItem(getChatsStorageKey(), JSON.stringify(chats.slice(0, MAX_SAVED_CHATS)));
+                renderChatsList();
             })
             .catch(err => console.error("Ошибка загрузки истории чатов из БД:", err));
     }
