@@ -2,6 +2,9 @@
 
 const WORKER_URL = 'https://solf-ai-api.mlemonw.workers.dev';
 
+/** Макс. длина текста пользователя в одном сообщении (экономия токенов Gemini + анти-спам). */
+const MAX_CHAT_MESSAGE_CHARS = 800;
+
 // Глобальный wrapper над fetch'ем для backend'а: добавляет AbortController с таймаутом.
 //
 // ЗАЧЕМ: solf-ai-api.mlemonw.workers.dev — это Cloudflare Workers. У части пользователей
@@ -936,6 +939,19 @@ function deliverInstantAiReply(text, chatId = currentChatId) {
     return deliverAiReplyToChat(chatId, text, { withTyping: true }).then(() => {
         resetGeneratingUi();
     });
+}
+
+/** Лёгкая пауза перед быстрым ответом (400–900 мс), чтобы не выглядело «мгновенным шаблоном». */
+function delayQuickReplyFeel() {
+    const ms = 400 + Math.floor(Math.random() * 500);
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** Обрезает/проверяет длину пользовательского текста. */
+function clampChatMessage(text) {
+    const raw = String(text || '');
+    if (raw.length <= MAX_CHAT_MESSAGE_CHARS) return { text: raw, truncated: false };
+    return { text: raw.slice(0, MAX_CHAT_MESSAGE_CHARS), truncated: true };
 }
 
 /** Составное задание — theory.js закрывает только первый распознанный шаблон; нужна полная генерация моделью. */
@@ -3197,6 +3213,7 @@ async function generateResponse(query, imageData = null) {
             useRequest();
             if (imageData) useImage();
         }
+        await delayQuickReplyFeel();
         await deliverInstantAiReply(instantReplyText, replyChatId);
         return;
     }
@@ -3641,6 +3658,8 @@ function scheduleSkipChatInputFocusCleanup() {
 }
 
 function proceedWithQuery(query, imageData) {
+    const clamped = clampChatMessage(query || '');
+    query = clamped.text;
     if (!currentChatId) { createNewChat(query || 'Image'); chatTitle.textContent = (query || 'Image').slice(0, 30); }
     const chat = chats.find(c => c.id === currentChatId);
     window.__solfaiResponseLang = detectResponseLanguage(query, chat?.messages);
@@ -3653,9 +3672,24 @@ function proceedWithQuery(query, imageData) {
 }
 
 function sendChatMessage() {
-    const query = chatInput.value.trim(); const imageData = attachedFiles[0]?.data || null;
+    let query = chatInput.value.trim();
+    const imageData = attachedFiles[0]?.data || null;
     if (getRemainingRequests() <= 0) { showNoRequestsToast(); refreshSendButtonState(); return; }
     if ((!query && !imageData) || isGenerating) return;
+
+    const clamped = clampChatMessage(query);
+    if (clamped.truncated) {
+        query = clamped.text;
+        chatInput.value = query;
+        showToast(
+            uiText('messageTooLong', {
+                fallback: `Message is too long. Max ${MAX_CHAT_MESSAGE_CHARS} characters.`
+            }),
+            'info',
+            { dedupeKey: 'msg-too-long' }
+        );
+    }
+
     lastUserQuery = query;
     if (!currentUser) { pendingQuery = { query, imageData }; showLoginPrompt(); return; }
     proceedWithQuery(query, imageData);
