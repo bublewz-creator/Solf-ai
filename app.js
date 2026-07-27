@@ -836,20 +836,9 @@ function queryTheoryQuickAnswer(userQuery) {
     }
 }
 
-function deliverInstantAiReply(text) {
-    document.getElementById('typingIndicator')?.remove();
-    const chat = chats.find(c => c.id === currentChatId);
-    if (chat) {
-        chat.messages.push({ role: 'ai', content: text, time: new Date().toISOString(), id: Date.now().toString() });
-        saveChatToStorage();
-    }
-    return addMessageToUI('ai', text, [], true).then(() => {
-        isGenerating = false;
-        userAbortedGeneration = false;
-        currentAbortController = null;
-        chatSendBtn.classList.remove('stop-btn');
-        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
-        refreshSendButtonState();
+function deliverInstantAiReply(text, chatId = currentChatId) {
+    return deliverAiReplyToChat(chatId, text, { withTyping: true }).then(() => {
+        resetGeneratingUi();
     });
 }
 
@@ -2987,10 +2976,55 @@ window.copyAiMessage = async function(button) {
     }
 };
 
-function showTypingIndicator() {
-    const div = document.createElement('div'); div.className = 'message message-ai'; div.id = 'typingIndicator';
+function showTypingIndicator(forChatId = currentChatId) {
+    const div = document.createElement('div');
+    div.className = 'message message-ai';
+    div.id = 'typingIndicator';
+    if (forChatId) div.dataset.chatId = String(forChatId);
     div.innerHTML = `<div class="message-avatar"><svg class="svg-icon" viewBox="0 0 24 24"><path d="M9 18V5l12-2v13"></path><circle cx="6" cy="18" r="3"></circle><circle cx="18" cy="16" r="3"></circle></svg></div><div class="message-content"><div class="typing-indicator"><div class="typing-dot"></div><div class="typing-dot"></div><div class="typing-dot"></div></div></div>`;
-    chatMessages.appendChild(div); scrollToBottom(true);
+    if (!forChatId || currentChatId === forChatId) {
+        chatMessages.appendChild(div);
+        scrollToBottom(true);
+    }
+}
+
+function removeTypingIndicator(forChatId = null) {
+    const el = document.getElementById('typingIndicator');
+    if (!el) return;
+    if (forChatId && el.dataset.chatId && el.dataset.chatId !== String(forChatId)) return;
+    el.remove();
+}
+
+function resetGeneratingUi() {
+    isGenerating = false;
+    userAbortedGeneration = false;
+    currentAbortController = null;
+    if (chatSendBtn) {
+        chatSendBtn.classList.remove('stop-btn');
+        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+    }
+    refreshSendButtonState();
+}
+
+/**
+ * Сохраняет ответ AI в чат, где был задан вопрос.
+ * В UI рисует только если пользователь всё ещё смотрит этот чат.
+ */
+async function deliverAiReplyToChat(chatId, text, { withTyping = true } = {}) {
+    removeTypingIndicator(chatId);
+    const chat = chats.find(c => c.id === chatId);
+    if (chat) {
+        chat.messages.push({
+            role: 'ai',
+            content: text,
+            time: new Date().toISOString(),
+            id: Date.now().toString()
+        });
+        saveChatToStorage();
+    }
+    if (currentChatId === chatId) {
+        await addMessageToUI('ai', text, [], withTyping);
+    }
 }
 
 async function generateResponse(query, imageData = null) {
@@ -3013,6 +3047,9 @@ async function generateResponse(query, imageData = null) {
     }
     if (isGenerating) return; 
 
+    // Чат, куда уйдёт ответ — фиксируем ДО любых await (иначе New Chat перехватит ответ)
+    const replyChatId = currentChatId;
+
     isGenerating = true;
     userAbortedGeneration = false;
     generationStartedAt = Date.now();
@@ -3020,17 +3057,40 @@ async function generateResponse(query, imageData = null) {
     chatSendBtn.disabled = false; chatSendBtn.classList.add('stop-btn');
     chatSendBtn.innerHTML = `<svg class="svg-icon" style="color:white;" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`;
     
-    showTypingIndicator();
+    showTypingIndicator(replyChatId);
 
-    // Сразу списываем в БД и обновляем бейдж актуальными данными (не из кэша устройства).
-    // Теория/AI дальше идут только если списание прошло.
+    const baseUserContent = query || 'Analyze image';
+    const replyChat = chats.find(c => c.id === replyChatId);
+    const responseLang = detectResponseLanguage(query, replyChat?.messages);
+    window.__solfaiResponseLang = responseLang;
+    if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
+        window.SolfTheory.setLabelLocale(responseLang);
+    }
+
+    const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
+    const chainTask = isChainTask(baseUserContent);
+    const compositeBuildTask = isCompositeBuildQuery(baseUserContent);
+
+    // Быстрые ответы считаем синхронно ДО сети — чтобы не «тупить» на /increment-usage
+    const theoryQuick = (harmonizationTask || imageData || compositeBuildTask)
+        ? null
+        : queryTheoryQuickAnswer(baseUserContent);
+    const theoryDetEarly = (!theoryQuick?.text && notationModeEnabled)
+        ? queryTheoryNotation(baseUserContent)
+        : null;
+    const theoryOnlyText = (!theoryQuick?.text
+        && canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData }))
+        ? patchAiWithTheory(baseUserContent, '', theoryDetEarly)
+        : null;
+    const instantReplyText = theoryQuick?.text || theoryOnlyText || null;
+
+    // Списание квоты (можно параллельно с уже посчитанным instant-ответом)
     const usageType = imageData ? 'image' : 'request';
     let usageChargedOnServer = false;
     try {
         if (isUserLoggedIn()) {
             const charged = await consumeUsageOnServer(usageType);
             usageChargedOnServer = Boolean(charged);
-            // Если списание отложено на /generate — оптимистично обновим бейдж
             if (!usageChargedOnServer) {
                 useRequest();
                 if (imageData) useImage();
@@ -3040,35 +3100,28 @@ async function generateResponse(query, imageData = null) {
             if (imageData) useImage();
         }
     } catch (limitErr) {
-        document.getElementById('typingIndicator')?.remove();
-        isGenerating = false;
-        userAbortedGeneration = false;
-        currentAbortController = null;
-        chatSendBtn.classList.remove('stop-btn');
-        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+        removeTypingIndicator(replyChatId);
+        resetGeneratingUi();
         if (limitErr?.code === 'LIMIT_IMAGES' || limitErr?.status === 403) {
             showImageLimitModal();
         } else {
             showNoRequestsToast();
         }
-        refreshSendButtonState();
+        return;
+    }
+
+    // Мгновенный ответ theory.js — в тот же чат, где был вопрос
+    if (instantReplyText) {
+        await deliverInstantAiReply(instantReplyText, replyChatId);
         return;
     }
     
     try {
-        const chat = chats.find(c => c.id === currentChatId);
-        const responseLang = detectResponseLanguage(query, chat?.messages);
-        window.__solfaiResponseLang = responseLang;
-        if (window.SolfTheory && typeof window.SolfTheory.setLabelLocale === 'function') {
-            window.SolfTheory.setLabelLocale(responseLang);
-        }
+        const chat = replyChat || chats.find(c => c.id === replyChatId);
+        // responseLang / locale уже выставлены выше (до theory + charge)
 
         const messages = [{ role: 'system', content: getSystemInstruction(responseLang, query) }];
         
-        const baseUserContent = query || 'Analyze image';
-        const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
-        const chainTask = isChainTask(baseUserContent);
-        const compositeBuildTask = isCompositeBuildQuery(baseUserContent);
         const freshBuildTask = notationModeEnabled && (isBuildTask(baseUserContent) || harmonizationTask || chainTask || compositeBuildTask);
 
         if (chat) {
@@ -3097,19 +3150,8 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
-        const theoryQuick = harmonizationTask || imageData || compositeBuildTask ? null : queryTheoryQuickAnswer(baseUserContent);
-        if (theoryQuick?.text) {
-            await deliverInstantAiReply(theoryQuick.text);
-            return;
-        }
-
-        const theoryDet = queryTheoryNotation(baseUserContent);
+        const theoryDet = theoryDetEarly || queryTheoryNotation(baseUserContent);
         const deterministicBlock = theoryDet?.blockString || null;
-
-        if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
-            await deliverInstantAiReply(patchAiWithTheory(baseUserContent, '', theoryDet));
-            return;
-        }
 
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
         // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
@@ -3317,16 +3359,14 @@ async function generateResponse(query, imageData = null) {
             aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal ?? queryTheoryNotation(baseUserContent));
         }
 
-        document.getElementById('typingIndicator')?.remove();
+        removeTypingIndicator(replyChatId);
         if (data.usage) {
             applyUsageFromServer(data.usage);
         }
-        chat.messages.push({ role: 'ai', content: aiText, time: new Date().toISOString(), id: Date.now().toString() }); 
-        saveChatToStorage();
-        await addMessageToUI('ai', aiText, [], true);
+        await deliverAiReplyToChat(replyChatId, aiText, { withTyping: true });
         
     } catch (e) {
-        document.getElementById('typingIndicator')?.remove();
+        removeTypingIndicator(replyChatId);
         if (e.name !== 'AbortError') {
             if (usageChargedOnServer) {
                 await refundUsageOnServer(usageType);
@@ -3337,20 +3377,27 @@ async function generateResponse(query, imageData = null) {
         }
         if (e.name === 'AbortError') {
             if (userAbortedGeneration) {
-                addMessageToUI('ai', `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`, [], false);
+                await deliverAiReplyToChat(
+                    replyChatId,
+                    `🛑 ${uiText('chatStopped', { chat: true, fallback: 'Stopped.' })}`,
+                    { withTyping: false }
+                );
             } else {
-                addMessageToUI('ai', `❌ ${uiText('chatTimeout', { chat: true, fallback: 'Request timed out. Try again.' })}`, [], false);
+                await deliverAiReplyToChat(
+                    replyChatId,
+                    `❌ ${uiText('chatTimeout', { chat: true, fallback: 'Request timed out. Try again.' })}`,
+                    { withTyping: false }
+                );
             }
         } else {
-            addMessageToUI('ai', `❌ ${uiText('chatError', { chat: true, fallback: 'Error' })}: ${e.message}`, [], false);
+            await deliverAiReplyToChat(
+                replyChatId,
+                `❌ ${uiText('chatError', { chat: true, fallback: 'Error' })}: ${e.message}`,
+                { withTyping: false }
+            );
         }
     } finally {
-        isGenerating = false;
-        userAbortedGeneration = false;
-        currentAbortController = null;
-        chatSendBtn.classList.remove('stop-btn');
-        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
-        refreshSendButtonState();
+        resetGeneratingUi();
     }
 }
 function showLoginPrompt() {

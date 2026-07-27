@@ -3758,7 +3758,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         }
         const keyForInt = parseKey(t);
         const intSpecIntro = parseIntervalSpec(rawQuery);
-        if (keyForInt && intSpecIntro && !parseScaleDegree(t) && !CHORD_WORDS_RE.test(t)) {
+        if (keyForInt && intSpecIntro && !parseScaleDegree(t) && !CHORD_WORDS_RE.test(t) && !isD7Query(t)) {
             const name = intervalNameFor(intSpecIntro.degree, intSpecIntro.semis, ru);
             const keyName = tonalityDisplayName(keyForInt.tonic, keyForInt.mode, ru);
             return pick(
@@ -3766,7 +3766,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
                 `${name} from the tonic of ${keyName}:`
             );
         }
-        if (intSpecIntro) {
+        if (intSpecIntro && !isD7Query(t)) {
             return wantsIntervalInversion(t)
                 ? pick('Интервал и его обращение:', 'The interval and its inversion:')
                 : pick('Интервал от заданного звука:', 'The interval from the given note:');
