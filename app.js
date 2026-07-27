@@ -1491,8 +1491,9 @@ function refreshImageAttachVisibility() {
 // ЗАЛОГИНЕННЫЙ ЮЗЕР (есть currentUser.id):
 //   Источник истины — БД (Cloudflare Workers).
 //   - При логине  : `/get-user` через syncAppData() → currentUser.requests_count
-//   - При запросе : `/increment-usage` → возвращает актуальное → currentUser.requests_count
-//   localStorage для них НЕ используется: даже если юзер очистит кеш, лимит из БД остаётся.
+//   - При запросе : `/increment-usage` (атомарно) → applyUsageFromServer → затем ответ
+//   localStorage для них НЕ используется как источник истины: даже если юзер очистит кеш,
+//   лимит из БД остаётся. Два устройства не могут «перезаписать» счётчик друг друга.
 //
 // ГОСТЬ (не залогинен):
 //   Источник истины — localStorage `solfai_usage_guest`.
@@ -1703,6 +1704,48 @@ function applyUsageFromServer(usage) {
     updateRequestsCounter();
     refreshImageAttachVisibility();
     if (typeof updateQuizCounter === 'function') updateQuizCounter();
+}
+
+/**
+ * Перед ответом: атомарно списываем квоту в БД и обновляем UI актуальными счётчиками.
+ * Так два устройства не могут «съесть» один и тот же остаток из устаревшего кэша.
+ */
+async function consumeUsageOnServer(type = 'request') {
+    if (!isUserLoggedIn()) return null;
+    const res = await apiFetch(`${WORKER_URL}/increment-usage`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: currentUser.id, type }),
+    }, 12000);
+    const data = await res.json().catch(() => ({}));
+    // Даже на 429 сервер отдаёт актуальные counts — синхронизируем бейдж
+    if (Number.isFinite(Number(data.requests_count)) || data.usage) {
+        applyUsageFromServer(data.usage || data);
+    }
+    if (!res.ok) {
+        const err = new Error(data.error || 'Usage limit');
+        err.status = res.status;
+        err.code = data.code || (type === 'image' ? 'LIMIT_IMAGES' : 'LIMIT_REQUESTS');
+        throw err;
+    }
+    applyUsageFromServer(data);
+    return data;
+}
+
+/** Откат серверного списания, если генерация упала до ответа. */
+async function refundUsageOnServer(type = 'request') {
+    if (!isUserLoggedIn()) return;
+    try {
+        const res = await apiFetch(`${WORKER_URL}/decrement-usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentUser.id, type }),
+        }, 12000);
+        const data = await res.json().catch(() => ({}));
+        if (res.ok) applyUsageFromServer(data);
+    } catch (err) {
+        console.warn('[Solf.ai] usage refund failed:', err);
+    }
 }
 
 function getWindowRemainingMs(startMs, windowMs) {
@@ -2959,7 +3002,35 @@ async function generateResponse(query, imageData = null) {
     chatSendBtn.disabled = false; chatSendBtn.classList.add('stop-btn');
     chatSendBtn.innerHTML = `<svg class="svg-icon" style="color:white;" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`;
     
-    showTypingIndicator(); useRequest(); if(imageData) useImage();
+    showTypingIndicator();
+
+    // Сразу списываем в БД и обновляем бейдж актуальными данными (не из кэша устройства).
+    // Теория/AI дальше идут только если списание прошло.
+    const usageType = imageData ? 'image' : 'request';
+    let usageChargedOnServer = false;
+    try {
+        if (isUserLoggedIn()) {
+            await consumeUsageOnServer(usageType);
+            usageChargedOnServer = true;
+        } else {
+            useRequest();
+            if (imageData) useImage();
+        }
+    } catch (limitErr) {
+        document.getElementById('typingIndicator')?.remove();
+        isGenerating = false;
+        userAbortedGeneration = false;
+        currentAbortController = null;
+        chatSendBtn.classList.remove('stop-btn');
+        chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
+        if (limitErr?.code === 'LIMIT_IMAGES' || (imageData && limitErr?.status === 403)) {
+            showImageLimitModal();
+        } else {
+            showNoRequestsToast();
+        }
+        refreshSendButtonState();
+        return;
+    }
     
     try {
         const chat = chats.find(c => c.id === currentChatId);
@@ -3024,6 +3095,8 @@ async function generateResponse(query, imageData = null) {
         const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : (harmonizationTask ? 4096 : 1024);
         const payload = {
             userId: currentUser?.id,
+            // Уже списали через /increment-usage (в т.ч. для theory-only ответов)
+            usageAlreadyCounted: usageChargedOnServer,
             messages,
             temperature: notationModeEnabled ? ((freshBuildTask || harmonizationTask || chainTask) ? 0.35 : 0.45) : 0.7,
             max_tokens: tokenBudget,
@@ -3045,15 +3118,20 @@ async function generateResponse(query, imageData = null) {
         const data = await res.json();
         if (!res.ok || data.error) {
             console.error('Server error:', data);
+            if (data.usage) applyUsageFromServer(data.usage);
             if (res.status === 429 || data.code === 'LIMIT_REQUESTS') {
-                rollbackRequestUsage();
-                if (imageData) rollbackImageUsage();
+                if (!usageChargedOnServer) {
+                    rollbackRequestUsage();
+                    if (imageData) rollbackImageUsage();
+                }
                 showNoRequestsToast();
                 return;
             }
-            if (res.status === 429 && data.code === 'LIMIT_IMAGES') {
-                rollbackRequestUsage();
-                rollbackImageUsage();
+            if ((res.status === 429 || res.status === 403) && data.code === 'LIMIT_IMAGES') {
+                if (!usageChargedOnServer) {
+                    rollbackRequestUsage();
+                    rollbackImageUsage();
+                }
                 showImageLimitModal();
                 return;
             }
@@ -3227,8 +3305,12 @@ async function generateResponse(query, imageData = null) {
     } catch (e) {
         document.getElementById('typingIndicator')?.remove();
         if (e.name !== 'AbortError') {
-            rollbackRequestUsage();
-            if (imageData) rollbackImageUsage();
+            if (usageChargedOnServer) {
+                await refundUsageOnServer(usageType);
+            } else {
+                rollbackRequestUsage();
+                if (imageData) rollbackImageUsage();
+            }
         }
         if (e.name === 'AbortError') {
             if (userAbortedGeneration) {
