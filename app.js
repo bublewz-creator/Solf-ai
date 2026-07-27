@@ -102,12 +102,108 @@ async function syncAppData() {
         localStorage.setItem('solfai_user', JSON.stringify(currentUser));
         localStorage.setItem(getPlanStorageKey(), JSON.stringify(syncedPlan));
 
-        updateUIForUser();
+        updateUIForUser({ skipChatReload: true });
         updatePlanDisplay();
+        updateRequestsCounter();
+        refreshImageAttachVisibility();
         if (typeof updateQuizCounter === 'function') updateQuizCounter();
     } catch (error) {
         console.error('App data sync failed:', error);
     }
+}
+
+/** Оценка свежести чата для merge local ↔ server. */
+function chatFreshnessScore(c) {
+    const t = Date.parse(c?.updatedAt || c?.createdAt || 0) || 0;
+    const n = Array.isArray(c?.messages) ? c.messages.length : 0;
+    return t * 1000 + n;
+}
+
+/**
+ * Тянет чаты из БД и сливает с локальными.
+ * Сервер — источник истины между устройствами; локальные-only дожимаем на сервер.
+ */
+async function syncChatsFromServer() {
+    if (!currentUser?.id) return;
+    try {
+        const res = await apiFetch(`${WORKER_URL}/get-chats?user_id=${currentUser.id}`, {}, 15000);
+        const data = await res.json().catch(() => ({}));
+        if (!res.ok || data.error) {
+            throw new Error(data.error || 'Failed to sync chats');
+        }
+        const serverChats = Array.isArray(data.chats) ? data.chats : [];
+        const local = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
+        const byId = new Map();
+
+        // Сначала сервер (мульти-девайс источник истины)
+        for (const c of serverChats) {
+            if (!c?.id) continue;
+            byId.set(c.id, c);
+        }
+        // Локальные: новые (ещё не в БД) — оставляем; пересечения — берём более свежие
+        for (const c of local) {
+            if (!c?.id) continue;
+            const prev = byId.get(c.id);
+            if (!prev) {
+                byId.set(c.id, c);
+                saveChatToServer(c);
+                continue;
+            }
+            if (chatFreshnessScore(c) > chatFreshnessScore(prev)) {
+                byId.set(c.id, {
+                    ...prev,
+                    ...c,
+                    pinned: !!(c.pinned || prev.pinned),
+                    messages: (c.messages?.length || 0) >= (prev.messages?.length || 0)
+                        ? (c.messages || [])
+                        : (prev.messages || []),
+                });
+                saveChatToServer(c);
+            } else {
+                byId.set(c.id, {
+                    ...c,
+                    ...prev,
+                    pinned: !!(c.pinned || prev.pinned),
+                    messages: (prev.messages?.length || 0) >= (c.messages?.length || 0)
+                        ? (prev.messages || [])
+                        : (c.messages || []),
+                });
+            }
+        }
+
+        chats = [...byId.values()].sort((a, b) => {
+            if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
+            return chatFreshnessScore(b) - chatFreshnessScore(a);
+        });
+        enforceChatLimit();
+        localStorage.setItem(getChatsStorageKey(), JSON.stringify(chats.slice(0, MAX_SAVED_CHATS)));
+        renderChatsList();
+    } catch (err) {
+        console.error('Ошибка загрузки истории чатов из БД:', err);
+    }
+}
+
+/** Квота + чаты с сервера. С дедупом параллельных вызовов и throttle. */
+let __serverSyncInflight = null;
+let __serverSyncLastAt = 0;
+const SERVER_SYNC_MIN_INTERVAL_MS = 8000;
+
+function scheduleServerSync(reason = '') {
+    if (!currentUser?.id) return Promise.resolve();
+    if (__serverSyncInflight) return __serverSyncInflight;
+    const now = Date.now();
+    // focus/visibility могут сыпаться часто — не долбим БД чаще раза в 8 сек
+    if (reason !== 'initApp' && reason !== 'updateUIForUser' && (now - __serverSyncLastAt) < SERVER_SYNC_MIN_INTERVAL_MS) {
+        return Promise.resolve();
+    }
+    __serverSyncLastAt = now;
+    __serverSyncInflight = Promise.all([
+        syncAppData(),
+        syncChatsFromServer(),
+    ])
+        .catch(err => console.warn('[Solf.ai] scheduleServerSync failed:', reason, err))
+        .finally(() => { __serverSyncInflight = null; });
+    return __serverSyncInflight;
 }
 
 const PLAN_LIMITS = {
@@ -3382,7 +3478,10 @@ async function generateResponse(query, imageData = null) {
         
     } catch (e) {
         removeTypingIndicator(replyChatId);
-        if (e.name !== 'AbortError') {
+        // Возврат попытки ТОЛЬКО при сбое ИИ / таймауте / ошибке.
+        // Ручной стоп (userAbortedGeneration) — попытка сгорает, не возвращаем.
+        const isUserStop = e.name === 'AbortError' && userAbortedGeneration;
+        if (!isUserStop) {
             if (usageChargedOnServer) {
                 await refundUsageOnServer(usageType);
             } else {
@@ -3562,7 +3661,7 @@ function sendChatMessage() {
     proceedWithQuery(query, imageData);
 }
 
-function updateUIForUser() {
+function updateUIForUser(options = {}) {
     if (currentUser) {
         document.documentElement.classList.add('is-logged-in');
 
@@ -3596,61 +3695,17 @@ function updateUIForUser() {
     }
     
     // Сначала грузим кэш, чтобы интерфейс не дергался
-    chats = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
-    updatePlanDisplay(); renderChatsList();
-    if (!currentChatId) startNewChat();
-    dismissChatInputFocus();
-
-    // Асинхронно грузим чаты из БД и СЛИВАЕМ с локальными (не затираем одни другими).
-    // 15 сек хватит даже на медленную мобильную связь; если бэк не отвечает (без VPN),
-    // юзер останется со списком из localStorage и сможет продолжать работу.
-    if (currentUser) {
-        apiFetch(`${WORKER_URL}/get-chats?user_id=${currentUser.id}`, {}, 15000)
-            .then(res => res.json())
-            .then(data => {
-                const serverChats = Array.isArray(data.chats) ? data.chats : [];
-                if (!serverChats.length) return;
-                const local = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
-                const byId = new Map();
-                const chatScore = (c) => {
-                    const t = Date.parse(c.updatedAt || c.createdAt || 0) || 0;
-                    const n = Array.isArray(c.messages) ? c.messages.length : 0;
-                    return t * 1000 + n;
-                };
-                for (const c of [...local, ...serverChats]) {
-                    if (!c?.id) continue;
-                    const prev = byId.get(c.id);
-                    if (!prev) {
-                        byId.set(c.id, c);
-                        continue;
-                    }
-                    const richer = chatScore(c) >= chatScore(prev) ? c : prev;
-                    const other = richer === c ? prev : c;
-                    byId.set(c.id, {
-                        ...other,
-                        ...richer,
-                        pinned: !!(c.pinned || prev.pinned),
-                        messages: (richer.messages?.length || 0) >= (other.messages?.length || 0)
-                            ? (richer.messages || [])
-                            : (other.messages || []),
-                    });
-                }
-                chats = [...byId.values()].sort((a, b) => {
-                    if (!!a.pinned !== !!b.pinned) return a.pinned ? -1 : 1;
-                    return chatScore(b) - chatScore(a);
-                });
-                // Чаты, которые есть только локально (ещё не улетели в БД) — дожимаем на сервер.
-                for (const localChat of local) {
-                    if (!localChat?.id) continue;
-                    if (!serverChats.some(s => s.id === localChat.id)) {
-                        saveChatToServer(localChat);
-                    }
-                }
-                enforceChatLimit();
-                localStorage.setItem(getChatsStorageKey(), JSON.stringify(chats.slice(0, MAX_SAVED_CHATS)));
-                renderChatsList();
-            })
-            .catch(err => console.error("Ошибка загрузки истории чатов из БД:", err));
+    if (!options.skipChatReload) {
+        chats = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
+        updatePlanDisplay();
+        renderChatsList();
+        if (!currentChatId) startNewChat();
+        dismissChatInputFocus();
+        // Асинхронно подтягиваем актуальные чаты + квоту из БД
+        if (currentUser) scheduleServerSync('updateUIForUser');
+    } else {
+        updatePlanDisplay();
+        dismissChatInputFocus();
     }
 }
 
@@ -3887,13 +3942,8 @@ function redirectVkOAuthToLogin() {
 async function initApp() {
     redirectVkOAuthToLogin();
     migrateRemoveStaleUsageKeysOnce();
-    // КРИТИЧНО: НЕ ждём `await syncAppData()`. Раньше тут было `await`, и если Cloudflare
-    // Workers не отвечал (юзер без VPN — workers.dev часто режется ТСПУ), весь initApp
-    // висел до таймаута, а значит ВСЕ обработчики кнопок ниже не успевали навеситься.
-    // На странице кнопки физически были, но клики игнорировались — "ничего не работает".
-    // Теперь sync запускается параллельно: UI сразу инициализируется с данными из
-    // localStorage-кэша (logged-in, имя, тариф уже там), а БД догонит в фоне и обновит.
-    syncAppData().catch((err) => console.warn('[Solf.ai] syncAppData (background) failed:', err));
+    // КРИТИЧНО: НЕ ждём sync. UI сразу с кэша; БД (квота + чаты) догоняет в фоне.
+    scheduleServerSync('initApp');
     initTheme();
     initColor();
     initFontSize();
@@ -3907,7 +3957,11 @@ async function initApp() {
     // ставились ТОЛЬКО внутри syncAppData() после ответа БД. А если БД не отвечает
     // (Cloudflare без VPN) — профиль так и оставался пустым ("есть buttn 'M' и всё").
     // Теперь рисуем профиль СРАЗУ из localStorage-кэша, БД лишь освежит позже.
-    updateUIForUser();
+    // skipChatReload: чаты уже поставит scheduleServerSync; локальный кэш — ниже одним разом.
+    chats = JSON.parse(localStorage.getItem(getChatsStorageKey()) || '[]');
+    updateUIForUser({ skipChatReload: true });
+    renderChatsList();
+    if (!currentChatId) startNewChat();
     restorePendingQueryAfterLogin();
     
     // --- ПРАВИЛЬНАЯ РАБОТА ВИЗУАЛЬНЫХ КНОПОК ПРИКРЕПЛЕНИЯ ---
@@ -4113,6 +4167,18 @@ window.addEventListener('load', () => {
 window.addEventListener('pageshow', () => {
     scheduleSkipChatInputFocusCleanup();
     if (isMobileLayout()) dismissChatInputFocus();
+    // bfcache / возврат на вкладку — подтянуть квоту и чаты с сервера
+    scheduleServerSync('pageshow');
+});
+
+document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+        scheduleServerSync('visibility');
+    }
+});
+
+window.addEventListener('focus', () => {
+    scheduleServerSync('focus');
 });
 
 function abortGeneration() {
