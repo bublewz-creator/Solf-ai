@@ -3070,22 +3070,43 @@ async function generateResponse(query, imageData = null) {
     const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
     const chainTask = isChainTask(baseUserContent);
     const compositeBuildTask = isCompositeBuildQuery(baseUserContent);
-
-    // Быстрые ответы считаем синхронно ДО сети — чтобы не «тупить» на /increment-usage
-    const theoryQuick = (harmonizationTask || imageData || compositeBuildTask)
-        ? null
-        : queryTheoryQuickAnswer(baseUserContent);
-    const theoryDetEarly = (!theoryQuick?.text && notationModeEnabled)
-        ? queryTheoryNotation(baseUserContent)
-        : null;
-    const theoryOnlyText = (!theoryQuick?.text
-        && canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData }))
-        ? patchAiWithTheory(baseUserContent, '', theoryDetEarly)
-        : null;
-    const instantReplyText = theoryQuick?.text || theoryOnlyText || null;
-
-    // Списание квоты (можно параллельно с уже посчитанным instant-ответом)
     const usageType = imageData ? 'image' : 'request';
+
+    // ——— БЫСТРЫЕ ОТВЕТЫ (theory.js) ———
+    // Считаем и отдаём СРАЗУ. Списание в БД — в фоне: await /increment-usage
+    // раньше стоял ПЕРЕД выдачей и при любом сбое/429 убивал весь быстрый путь.
+    let instantReplyText = null;
+    try {
+        const theoryQuick = (harmonizationTask || imageData || compositeBuildTask)
+            ? null
+            : queryTheoryQuickAnswer(baseUserContent);
+        if (theoryQuick?.text) {
+            instantReplyText = theoryQuick.text;
+        } else if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
+            instantReplyText = patchAiWithTheory(baseUserContent, '') || null;
+        }
+    } catch (theoryErr) {
+        console.warn('[Solf.ai] instant theory path failed:', theoryErr);
+    }
+
+    if (instantReplyText) {
+        // Локально сразу −1, в БД — fire-and-forget (атомарный increment на сервере)
+        if (isUserLoggedIn()) {
+            useRequest();
+            if (imageData) useImage();
+            consumeUsageOnServer(usageType).catch(err => {
+                console.warn('[Solf.ai] background usage charge failed:', err);
+            });
+        } else {
+            useRequest();
+            if (imageData) useImage();
+        }
+        await deliverInstantAiReply(instantReplyText, replyChatId);
+        return;
+    }
+
+    // ——— МЕДЛЕННЫЙ ПУТЬ (Gemini) ———
+    // Здесь ждём списание: платный API, нужна жёсткая проверка лимита
     let usageChargedOnServer = false;
     try {
         if (isUserLoggedIn()) {
@@ -3109,16 +3130,10 @@ async function generateResponse(query, imageData = null) {
         }
         return;
     }
-
-    // Мгновенный ответ theory.js — в тот же чат, где был вопрос
-    if (instantReplyText) {
-        await deliverInstantAiReply(instantReplyText, replyChatId);
-        return;
-    }
     
     try {
         const chat = replyChat || chats.find(c => c.id === replyChatId);
-        // responseLang / locale уже выставлены выше (до theory + charge)
+        // responseLang / locale уже выставлены выше
 
         const messages = [{ role: 'system', content: getSystemInstruction(responseLang, query) }];
         
@@ -3150,7 +3165,7 @@ async function generateResponse(query, imageData = null) {
             : baseUserContent;
         messages.push({ role: 'user', content: apiUserContent });
 
-        const theoryDet = theoryDetEarly || queryTheoryNotation(baseUserContent);
+        const theoryDet = queryTheoryNotation(baseUserContent);
         const deterministicBlock = theoryDet?.blockString || null;
 
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
