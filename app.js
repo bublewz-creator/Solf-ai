@@ -1709,27 +1709,45 @@ function applyUsageFromServer(usage) {
 /**
  * Перед ответом: атомарно списываем квоту в БД и обновляем UI актуальными счётчиками.
  * Так два устройства не могут «съесть» один и тот же остаток из устаревшего кэша.
+ *
+ * Возвращает user-snapshot при успехе.
+ * Кидает ошибку только при реальном лимите (429/403 LIMIT_*).
+ * Сетевые/500 ошибки — return null: тогда /generate сам спишет квоту.
  */
 async function consumeUsageOnServer(type = 'request') {
     if (!isUserLoggedIn()) return null;
-    const res = await apiFetch(`${WORKER_URL}/increment-usage`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id: currentUser.id, type }),
-    }, 12000);
+    let res;
+    try {
+        res = await apiFetch(`${WORKER_URL}/increment-usage`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ id: currentUser.id, type }),
+        }, 12000);
+    } catch (netErr) {
+        console.warn('[Solf.ai] consumeUsageOnServer network error, defer to /generate:', netErr);
+        return null;
+    }
     const data = await res.json().catch(() => ({}));
     // Даже на 429 сервер отдаёт актуальные counts — синхронизируем бейдж
     if (Number.isFinite(Number(data.requests_count)) || data.usage) {
         applyUsageFromServer(data.usage || data);
     }
-    if (!res.ok) {
+    if (res.ok) {
+        applyUsageFromServer(data);
+        return data;
+    }
+    const code = data.code || '';
+    const isLimit = res.status === 429 || res.status === 403 ||
+        code === 'LIMIT_REQUESTS' || code === 'LIMIT_IMAGES' || code === 'LIMIT_QUIZ';
+    if (isLimit) {
         const err = new Error(data.error || 'Usage limit');
         err.status = res.status;
-        err.code = data.code || (type === 'image' ? 'LIMIT_IMAGES' : 'LIMIT_REQUESTS');
+        err.code = code || (type === 'image' ? 'LIMIT_IMAGES' : 'LIMIT_REQUESTS');
         throw err;
     }
-    applyUsageFromServer(data);
-    return data;
+    // Worker ещё не задеплоен / SQL глюк — не блокируем чат ложным "0 requests"
+    console.warn('[Solf.ai] consumeUsageOnServer soft-fail', res.status, data);
+    return null;
 }
 
 /** Откат серверного списания, если генерация упала до ответа. */
@@ -3010,8 +3028,13 @@ async function generateResponse(query, imageData = null) {
     let usageChargedOnServer = false;
     try {
         if (isUserLoggedIn()) {
-            await consumeUsageOnServer(usageType);
-            usageChargedOnServer = true;
+            const charged = await consumeUsageOnServer(usageType);
+            usageChargedOnServer = Boolean(charged);
+            // Если списание отложено на /generate — оптимистично обновим бейдж
+            if (!usageChargedOnServer) {
+                useRequest();
+                if (imageData) useImage();
+            }
         } else {
             useRequest();
             if (imageData) useImage();
@@ -3023,7 +3046,7 @@ async function generateResponse(query, imageData = null) {
         currentAbortController = null;
         chatSendBtn.classList.remove('stop-btn');
         chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
-        if (limitErr?.code === 'LIMIT_IMAGES' || (imageData && limitErr?.status === 403)) {
+        if (limitErr?.code === 'LIMIT_IMAGES' || limitErr?.status === 403) {
             showImageLimitModal();
         } else {
             showNoRequestsToast();

@@ -104,7 +104,9 @@ export default {
 
     function shouldResetWindow(startMs, windowMs) {
       const start = Number(startMs) || 0;
-      if (!start) return true;
+      // Нет метки окна — НЕ сбрасываем счётчик (иначе null window_start обнуляет usage в БД).
+      // Простое истечение окна — только когда start уже был записан.
+      if (!start) return false;
       return Date.now() - start >= windowMs;
     }
 
@@ -113,12 +115,15 @@ export default {
       const next = { ...user };
       for (const type of ["request", "image", "quiz"]) {
         const { count, start, window } = usageFields(type);
-        if (shouldResetWindow(user[start], window)) {
+        const startMs = Number(user[start]) || 0;
+        const countVal = Number(user[count]) || 0;
+        if (shouldResetWindow(startMs, window)) {
           next[count] = 0;
           next[start] = now;
         } else {
-          next[count] = Number(user[count]) || 0;
-          next[start] = Number(user[start]) || now;
+          next[count] = countVal;
+          // Инициализируем окно, если его ещё не было — без обнуления счётчика.
+          next[start] = startMs || now;
         }
       }
       return next;
@@ -185,47 +190,241 @@ export default {
       return remainingUsage(user, type) > 0;
     }
 
-    async function incrementUsageForUser(userId, type, { withRequest = false } = {}) {
+    function usageSnapshot(user) {
+      if (!user) return null;
+      return {
+        requests_count: Number(user.requests_count) || 0,
+        images_count: Number(user.images_count) || 0,
+        quiz_count: Number(user.quiz_count) || 0,
+        requests_window_start: Number(user.requests_window_start) || 0,
+        images_window_start: Number(user.images_window_start) || 0,
+        quiz_window_start: Number(user.quiz_window_start) || 0,
+        plan_type: user.plan_type || "free",
+      };
+    }
+
+    /**
+     * Атомарное списание: UPDATE ... SET count = count + 1 WHERE count < limit.
+     * Нельзя делать read→+1→write абсолютным значением — два устройства
+     * перезаписывают друг друга (last-write-wins) и «теряют» списания.
+     *
+     * Fallback на legacy write, если атомарный SQL не поддерживается / вернул пусто
+     * при ещё доступном лимите (ложные 429 из‑за формата ответа Neon).
+     */
+    async function incrementUsageForUser(userId, type) {
       let user = await getUserWithFreshUsage(userId);
       if (!user) return { error: "User not found", status: 404 };
 
       const limits = planLimits(user.plan_type || "free");
+      const now = Date.now();
 
       if (type === "image") {
-        if (limits.images === 0) return { error: "Images not available on your plan", status: 403, code: "LIMIT_IMAGES" };
-        if (!canUse(user, "image")) return { error: "Image limit reached", status: 429, code: "LIMIT_IMAGES" };
+        if (limits.images === 0) {
+          return { error: "Images not available on your plan", status: 403, code: "LIMIT_IMAGES", user };
+        }
+        if (limits.images !== Infinity && !canUse(user, "image")) {
+          return { error: "Image limit reached", status: 429, code: "LIMIT_IMAGES", user };
+        }
         if (limits.requests !== Infinity && !canUse(user, "request")) {
-          return { error: "Request limit reached", status: 429, code: "LIMIT_REQUESTS" };
+          return { error: "Request limit reached", status: 429, code: "LIMIT_REQUESTS", user };
         }
       } else if (type === "quiz") {
         if (limits.quizzes !== Infinity && !canUse(user, "quiz")) {
-          return { error: "Quiz limit reached", status: 429, code: "LIMIT_QUIZ" };
+          return { error: "Quiz limit reached", status: 429, code: "LIMIT_QUIZ", user };
         }
-      } else if (!canUse(user, "request")) {
+      } else if (limits.requests !== Infinity && !canUse(user, "request")) {
+        return { error: "Request limit reached", status: 429, code: "LIMIT_REQUESTS", user };
+      }
+
+      const limitError = () => {
+        if (type === "image") return { error: "Image limit reached", status: 429, code: "LIMIT_IMAGES" };
+        if (type === "quiz") return { error: "Quiz limit reached", status: 429, code: "LIMIT_QUIZ" };
         return { error: "Request limit reached", status: 429, code: "LIMIT_REQUESTS" };
+      };
+
+      async function legacyWrite(baseUser) {
+        const next = { ...baseUser };
+        if (type === "image") {
+          next.images_count = (Number(next.images_count) || 0) + 1;
+          if (!next.images_window_start) next.images_window_start = now;
+          next.requests_count = (Number(next.requests_count) || 0) + 1;
+          if (!next.requests_window_start) next.requests_window_start = now;
+        } else if (type === "quiz") {
+          next.quiz_count = (Number(next.quiz_count) || 0) + 1;
+          if (!next.quiz_window_start) next.quiz_window_start = now;
+        } else {
+          next.requests_count = (Number(next.requests_count) || 0) + 1;
+          if (!next.requests_window_start) next.requests_window_start = now;
+        }
+        const saved = await persistUsageWindows(next);
+        return { user: saved };
       }
 
-      const now = Date.now();
+      try {
+        let data;
+        if (type === "image") {
+          if (limits.images === Infinity && limits.requests === Infinity) {
+            data = await neonQuery(
+              `UPDATE users SET
+                 images_count = COALESCE(images_count, 0) + 1,
+                 images_window_start = CASE WHEN COALESCE(images_window_start, 0) = 0 THEN $2 ELSE images_window_start END,
+                 requests_count = COALESCE(requests_count, 0) + 1,
+                 requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+               WHERE id = $1
+               RETURNING *`,
+              [userId, now]
+            );
+          } else if (limits.images === Infinity) {
+            data = await neonQuery(
+              `UPDATE users SET
+                 images_count = COALESCE(images_count, 0) + 1,
+                 images_window_start = CASE WHEN COALESCE(images_window_start, 0) = 0 THEN $2 ELSE images_window_start END,
+                 requests_count = COALESCE(requests_count, 0) + 1,
+                 requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+               WHERE id = $1 AND COALESCE(requests_count, 0) < $3
+               RETURNING *`,
+              [userId, now, limits.requests]
+            );
+          } else if (limits.requests === Infinity) {
+            data = await neonQuery(
+              `UPDATE users SET
+                 images_count = COALESCE(images_count, 0) + 1,
+                 images_window_start = CASE WHEN COALESCE(images_window_start, 0) = 0 THEN $2 ELSE images_window_start END,
+                 requests_count = COALESCE(requests_count, 0) + 1,
+                 requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+               WHERE id = $1 AND COALESCE(images_count, 0) < $3
+               RETURNING *`,
+              [userId, now, limits.images]
+            );
+          } else {
+            data = await neonQuery(
+              `UPDATE users SET
+                 images_count = COALESCE(images_count, 0) + 1,
+                 images_window_start = CASE WHEN COALESCE(images_window_start, 0) = 0 THEN $2 ELSE images_window_start END,
+                 requests_count = COALESCE(requests_count, 0) + 1,
+                 requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+               WHERE id = $1
+                 AND COALESCE(images_count, 0) < $3
+                 AND COALESCE(requests_count, 0) < $4
+               RETURNING *`,
+              [userId, now, limits.images, limits.requests]
+            );
+          }
+        } else if (type === "quiz") {
+          if (limits.quizzes === Infinity) {
+            data = await neonQuery(
+              `UPDATE users SET
+                 quiz_count = COALESCE(quiz_count, 0) + 1,
+                 quiz_window_start = CASE WHEN COALESCE(quiz_window_start, 0) = 0 THEN $2 ELSE quiz_window_start END
+               WHERE id = $1
+               RETURNING *`,
+              [userId, now]
+            );
+          } else {
+            data = await neonQuery(
+              `UPDATE users SET
+                 quiz_count = COALESCE(quiz_count, 0) + 1,
+                 quiz_window_start = CASE WHEN COALESCE(quiz_window_start, 0) = 0 THEN $2 ELSE quiz_window_start END
+               WHERE id = $1 AND COALESCE(quiz_count, 0) < $3
+               RETURNING *`,
+              [userId, now, limits.quizzes]
+            );
+          }
+        } else if (limits.requests === Infinity) {
+          data = await neonQuery(
+            `UPDATE users SET
+               requests_count = COALESCE(requests_count, 0) + 1,
+               requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+             WHERE id = $1
+             RETURNING *`,
+            [userId, now]
+          );
+        } else {
+          data = await neonQuery(
+            `UPDATE users SET
+               requests_count = COALESCE(requests_count, 0) + 1,
+               requests_window_start = CASE WHEN COALESCE(requests_window_start, 0) = 0 THEN $2 ELSE requests_window_start END
+             WHERE id = $1 AND COALESCE(requests_count, 0) < $3
+             RETURNING *`,
+            [userId, now, limits.requests]
+          );
+        }
+
+        const row = data?.rows?.[0];
+        if (row) return { user: row };
+
+        // Пустой RETURNING: либо лимит, либо глюк ответа — перепроверяем
+        user = await getUserWithFreshUsage(userId);
+        if (type === "image") {
+          if ((limits.images === Infinity || canUse(user, "image")) &&
+              (limits.requests === Infinity || canUse(user, "request"))) {
+            return legacyWrite(user);
+          }
+        } else if (type === "quiz") {
+          if (limits.quizzes === Infinity || canUse(user, "quiz")) return legacyWrite(user);
+        } else if (limits.requests === Infinity || canUse(user, "request")) {
+          return legacyWrite(user);
+        }
+        return { ...limitError(), user };
+      } catch (err) {
+        console.warn("[usage] atomic increment failed, legacy fallback", err);
+        user = await getUserWithFreshUsage(userId);
+        if (!user) return { error: "User not found", status: 404 };
+        if (type === "image") {
+          if (limits.images === 0) return { error: "Images not available on your plan", status: 403, code: "LIMIT_IMAGES", user };
+          if (limits.images !== Infinity && !canUse(user, "image")) return { ...limitError(), user };
+          if (limits.requests !== Infinity && !canUse(user, "request")) {
+            return { error: "Request limit reached", status: 429, code: "LIMIT_REQUESTS", user };
+          }
+        } else if (type === "quiz") {
+          if (limits.quizzes !== Infinity && !canUse(user, "quiz")) return { ...limitError(), user };
+        } else if (limits.requests !== Infinity && !canUse(user, "request")) {
+          return { ...limitError(), user };
+        }
+        return legacyWrite(user);
+      }
+    }
+
+    /** Откат списания (например, Gemini упал после pre-charge). */
+    async function decrementUsageForUser(userId, type) {
+      try {
+        if (type === "image") {
+          const data = await neonQuery(
+            `UPDATE users SET
+               images_count = GREATEST(COALESCE(images_count, 0) - 1, 0),
+               requests_count = GREATEST(COALESCE(requests_count, 0) - 1, 0)
+             WHERE id = $1
+             RETURNING *`,
+            [userId]
+          );
+          if (data?.rows?.[0]) return data.rows[0];
+        } else if (type === "quiz") {
+          const data = await neonQuery(
+            `UPDATE users SET quiz_count = GREATEST(COALESCE(quiz_count, 0) - 1, 0) WHERE id = $1 RETURNING *`,
+            [userId]
+          );
+          if (data?.rows?.[0]) return data.rows[0];
+        } else {
+          const data = await neonQuery(
+            `UPDATE users SET requests_count = GREATEST(COALESCE(requests_count, 0) - 1, 0) WHERE id = $1 RETURNING *`,
+            [userId]
+          );
+          if (data?.rows?.[0]) return data.rows[0];
+        }
+      } catch (err) {
+        console.warn("[usage] atomic decrement failed, legacy fallback", err);
+      }
+      const user = await getUserWithFreshUsage(userId);
+      if (!user) return null;
       if (type === "image") {
-        user.images_count = (Number(user.images_count) || 0) + 1;
-        if (!user.images_window_start) user.images_window_start = now;
-        user.requests_count = (Number(user.requests_count) || 0) + 1;
-        if (!user.requests_window_start) user.requests_window_start = now;
+        user.images_count = Math.max(0, (Number(user.images_count) || 0) - 1);
+        user.requests_count = Math.max(0, (Number(user.requests_count) || 0) - 1);
       } else if (type === "quiz") {
-        user.quiz_count = (Number(user.quiz_count) || 0) + 1;
-        if (!user.quiz_window_start) user.quiz_window_start = now;
+        user.quiz_count = Math.max(0, (Number(user.quiz_count) || 0) - 1);
       } else {
-        user.requests_count = (Number(user.requests_count) || 0) + 1;
-        if (!user.requests_window_start) user.requests_window_start = now;
+        user.requests_count = Math.max(0, (Number(user.requests_count) || 0) - 1);
       }
-
-      if (withRequest && type !== "image" && type !== "request") {
-        user.requests_count = (Number(user.requests_count) || 0) + 1;
-        if (!user.requests_window_start) user.requests_window_start = now;
-      }
-
-      const saved = await persistUsageWindows(user);
-      return { user: saved };
+      return persistUsageWindows(user);
     }
 
     // ========== SESSION AUTH ==========
@@ -660,12 +859,12 @@ export default {
         const forbid = forbidSelfOnly(auth.userId, userId);
         if (forbid) return forbid;
 
-        const prevPlan = url.searchParams.get("prev_plan");
-        let user = await getUserWithFreshUsage(userId);
+        // Важно: refillUsageOnPlanUpgrade здесь НЕ вызываем.
+        // Раньше клиент слал prev_plan (часто устаревший/free после очистки кэша),
+        // и сервер ошибочно считал это апгрейдом → обнулял requests_count в БД
+        // (40/50 превращалось в 50/50 на всех устройствах). Refill только в /update-plan.
+        const user = await getUserWithFreshUsage(userId);
         if (!user) return new Response(JSON.stringify({ error: "Not found" }), { status: 404, headers: corsHeaders });
-        if (prevPlan) {
-          user = await refillUsageOnPlanUpgrade(user, prevPlan);
-        }
 
         return new Response(JSON.stringify(user), { headers: corsHeaders });
       }
@@ -726,9 +925,29 @@ export default {
         const usageType = type === "image" ? "image" : type === "quiz" ? "quiz" : "request";
         const result = await incrementUsageForUser(id, usageType);
         if (result.error) {
-          return new Response(JSON.stringify({ error: result.error, code: result.code }), { status: result.status || 400, headers: corsHeaders });
+          return new Response(JSON.stringify({
+            error: result.error,
+            code: result.code,
+            // Актуальные счётчики из БД — клиент на другом устройстве синхронизирует UI
+            ...(usageSnapshot(result.user) || {}),
+          }), { status: result.status || 400, headers: corsHeaders });
         }
         return new Response(JSON.stringify(result.user), { headers: corsHeaders });
+      }
+
+      if (url.pathname === "/decrement-usage" && request.method === "POST") {
+        const auth = await requireAuth(request, env);
+        if (auth.error) return auth.error;
+
+        const { id, type } = await request.json();
+        if (!id) return new Response(JSON.stringify({ error: "User ID is required" }), { status: 400, headers: corsHeaders });
+        const forbid = forbidSelfOnly(auth.userId, id);
+        if (forbid) return forbid;
+
+        const usageType = type === "image" ? "image" : type === "quiz" ? "quiz" : "request";
+        const user = await decrementUsageForUser(id, usageType);
+        if (!user) return new Response(JSON.stringify({ error: "User not found" }), { status: 404, headers: corsHeaders });
+        return new Response(JSON.stringify(user), { headers: corsHeaders });
       }
 
       if (url.pathname === "/generate" && request.method === "POST") {
@@ -751,18 +970,22 @@ export default {
         }
 
         const skipUsageCharge = Boolean(body.usageAlreadyCounted);
-        const limits = planLimits(user.plan_type || "free");
+        const chargeType = image ? "image" : "request";
+        let usagePayload = usageSnapshot(user);
 
+        // Списание ДО вызова Gemini (атомарно). Иначе два устройства проходят check,
+        // оба получают ответ, а last-write-wins оставляет в БД только одно списание.
         if (!skipUsageCharge) {
-          if (image && limits.images === 0) {
-            return new Response(JSON.stringify({ error: "Images not available on your plan", code: "LIMIT_IMAGES" }), { status: 403, headers: corsHeaders });
+          const usageResult = await incrementUsageForUser(userId, chargeType);
+          if (usageResult.error) {
+            return new Response(JSON.stringify({
+              error: usageResult.error,
+              code: usageResult.code,
+              usage: usageSnapshot(usageResult.user),
+              ...(usageSnapshot(usageResult.user) || {}),
+            }), { status: usageResult.status || 400, headers: corsHeaders });
           }
-          if (image && limits.images !== Infinity && !canUse(user, "image")) {
-            return new Response(JSON.stringify({ error: "Image limit reached", code: "LIMIT_IMAGES" }), { status: 429, headers: corsHeaders });
-          }
-          if (limits.requests !== Infinity && !canUse(user, "request")) {
-            return new Response(JSON.stringify({ error: "Request limit reached", code: "LIMIT_REQUESTS" }), { status: 429, headers: corsHeaders });
-          }
+          usagePayload = usageSnapshot(usageResult.user);
         }
 
         // === ЛИМИТ ТОКЕНОВ: уважаем то, что просит фронтенд (app.js) ===
@@ -819,29 +1042,23 @@ export default {
 
         const data = await response.json();
         if (!response.ok || data.error) {
-          return new Response(JSON.stringify({ gemini_error: data.error || data, message: data.error?.message || "API error" }), { status: response.status, headers: corsHeaders });
+          // Gemini упал после списания — возвращаем квоту, чтобы не штрафовать за сбой API
+          if (!skipUsageCharge) {
+            const refunded = await decrementUsageForUser(userId, chargeType);
+            if (refunded) usagePayload = usageSnapshot(refunded);
+          }
+          return new Response(JSON.stringify({
+            gemini_error: data.error || data,
+            message: data.error?.message || "API error",
+            usage: usagePayload || undefined,
+          }), { status: response.status, headers: corsHeaders });
         }
 
         const text = data?.candidates?.[0]?.content?.parts?.map((p) => p.text).join("") || "Empty response from the model";
 
-        let usagePayload = null;
-        if (!skipUsageCharge) {
-          const usageResult = await incrementUsageForUser(userId, image ? "image" : "request");
-          if (usageResult.user) usagePayload = usageResult.user;
-        } else {
-          usagePayload = user;
-        }
-
         return new Response(JSON.stringify({
           text,
-          usage: usagePayload ? {
-            requests_count: usagePayload.requests_count,
-            images_count: usagePayload.images_count,
-            quiz_count: usagePayload.quiz_count,
-            requests_window_start: usagePayload.requests_window_start,
-            images_window_start: usagePayload.images_window_start,
-            quiz_window_start: usagePayload.quiz_window_start,
-          } : undefined,
+          usage: usagePayload || undefined,
         }), { headers: corsHeaders });
       }
 
