@@ -429,21 +429,96 @@ export default {
 
     // ========== SESSION AUTH ==========
     const SESSION_TTL_SEC = 30 * 24 * 60 * 60;
+    // Телефон + ПК (+ запас) — ок. 4-й логин выкидывает самую старую сессию.
+    const MAX_SESSIONS_PER_USER = 3;
 
     function sessionStore(env) {
       return env.OTP_KV || env.SESSION_KV || null;
+    }
+
+    function userSessionsKey(userId) {
+      return "usess:" + userId;
+    }
+
+    async function readUserSessionList(kv, userId) {
+      try {
+        const raw = await kv.get(userSessionsKey(userId));
+        if (!raw) return [];
+        const list = JSON.parse(raw);
+        return Array.isArray(list) ? list.filter((e) => e && e.token) : [];
+      } catch (_) {
+        return [];
+      }
+    }
+
+    async function writeUserSessionList(kv, userId, list) {
+      await kv.put(userSessionsKey(userId), JSON.stringify(list), {
+        expirationTtl: SESSION_TTL_SEC,
+      });
+    }
+
+    /** Убрать токен из индекса сессий пользователя (без удаления самого sess:). */
+    async function removeTokenFromUserSessions(env, userId, token) {
+      const kv = sessionStore(env);
+      if (!kv || !userId || !token) return;
+      const list = await readUserSessionList(kv, userId);
+      const next = list.filter((e) => e.token !== token);
+      if (next.length === list.length) return;
+      if (next.length === 0) {
+        await kv.delete(userSessionsKey(userId));
+      } else {
+        await writeUserSessionList(kv, userId, next);
+      }
+    }
+
+    /**
+     * Зарегистрировать новую сессию. Если у юзера уже MAX — удаляем самые старые sess:.
+     * Старый клиент получит 401 на следующем запросе (существующий редирект на login).
+     */
+    async function registerUserSession(env, userId, token, createdAt) {
+      const kv = sessionStore(env);
+      if (!kv) return;
+      let list = await readUserSessionList(kv, userId);
+      list.push({ token, createdAt });
+      list.sort((a, b) => (a.createdAt || 0) - (b.createdAt || 0));
+      while (list.length > MAX_SESSIONS_PER_USER) {
+        const oldest = list.shift();
+        if (oldest?.token) {
+          try {
+            await kv.delete("sess:" + oldest.token);
+          } catch (_) {}
+        }
+      }
+      await writeUserSessionList(kv, userId, list);
     }
 
     async function createSession(env, userId) {
       const kv = sessionStore(env);
       if (!kv) throw new Error("SESSION_KV or OTP_KV binding is required for auth");
       const token = crypto.randomUUID();
+      const createdAt = Date.now();
       await kv.put(
         "sess:" + token,
-        JSON.stringify({ userId, createdAt: Date.now() }),
+        JSON.stringify({ userId, createdAt }),
         { expirationTtl: SESSION_TTL_SEC }
       );
+      await registerUserSession(env, userId, token, createdAt);
       return token;
+    }
+
+    /** Logout / отзыв: удалить sess: и убрать из списка usess:. */
+    async function destroySession(env, token) {
+      const kv = sessionStore(env);
+      if (!kv || !token) return;
+      let userId = null;
+      try {
+        const raw = await kv.get("sess:" + token);
+        if (raw) userId = JSON.parse(raw).userId || null;
+      } catch (_) {}
+      try {
+        await kv.delete("sess:" + token);
+      } catch (_) {}
+      if (userId) await removeTokenFromUserSessions(env, userId, token);
     }
 
     async function getSessionUserId(request, env) {
@@ -591,11 +666,10 @@ export default {
     }
 
     async function handleLogout(request) {
-      const kv = sessionStore(env);
       const auth = request.headers.get("Authorization") || "";
-      if (kv && auth.startsWith("Bearer ")) {
+      if (auth.startsWith("Bearer ")) {
         const token = auth.slice(7).trim();
-        if (token) await kv.delete("sess:" + token);
+        if (token) await destroySession(env, token);
       }
       return new Response(JSON.stringify({ ok: true }), { headers: corsHeaders });
     }
