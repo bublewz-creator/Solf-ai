@@ -883,12 +883,13 @@
         }
 
         const intSpec = parseIntervalSpec(rawQuery);
-        if (scaleDeg && intSpec && /интервал|секунд|терци|кварт|квинт|септим|построй|build/i.test(t)) {
+        // d7 / D7 / доминантсепт — это аккорд, не интервал «уменьшённая септима»
+        if (scaleDeg && intSpec && !isD7Query(t) && /интервал|секунд|терци|кварт|квинт|септим|построй|build/i.test(t)) {
             return finalize(buildIntervalOnDegree(key.tonic, key.mode, scaleDeg, intSpec, t, withRes));
         }
 
         // «большую септиму в ми минор» — интервал от тоники, без «на N ступени».
-        if (!scaleDeg && intSpec && !CHORD_WORDS_RE.test(t)
+        if (!scaleDeg && intSpec && !CHORD_WORDS_RE.test(t) && !isD7Query(t)
             && /интервал|секунд|терци|кварт|квинт|секст|септим|октав|построй|постро|build|draw|напиш|сделай/i.test(t)) {
             return finalize(buildIntervalOnDegree(key.tonic, key.mode, 1, intSpec, t, withRes));
         }
@@ -1625,12 +1626,17 @@
         }
 
         // Английская краткая запись: P5, M3, m6, A4, d5 (регистр значим).
+        // ВАЖНО: голое d7 / D7 в сольфеджио = ДОМИНАНТСЕПТАККОРД, не уменьшённая септима.
+        // Уменьшённую септиму пишем явно: dim7, d7 interval, ум.7 / ум7.
         m = raw.match(/(?:^|[^A-Za-z])(P|M|m|A|d)\s*([1-8])(?![0-9/])/);
         if (m) {
-            const qmap = { 'P': 'perfect', 'M': 'major', 'm': 'minor', 'A': 'aug', 'd': 'dim' };
-            const degree = parseInt(m[2], 10);
-            const semis = intervalSemisFor(qmap[m[1]], degree);
-            if (semis != null) return { degree, semis };
+            const isBareD7 = m[1] === 'd' && m[2] === '7';
+            if (!isBareD7) {
+                const qmap = { 'P': 'perfect', 'M': 'major', 'm': 'minor', 'A': 'aug', 'd': 'dim' };
+                const degree = parseInt(m[2], 10);
+                const semis = intervalSemisFor(qmap[m[1]], degree);
+                if (semis != null) return { degree, semis };
+            }
         }
 
         // Английская словесная запись.
@@ -2467,7 +2473,7 @@
 
     /** Слова, из-за которых «терцию/сексту» нельзя понимать как интервал (это аккорд). */
     // Голое м7/m7 — интервал (малая септима), не аккорд; в этот список не входит.
-    const CHORD_WORDS_RE = /трезвуч|секстаккорд|квартсекст|терцкварт|квинтсекст|секундаккорд|септаккорд|аккорд|triad|chord|seventh|\bmaj7\b|\bdim7\b|\bm7b5\b|\bmm7\b/i;
+    const CHORD_WORDS_RE = /трезвуч|секстаккорд|квартсекст|терцкварт|квинтсекст|секундаккорд|септаккорд|аккорд|triad|chord|seventh|\bmaj7\b|\bdim7\b|\bm7b5\b|\bmm7\b|\bd\s*7\b|\bd7\b|(?:^|[^а-яё])д\s*7(?![0-9])|доминантсепт/i;
 
     function isChromaticScaleQuery(t) {
         // Любой порядок: «хроматическая гамма», «гамму хроматическую», «хроматическую от фа»
@@ -3623,6 +3629,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
         if (!note) return '';
 
         // Сначала интервал: голое м7/m7 = малая септима, не септаккорд.
+        // Голое d7 = доминантсепт, не уменьшённая септима (см. parseIntervalSpec).
         const spec = parseIntervalSpec(rawQuery);
         if (spec && !CHORD_WORDS_RE.test(t) && !isD7Query(t) && parseSeventhKind(t) === null) {
             const data = buildIntervalFromNote(
