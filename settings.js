@@ -1,10 +1,10 @@
 const SETTINGS_TEXT = {
-    en: { title: 'Settings', app: 'Application', language: 'Language', theme: 'Theme', dark: 'Dark', light: 'Light', font: 'Font size', fontSm: 'Small', fontMd: 'Medium', fontLg: 'Large', accent: 'Accent color', about: 'About', pricing: 'Pricing', privacy: 'Privacy Policy', terms: 'Terms of Use', help: 'Help & Feedback', logout: 'Sign Out', guest: 'Guest' },
-    ru: { title: 'Настройки', app: 'Приложение', language: 'Язык', theme: 'Внешний вид', dark: 'Тёмная', light: 'Светлая', font: 'Размер шрифта', fontSm: 'Маленький', fontMd: 'Средний', fontLg: 'Большой', accent: 'Цвет акцента', about: 'О программе', pricing: 'Тарифы', privacy: 'Политика конфиденциальности', terms: 'Условия пользования', help: 'Помощь и обратная связь', logout: 'Выйти', guest: 'Гость' },
-    de: { title: 'Einstellungen', app: 'Anwendung', language: 'Sprache', theme: 'Design', dark: 'Dunkel', light: 'Hell', font: 'Schriftgröße', fontSm: 'Klein', fontMd: 'Mittel', fontLg: 'Groß', accent: 'Akzentfarbe', about: 'Über', pricing: 'Preise', privacy: 'Datenschutz', terms: 'Nutzungsbedingungen', help: 'Hilfe & Feedback', logout: 'Abmelden', guest: 'Gast' },
-    es: { title: 'Ajustes', app: 'Aplicación', language: 'Idioma', theme: 'Tema', dark: 'Oscuro', light: 'Claro', font: 'Tamaño de fuente', fontSm: 'Pequeño', fontMd: 'Mediano', fontLg: 'Grande', accent: 'Color de acento', about: 'Acerca de', pricing: 'Precios', privacy: 'Política de Privacidad', terms: 'Términos de Uso', help: 'Ayuda y Soporte', logout: 'Cerrar Sesión', guest: 'Invitado' },
-    zh: { title: '设置', app: '应用', language: '语言', theme: '主题', dark: '深色', light: '浅色', font: '字体大小', fontSm: '小', fontMd: '中', fontLg: '大', accent: '强调色', about: '关于', pricing: '定价', privacy: '隐私政策', terms: '使用条款', help: '帮助与反馈', logout: '退出登录', guest: '访客' },
-    ja: { title: '設定', app: 'アプリ', language: '言語', theme: 'テーマ', dark: 'ダーク', light: 'ライト', font: '文字サイズ', fontSm: '小', fontMd: '中', fontLg: '大', accent: 'アクセントカラー', about: 'このアプリについて', pricing: '料金', privacy: 'プライバシーポリシー', terms: '利用規約', help: 'ヘルプとフィードバック', logout: 'サインアウト', guest: 'ゲスト' }
+    en: { title: 'Settings', app: 'Application', language: 'Language', theme: 'Theme', dark: 'Dark', light: 'Light', font: 'Font size', fontSm: 'Small', fontMd: 'Medium', fontLg: 'Large', accent: 'Accent color', about: 'About', pricing: 'Pricing', privacy: 'Privacy Policy', terms: 'Terms of Use', consent: 'Data processing', cookies: 'Cookie Policy', help: 'Contact: Telegram @vwirex', logout: 'Sign Out', guest: 'Guest' },
+    ru: { title: 'Настройки', app: 'Приложение', language: 'Язык', theme: 'Внешний вид', dark: 'Тёмная', light: 'Светлая', font: 'Размер шрифта', fontSm: 'Маленький', fontMd: 'Средний', fontLg: 'Большой', accent: 'Цвет акцента', about: 'О программе', pricing: 'Тарифы', privacy: 'Политика конфиденциальности', terms: 'Условия пользования', consent: 'Обработка данных', cookies: 'Политика cookies', help: 'Контакт: Telegram @vwirex', logout: 'Выйти', guest: 'Гость' },
+    de: { title: 'Einstellungen', app: 'Anwendung', language: 'Sprache', theme: 'Design', dark: 'Dunkel', light: 'Hell', font: 'Schriftgröße', fontSm: 'Klein', fontMd: 'Mittel', fontLg: 'Groß', accent: 'Akzentfarbe', about: 'Über', pricing: 'Preise', privacy: 'Datenschutz', terms: 'Nutzungsbedingungen', consent: 'Datenverarbeitung', cookies: 'Cookie-Richtlinie', help: 'Kontakt: Telegram @vwirex', logout: 'Abmelden', guest: 'Gast' },
+    es: { title: 'Ajustes', app: 'Aplicación', language: 'Idioma', theme: 'Tema', dark: 'Oscuro', light: 'Claro', font: 'Tamaño de fuente', fontSm: 'Pequeño', fontMd: 'Mediano', fontLg: 'Grande', accent: 'Color de acento', about: 'Acerca de', pricing: 'Precios', privacy: 'Política de Privacidad', terms: 'Términos de Uso', consent: 'Tratamiento de datos', cookies: 'Política de cookies', help: 'Contacto: Telegram @vwirex', logout: 'Cerrar Sesión', guest: 'Invitado' },
+    zh: { title: '设置', app: '应用', language: '语言', theme: '主题', dark: '深色', light: '浅色', font: '字体大小', fontSm: '小', fontMd: '中', fontLg: '大', accent: '强调色', about: '关于', pricing: '定价', privacy: '隐私政策', terms: '使用条款', consent: '数据处理', cookies: 'Cookie 政策', help: '联系：Telegram @vwirex', logout: '退出登录', guest: '访客' },
+    ja: { title: '設定', app: 'アプリ', language: '言語', theme: 'テーマ', dark: 'ダーク', light: 'ライト', font: '文字サイズ', fontSm: '小', fontMd: '中', fontLg: '大', accent: 'アクセントカラー', about: 'このアプリについて', pricing: '料金', privacy: 'プライバシーポリシー', terms: '利用規約', consent: 'データ処理', cookies: 'Cookieポリシー', help: '連絡先：Telegram @vwirex', logout: 'サインアウト', guest: 'ゲスト' }
 };
 
 const LANG_LABELS = { en: 'EN English', ru: 'RU Русский', de: 'DE Deutsch', es: 'ES Español', zh: 'ZH 中文', ja: 'JA 日本語' };
@@ -47,6 +47,10 @@ function renderTexts() {
     document.getElementById('pricingLabel') && (document.getElementById('pricingLabel').textContent = t.pricing);
     document.getElementById('privacyLabel').textContent = t.privacy;
     document.getElementById('termsLabel').textContent = t.terms;
+    const consentLabel = document.getElementById('consentLabel');
+    if (consentLabel) consentLabel.textContent = t.consent;
+    const cookiesLabel = document.getElementById('cookiesLabel');
+    if (cookiesLabel) cookiesLabel.textContent = t.cookies;
     document.getElementById('helpLabel').textContent = t.help;
     document.getElementById('logoutLabel').textContent = t.logout;
 }
