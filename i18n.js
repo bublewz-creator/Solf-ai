@@ -56,7 +56,7 @@ const translations = {
         support: 'Support',
         upgrade: 'Upgrade',
         home: 'Home',
-        disclaimer: 'Solf.ai may make mistakes. Please verify important information.',
+        disclaimer: 'Solf.ai may make mistakes. Please verify important information. · <a href="privacy.html">Privacy</a> · <a href="terms.html">Terms</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Skip',
@@ -198,7 +198,7 @@ const translations = {
         support: 'Поддержка',
         upgrade: 'Улучшить',
         home: 'На главную',
-        disclaimer: 'Solf.ai может допускать ошибки. Пожалуйста, проверяйте важную информацию.',
+        disclaimer: 'Solf.ai может допускать ошибки. Пожалуйста, проверяйте важную информацию. · <a href="privacy.html">Политика</a> · <a href="terms.html">Условия</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Пропустить',
@@ -245,7 +245,7 @@ const translations = {
         getUnlimited: 'Перейти на Pro | Unlimited',
         language: 'Язык',
         themeToggle: 'Сменить тему',
-        cookieText: 'Мы используем файлы cookie. Продолжая, вы соглашаетесь с ',
+        cookieText: 'Мы используем файлы cookie для настроек. Продолжая, вы соглашаетесь с ',
         cookieTerms: 'Условиями',
         cookiePrivacy: 'Политикой',
         cookieAccept: 'Принять',
@@ -340,7 +340,7 @@ const translations = {
         support: 'Support',
         upgrade: 'Upgrade',
         home: 'Startseite',
-        disclaimer: 'Solf.ai kann Fehler machen. Bitte überprüfen Sie wichtige Informationen.',
+        disclaimer: 'Solf.ai kann Fehler machen. Bitte überprüfen Sie wichtige Informationen. · <a href="privacy.html">Datenschutz</a> · <a href="terms.html">AGB</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Überspringen',
@@ -477,7 +477,7 @@ const translations = {
         support: 'Soporte',
         upgrade: 'Mejorar',
         home: 'Inicio',
-        disclaimer: 'Solf.ai puede cometer errores. Por favor, verifica la información importante.',
+        disclaimer: 'Solf.ai puede cometer errores. Por favor, verifica la información importante. · <a href="privacy.html">Privacidad</a> · <a href="terms.html">Términos</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'Omitir',
@@ -614,7 +614,7 @@ const translations = {
         support: '支持',
         upgrade: '升级',
         home: '首页',
-        disclaimer: 'Solf.ai 可能会犯错。请验证重要信息。',
+        disclaimer: 'Solf.ai 可能会犯错。请验证重要信息。 · <a href="privacy.html">隐私</a> · <a href="terms.html">条款</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: '跳过',
@@ -751,7 +751,7 @@ const translations = {
         support: 'サポート',
         upgrade: 'アップグレード',
         home: 'ホーム',
-        disclaimer: 'Solf.ai は間違いを犯す可能性があります。',
+        disclaimer: 'Solf.ai は間違いを犯す可能性があります。 · <a href="privacy.html">プライバシー</a> · <a href="terms.html">利用規約</a>',
         
         // --- TOUR & INSTRUCTIONS ---
         tourSkip: 'スキップ',
