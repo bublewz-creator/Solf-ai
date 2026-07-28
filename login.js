@@ -15,13 +15,14 @@ function consentsOk() {
     return termsAccepted;
 }
 
-function persistPdConsent() {
+function persistConsents() {
     if (!termsAccepted) return;
     try {
         localStorage.setItem('solfai_pd_consent', JSON.stringify({
             accepted: true,
             at: new Date().toISOString(),
         }));
+        localStorage.setItem('solfai_cookie_consent', 'accepted');
     } catch (_) {}
 }
 
@@ -96,24 +97,6 @@ function updateAuthGate() {
     if (hint) hint.hidden = ok;
 }
 
-function initCookieBanner() {
-    const banner = document.getElementById('cookieBanner');
-    if (!banner) return;
-    let consent = null;
-    try { consent = localStorage.getItem('solfai_cookie_consent'); } catch (_) {}
-    if (consent === 'accepted' || consent === 'declined') {
-        banner.hidden = true;
-        return;
-    }
-    banner.hidden = false;
-    const save = (value) => {
-        try { localStorage.setItem('solfai_cookie_consent', value); } catch (_) {}
-        banner.hidden = true;
-    };
-    document.getElementById('cookieAccept')?.addEventListener('click', () => save('accepted'));
-    document.getElementById('cookieDecline')?.addEventListener('click', () => save('declined'));
-}
-
 function ensureGoogleSignInLoaded() {
     if (typeof google !== 'undefined' && google.accounts) {
         initGoogleAuth();
@@ -162,7 +145,7 @@ function initGoogleAuth() {
                 alert(window.__solfTermsAlert || 'Please accept the terms and privacy first.');
                 return;
             }
-            persistPdConsent();
+            persistConsents();
             exchangeGoogleCredential(r.credential).catch((err) => {
                 console.warn('[Solf.ai] Google auth error:', err);
                 alert('Sign-in failed: ' + (err.message || 'Unknown error'));
@@ -238,7 +221,7 @@ async function startVkLogin(e) {
         alert(window.__solfTermsAlert || 'Please accept the terms and privacy first.');
         return;
     }
-    persistPdConsent();
+    persistConsents();
     const VKID = window.VKIDSDK || await ensureVkIdLoaded();
     if (!VKID) {
         alert('VK sign-in could not load. Check your connection or try Google sign-in.');
@@ -317,7 +300,7 @@ function ensureLoginProvidersLoaded() {
 
 document.getElementById('termsAccept')?.addEventListener('change', (e) => {
     termsAccepted = Boolean(e.target.checked);
-    if (termsAccepted) persistPdConsent();
+    if (termsAccepted) persistConsents();
     updateAuthGate();
 });
 
@@ -330,23 +313,17 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     const copy = {
         en: {
             subtitle: 'Sign in to save your chat history',
-            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a> &amp; personal data processing',
+            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>, data processing &amp; cookies',
             hint: 'Accept to continue',
             later: 'Maybe later',
             termsAlert: 'Please accept the terms first.',
-            cookieText: 'We use cookies to save your settings. ',
-            cookieAccept: 'Accept',
-            cookieDecline: 'Decline',
         },
         ru: {
             subtitle: 'Войдите, чтобы сохранить историю чатов',
-            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a> и обработку персональных данных',
+            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a>, обработку данных и cookies',
             hint: 'Примите, чтобы продолжить',
             later: 'Позже',
             termsAlert: 'Сначала примите условия.',
-            cookieText: 'Мы используем cookie для настроек. ',
-            cookieAccept: 'Принять',
-            cookieDecline: 'Отклонить',
         },
     };
     const t = copy[lang];
@@ -354,25 +331,12 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     const termsText = document.getElementById('termsText');
     const hint = document.getElementById('termsHint');
     const later = document.getElementById('loginLaterBtn');
-    const cookieText = document.getElementById('cookieBannerText');
     if (sub) sub.textContent = t.subtitle;
     if (termsText) termsText.innerHTML = t.termsHtml;
     if (hint) hint.textContent = t.hint;
     if (later) later.textContent = t.later;
-    if (cookieText) {
-        cookieText.innerHTML = t.cookieText +
-            '<a href="privacy.html" target="_blank" rel="noopener">' +
-            (lang === 'ru' ? 'Политика' : 'Privacy') +
-            '</a>';
-    }
-    const cookieAccept = document.getElementById('cookieAccept');
-    const cookieDecline = document.getElementById('cookieDecline');
-    if (cookieAccept) cookieAccept.textContent = t.cookieAccept;
-    if (cookieDecline) cookieDecline.textContent = t.cookieDecline;
     window.__solfTermsAlert = t.termsAlert;
 })();
-
-initCookieBanner();
 
 ensureLoginProvidersLoaded();
 

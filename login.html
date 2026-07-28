@@ -271,60 +271,6 @@
         .login-later:hover {
             color: var(--text-primary);
         }
-        .cookie-banner {
-            position: fixed;
-            bottom: 16px;
-            left: 50%;
-            transform: translateX(-50%);
-            width: calc(100% - 32px);
-            max-width: 420px;
-            background: var(--bg-card);
-            border: 1px solid var(--border-color);
-            border-radius: 14px;
-            padding: 12px 14px;
-            z-index: 9990;
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            box-sizing: border-box;
-        }
-        [data-theme="light"] .cookie-banner {
-            background: var(--bg-secondary);
-            border-color: rgba(0,0,0,0.12);
-        }
-        .cookie-banner p {
-            margin: 0;
-            font-size: 12px;
-            line-height: 1.4;
-            color: var(--text-secondary);
-        }
-        .cookie-banner a {
-            color: var(--purple-glow);
-            text-decoration: none;
-        }
-        .cookie-banner a:hover { text-decoration: underline; }
-        .cookie-buttons {
-            display: flex;
-            gap: 8px;
-            justify-content: flex-end;
-        }
-        .cookie-btn {
-            padding: 7px 14px;
-            border-radius: 8px;
-            font-size: 12px;
-            font-weight: 600;
-            cursor: pointer;
-            border: none;
-        }
-        .cookie-btn.primary {
-            background: var(--purple-soft);
-            color: #fff;
-        }
-        .cookie-btn.secondary {
-            background: transparent;
-            color: var(--text-primary);
-            border: 1px solid var(--border-color);
-        }
         @media (max-width: 480px) {
             .login-card {
                 padding: 32px 20px 24px;
@@ -364,8 +310,8 @@
                     <span class="terms-switch" aria-hidden="true"></span>
                     <span class="terms-text" id="termsText">
                         Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>,
-                        <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>
-                        &amp; personal data processing
+                        <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>,
+                        data processing &amp; cookies
                     </span>
                 </label>
 
@@ -396,18 +342,7 @@
         </div>
     </div>
 
-    <div class="cookie-banner" id="cookieBanner" hidden>
-        <p id="cookieBannerText">
-            We use cookies to save your settings.
-            <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
-        </p>
-        <div class="cookie-buttons">
-            <button type="button" class="cookie-btn secondary" id="cookieDecline">Decline</button>
-            <button type="button" class="cookie-btn primary" id="cookieAccept">Accept</button>
-        </div>
-    </div>
-
     <script src="auth.js?v=1"></script>
-    <script src="login.js?v=13"></script>
+    <script src="login.js?v=14"></script>
 </body>
 </html>

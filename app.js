@@ -5,6 +5,20 @@ const WORKER_URL = 'https://solf-ai-api.mlemonw.workers.dev';
 /** Макс. длина текста пользователя в одном сообщении (экономия токенов Gemini + анти-спам). */
 const MAX_CHAT_MESSAGE_CHARS = 800;
 
+/** Убираем email/телефон из текста перед отправкой в Gemini (профиль name/email в payload не кладём). */
+function redactPiiForModel(text) {
+    return String(text || '')
+        .replace(/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, '[email]')
+        .replace(/(?:\+?\d[\d\s\-().]{7,}\d)/g, '[phone]');
+}
+
+function sanitizeMessagesForModel(messages) {
+    return (messages || []).map((m) => ({
+        ...m,
+        content: typeof m.content === 'string' ? redactPiiForModel(m.content) : m.content,
+    }));
+}
+
 // Глобальный wrapper над fetch'ем для backend'а: добавляет AbortController с таймаутом.
 //
 // ЗАЧЕМ: solf-ai-api.mlemonw.workers.dev — это Cloudflare Workers. У части пользователей
@@ -3290,7 +3304,8 @@ async function generateResponse(query, imageData = null) {
             userId: currentUser?.id,
             // Уже списали через /increment-usage (в т.ч. для theory-only ответов)
             usageAlreadyCounted: usageChargedOnServer,
-            messages,
+            // В модель — только текст/картинка; name/email профиля не отправляем. Email/телефон в тексте маскируем.
+            messages: sanitizeMessagesForModel(messages),
             temperature: notationModeEnabled ? ((freshBuildTask || harmonizationTask || chainTask) ? 0.35 : 0.45) : 0.7,
             max_tokens: tokenBudget,
             maxOutputTokens: tokenBudget,
@@ -3371,7 +3386,7 @@ async function generateResponse(query, imageData = null) {
                         body: JSON.stringify({
                             userId: currentUser?.id,
                             usageAlreadyCounted: true,
-                            messages: retryMessages,
+                            messages: sanitizeMessagesForModel(retryMessages),
                             temperature: notationRetryTemps[ri] ?? 0.15,
                             max_tokens: retryBudget,
                             maxOutputTokens: retryBudget,
@@ -3419,10 +3434,10 @@ async function generateResponse(query, imageData = null) {
                         body: JSON.stringify({
                             userId: currentUser?.id,
                             usageAlreadyCounted: true,
-                            messages: messages.concat([
+                            messages: sanitizeMessagesForModel(messages.concat([
                                 { role: 'assistant', content: aiText },
                                 { role: 'user', content: `${HARMONIZATION_RETRY_PROMPT}${buildHarmonizationReminder(responseLang, !!imageData)}` }
-                            ]),
+                            ])),
                             temperature: 0.2,
                             max_tokens: 8192,
                             maxOutputTokens: 8192,
@@ -3456,10 +3471,10 @@ async function generateResponse(query, imageData = null) {
                         body: JSON.stringify({
                             userId: currentUser?.id,
                             usageAlreadyCounted: true,
-                            messages: messages.concat([
+                            messages: sanitizeMessagesForModel(messages.concat([
                                 { role: 'assistant', content: aiText },
                                 { role: 'user', content: `${CHAIN_RETRY_PROMPT}${buildChainReminder(responseLang, baseUserContent)}` }
-                            ]),
+                            ])),
                             temperature: 0.2,
                             max_tokens: 8192,
                             maxOutputTokens: 8192,
