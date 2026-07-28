@@ -5,13 +5,9 @@
         (function() {
             try {
                 var theme = localStorage.getItem('solfai_theme');
-                if (theme === 'light') {
-                    document.documentElement.setAttribute('data-theme', 'light');
-                }
+                if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
                 var color = localStorage.getItem('solfai_color');
-                if (color && color !== 'default') {
-                    document.documentElement.setAttribute('data-color', color);
-                }
+                if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
             } catch (e) {}
         })();
     </script>
@@ -22,13 +18,9 @@
     <link rel="icon" href="favicon.ico?v=8" sizes="48x48">
     <link rel="icon" type="image/png" sizes="32x32" href="assets/favicon-32.png?v=8">
     <link rel="apple-touch-icon" sizes="180x180" href="assets/apple-touch-icon.png?v=8">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="Solf.ai">
-   <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
         :root {
@@ -41,48 +33,29 @@
             --text-secondary: #64607a; --purple-soft: #7c3aed; --purple-glow: #8b5cf6;
             --border-color: rgba(139,92,246,0.2); --hover-accent-bg: rgba(139,92,246,0.1);
         }
-        [data-color="blue"] {
-            --purple-soft: #3b82f6; --purple-glow: #60a5fa; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1);
-        }
-        [data-theme="light"][data-color="blue"] {
-            --purple-glow: #2563eb; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1);
-        }
-        [data-color="green"] {
-            --purple-soft: #10b981; --purple-glow: #34d399; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1);
-        }
-        [data-theme="light"][data-color="green"] {
-            --purple-glow: #059669; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1);
-        }
-        [data-color="rose"] {
-            --purple-soft: #f43f5e; --purple-glow: #fb7185; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1);
-        }
-        [data-theme="light"][data-color="rose"] {
-            --purple-glow: #e11d48; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1);
-        }
-        [data-theme="light"] body {
-            background: linear-gradient(180deg, #f8f7fc 0%, #f0eef7 100%);
-        }
-        body { background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; margin: 0; padding: 40px 20px; transition: all 0.3s; }
+        [data-color="blue"] { --purple-soft: #3b82f6; --purple-glow: #60a5fa; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1); }
+        [data-color="green"] { --purple-soft: #10b981; --purple-glow: #34d399; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1); }
+        [data-color="rose"] { --purple-soft: #f43f5e; --purple-glow: #fb7185; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1); }
+        body { background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; margin: 0; padding: 40px 20px; }
         .container { max-width: 800px; margin: 0 auto; }
         .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
-        .back-link { display: inline-flex; align-items: center; gap: 8px; color: var(--purple-soft); text-decoration: none; font-size: 14px; }
-        .back-link:hover { text-decoration: underline; }
-        .lang-selector { display: flex; gap: 8px; flex-wrap: wrap; }
-        .lang-btn { padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 14px; transition: all 0.2s; }
-        .lang-btn:hover, .lang-btn.active { border-color: var(--purple-soft); background: var(--hover-accent-bg); }
+        .back-link { color: var(--purple-soft); text-decoration: none; font-size: 14px; }
+        .lang-btn { padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 14px; }
+        .lang-btn.active, .lang-btn:hover { border-color: var(--purple-soft); background: var(--hover-accent-bg); }
         h1 { font-size: 2rem; margin-bottom: 8px; background: linear-gradient(135deg, var(--purple-soft), var(--purple-glow)); -webkit-background-clip: text; background-clip: text; -webkit-text-fill-color: transparent; }
         .date { color: var(--text-secondary); font-size: 14px; margin-bottom: 40px; }
-        h2 { font-size: 1.25rem; margin: 32px 0 16px; color: var(--text-primary); }
+        h2 { font-size: 1.25rem; margin: 32px 0 16px; color: var(--text-primary); scroll-margin-top: 24px; }
         p, li { font-size: 15px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 16px; }
         ul { padding-left: 24px; }
         strong { color: var(--text-primary); }
         a { color: var(--purple-soft); }
+        code { font-size: 0.9em; color: var(--text-primary); }
         .content { display: none; }
         .content.active { display: block; }
         .site-contact { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border-color); font-size: 14px; color: var(--text-secondary); }
     </style>
 </head>
-<body class="preload">
+<body>
     <div class="container">
         <div class="header">
             <a href="index.html" class="back-link" id="backLink">← Back to Solf.ai</a>
@@ -96,56 +69,58 @@
             <h1>Privacy Policy</h1>
             <p class="date">Effective date: July 28, 2026 · <a href="terms.html">Terms of Service</a></p>
             <p>This Privacy Policy describes how Solf.ai (“<strong>we</strong>”, “<strong>us</strong>”) processes personal data when you use our website and application (the “<strong>Service</strong>”). It should be read together with our <a href="terms.html">Terms of Service</a>. Where Russian law applies, processing is also guided by Federal Law No. 152-FZ “On Personal Data”.</p>
+            <p>Jump to: <a href="#consent">Consent to data processing</a> · <a href="#cookies">Cookies</a></p>
 
             <h2>1. Operator / contact</h2>
-            <p>Solf.ai is operated as an independent online service. For privacy requests and other questions contact us on Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <p>Solf.ai is operated as an independent online service. Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>2. Categories of data we process</h2>
             <ul>
-                <li><strong>Account &amp; identity:</strong> when you sign in with Google or VK, we receive identifiers and profile elements that the provider shares (typically name, email, profile picture URL) to create/display your account.</li>
-                <li><strong>Messages &amp; prompts:</strong> your <strong>text</strong> and a <strong>limited amount of prior conversation context</strong> are sent to our backend so an AI model can generate a reply. This is required for the chat feature.</li>
-                <li><strong>Images you attach:</strong> images uploaded for analysis are sent to our backend for processing.</li>
-                <li><strong>Local chat history &amp; settings:</strong> chats and preferences (theme, language, font size, plan metadata, usage counters, etc.) may be stored in your browser (<strong>localStorage</strong> and similar).</li>
-                <li><strong>Cookie / storage consent:</strong> we record whether you accepted or declined the cookie banner.</li>
-                <li><strong>Technical data:</strong> when you call our API, hosting providers may process IP address, timestamps, and request metadata for security, abuse prevention, and operation of the Service.</li>
-                <li><strong>Payments:</strong> if you buy a paid plan, payment is processed by <strong>YooKassa</strong>. We receive payment status / plan information needed to activate access; card details are handled by YooKassa, not stored by us as full card numbers.</li>
+                <li><strong>Account &amp; identity:</strong> when you sign in with Google or VK — typically name, email, profile picture URL, provider id.</li>
+                <li><strong>Messages &amp; prompts:</strong> text and limited conversation context sent to our backend for AI replies.</li>
+                <li><strong>Images you attach:</strong> sent to our backend for analysis.</li>
+                <li><strong>Local storage:</strong> chats and preferences in the browser (<strong>localStorage</strong>).</li>
+                <li><strong>Consent flags:</strong> that you accepted legal consents on sign-in (stored locally).</li>
+                <li><strong>Technical data:</strong> IP, timestamps, request metadata for security and operation.</li>
+                <li><strong>Payments:</strong> plan/payment status via <strong>YooKassa</strong>; card numbers are handled by YooKassa.</li>
             </ul>
 
             <h2>3. Purposes</h2>
-            <p>We process data to: provide and secure the Service; authenticate users; enforce usage limits and plans; process payments and activate paid access; respond to your requests; and comply with applicable law.</p>
+            <p>Operate and secure the Service; authenticate users; enforce limits and plans; process payments; respond to requests; comply with law.</p>
 
             <h2>4. AI processing (Google Gemini) and other recipients</h2>
-            <p>We do <strong>not</strong> sell your personal data. To generate answers, prompts and attached images are processed via our backend using <strong>Google Gemini</strong> (Google LLC / Google API). We aim <strong>not</strong> to send your account name, email, or phone number to the model as separate profile fields; if you type such details into the chat yourself, they may appear in the prompt text.</p>
-            <p>Other infrastructure / service providers may include:</p>
-            <ul>
-                <li><strong>Google LLC</strong> — authentication and/or AI inference;</li>
-                <li><strong>VK</strong> — authentication when you choose VK sign-in;</li>
-                <li><strong>Hosting / edge providers</strong> (e.g. Cloudflare or similar) — routing and protecting API traffic;</li>
-                <li><strong>Database / session storage</strong> used by our backend;</li>
-                <li><strong>YooKassa</strong> — payment processing for paid plans;</li>
-                <li>optional email/SMS providers if one-time codes are enabled.</li>
-            </ul>
-            <p>These providers may process data outside your country (including the United States). By using the Service and accepting this Policy, you acknowledge such international processing where it is necessary to operate the features you request.</p>
+            <p>We do <strong>not</strong> sell your personal data. Prompts and images may be processed via <strong>Google Gemini</strong>. We aim not to send account name/email/phone to the model as separate profile fields; if you type them in chat, they may appear in the prompt.</p>
+            <p>Other providers may include Google (auth/AI), VK (auth), hosting/CDN (e.g. Cloudflare), database/session storage, YooKassa, and optional email/SMS providers. Processing may occur outside your country (including the United States) where needed for the features you use.</p>
 
             <h2>5. Retention</h2>
-            <p>Data in your browser remains until you clear site data or use in-app controls. Server-side account, usage, and logs are kept as needed to provide the Service, prevent abuse, and meet legal requirements. You may ask us to delete account-related data via <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <p>Browser data until you clear it. Server data as needed for the Service, security, and law. Deletion requests: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>6. Your rights</h2>
-            <p>Depending on applicable law, you may request access, correction, deletion, restriction, or information about processing. Under Russian law you may also contact Roskomnadzor. To exercise rights, write to <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. You can delete locally stored data by clearing this site’s storage in your browser.</p>
+            <p>Depending on law: access, correction, deletion, restriction, information about processing; under Russian law you may also contact Roskomnadzor. Contact <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>7. Children / age</h2>
-            <p>The Service is not directed at children under <strong>13</strong>. Paid plans are intended for users aged <strong>18+</strong>. We do not knowingly collect personal data from children below the applicable minimum age. If you believe we have, contact us and we will take steps to delete such information.</p>
+            <p>Not directed at children under <strong>13</strong>. Paid plans are intended for users aged <strong>18+</strong>.</p>
 
             <h2>8. Security</h2>
-            <p>We use appropriate measures such as HTTPS for API calls. No method of transmission over the Internet is 100% secure.</p>
+            <p>Measures such as HTTPS for API calls. No method of transmission over the Internet is 100% secure.</p>
 
-            <h2>9. Cookies and similar technologies</h2>
-            <p>We use storage needed for settings, session/auth cache, and preferences. We do <strong>not</strong> use third-party advertising cookies. By accepting the consent switch on sign-in (Terms, Privacy, data processing &amp; cookies), you agree to this use of cookies/local storage.</p>
+            <h2 data-anchor="cookies">9. Cookies and similar technologies</h2>
+            <p>We mainly use <strong>first-party</strong> storage (cookies / <strong>localStorage</strong> / session storage), not third-party advertising cookies.</p>
+            <ul>
+                <li><strong>Necessary / functional:</strong> language, theme, font, UI preferences; auth/session cache; local chat history; plan/usage counters; consent flags (<code>solfai_cookie_consent</code>, <code>solfai_pd_consent</code>).</li>
+                <li><strong>We do not use</strong> third-party advertising or ad-network analytics cookies.</li>
+            </ul>
+            <p>By enabling the sign-in consent switch, you agree to this use. Stored as <code>solfai_cookie_consent=accepted</code>. Clear site data in the browser to remove it; some features may stop working.</p>
 
-            <h2>10. Changes</h2>
+            <h2 data-anchor="consent">10. Consent to personal data processing</h2>
+            <p>By enabling the sign-in consent switch (or otherwise expressly agreeing), you give Solf.ai consent to process your personal data as described in this Policy, including account data from Google/VK; chat text, context and images; plan/usage and technical data; payment status from YooKassa.</p>
+            <p>Purposes: Service, auth, limits/plans, payments, security, support, legal compliance. Processing may involve providers outside your country (including the United States) where needed (e.g. Gemini, login, hosting).</p>
+            <p>Withdraw via <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> and/or a deletion request. Withdrawal does not affect prior lawful processing. Without this consent, account features requiring personal data may be unavailable.</p>
+
+            <h2>11. Changes</h2>
             <p>We may update this Policy; the effective date above will change.</p>
 
-            <h2>11. Contact</h2>
+            <h2>12. Contact</h2>
             <p>Solf.ai · Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Terms of Service</a></p>
         </div>
 
@@ -153,56 +128,58 @@
             <h1>Политика конфиденциальности</h1>
             <p class="date">Дата вступления в силу: 28 июля 2026 г. · <a href="terms.html">Условия использования</a></p>
             <p>Настоящая Политика описывает обработку персональных данных при использовании Solf.ai («<strong>Сервис</strong>»). Действует совместно с <a href="terms.html">Условиями использования</a>. При применимости российского права учитывается Федеральный закон № 152-ФЗ «О персональных данных».</p>
+            <p>Разделы: <a href="#consent">обработка данных (согласие)</a> · <a href="#cookies">Cookies</a></p>
 
             <h2>1. Оператор / контакт</h2>
-            <p>Solf.ai — независимый онлайн-сервис. Запросы по персональным данным и иные обращения: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <p>Solf.ai — независимый онлайн-сервис. Контакт: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>2. Какие данные обрабатываются</h2>
             <ul>
-                <li><strong>Учётная запись:</strong> при входе через Google или VK мы получаем сведения, которые передаёт провайдер (как правило имя, email, URL фото профиля) для создания/отображения аккаунта.</li>
-                <li><strong>Сообщения и запросы:</strong> ваш <strong>текст</strong> и <strong>ограниченный контекст переписки</strong> передаются на бэкенд для генерации ответа моделью ИИ — без этого чат невозможен.</li>
-                <li><strong>Изображения:</strong> прикреплённые изображения передаются на бэкенд для анализа.</li>
-                <li><strong>Локально в браузере:</strong> история чатов, настройки (тема, язык, шрифт, тариф, счётчики) могут храниться в <strong>localStorage</strong>.</li>
-                <li><strong>Согласие на cookie:</strong> факт выбора в баннере cookie.</li>
-                <li><strong>Технические данные:</strong> у хостинг-провайдеров могут обрабатываться IP, время запроса и метаданные для безопасности и работы Сервиса.</li>
-                <li><strong>Оплата:</strong> платные тарифы оплачиваются через <strong>ЮKassa</strong>. Мы получаем статус оплаты / сведения, нужные для активации тарифа; полные данные карты обрабатывает ЮKassa, мы их не храним как номер карты.</li>
+                <li><strong>Учётная запись:</strong> при входе через Google или VK — обычно имя, email, URL фото, id провайдера.</li>
+                <li><strong>Сообщения:</strong> текст и ограниченный контекст на бэкенд для ответа ИИ.</li>
+                <li><strong>Изображения:</strong> на бэкенд для анализа.</li>
+                <li><strong>Локально:</strong> чаты и настройки в <strong>localStorage</strong>.</li>
+                <li><strong>Флаги согласия:</strong> факт принятия согласий при входе.</li>
+                <li><strong>Технические данные:</strong> IP, время, метаданные для безопасности.</li>
+                <li><strong>Оплата:</strong> статус через <strong>ЮKassa</strong>; номер карты обрабатывает ЮKassa.</li>
             </ul>
 
             <h2>3. Цели</h2>
-            <p>Обработка для: предоставления и защиты Сервиса; входа в аккаунт; лимитов и тарифов; оплаты и активации доступа; ответов на обращения; исполнения закона.</p>
+            <p>Сервис и безопасность; вход; лимиты и тарифы; оплата; обращения; закон.</p>
 
             <h2>4. ИИ (Google Gemini) и получатели</h2>
-            <p>Мы <strong>не продаём</strong> персональные данные. Для ответов запросы и изображения обрабатываются через бэкенд с использованием <strong>Google Gemini</strong> (Google LLC / Google API). Мы стремимся <strong>не передавать</strong> в модель отдельно имя, email или телефон из профиля; если вы сами напишете их в чат, они могут попасть в текст запроса.</p>
-            <p>Также могут привлекаться:</p>
-            <ul>
-                <li><strong>Google LLC</strong> — авторизация и/или ИИ;</li>
-                <li><strong>VK</strong> — авторизация при входе через VK;</li>
-                <li><strong>хостинг / CDN</strong> (напр. Cloudflare) — маршрутизация и защита API;</li>
-                <li><strong>база данных / сессии</strong> бэкенда;</li>
-                <li><strong>ЮKassa</strong> — приём оплаты;</li>
-                <li>при необходимости — сервисы email/SMS для кодов входа.</li>
-            </ul>
-            <p>Обработка может происходить за пределами вашей страны (в т.ч. в США). Используя Сервис и принимая Политику, вы подтверждаете согласие с такой обработкой в объёме, необходимом для работы запрошенных функций.</p>
+            <p>Мы <strong>не продаём</strong> персональные данные. Запросы и изображения могут обрабатываться через <strong>Google Gemini</strong>. Имя/email/телефон из профиля в модель отдельными полями не отправляем; если вы напишете их в чат — могут попасть в текст.</p>
+            <p>Также: Google, VK, хостинг/CDN (напр. Cloudflare), БД/сессии, ЮKassa, при необходимости email/SMS. Обработка может быть за пределами вашей страны (в т.ч. США).</p>
 
             <h2>5. Сроки хранения</h2>
-            <p>Данные в браузере — до удаления вами. Серверные данные аккаунта, использования и журналы — пока нужны для Сервиса, безопасности и закона. Запрос на удаление: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <p>В браузере — до очистки вами. На сервере — пока нужно для Сервиса, безопасности и закона. Удаление: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>6. Ваши права</h2>
-            <p>В зависимости от применимого права вы можете запросить доступ, уточнение, удаление, ограничение обработки или сведения об обработке. По российскому праву также можно обратиться в Роскомнадзор. Для запросов: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. Локальные данные можно удалить, очистив хранилище сайта в браузере.</p>
+            <p>Доступ, уточнение, удаление, ограничение, сведения об обработке; по РФ — также Роскомнадзор. Пишите <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
 
             <h2>7. Возраст</h2>
-            <p>Сервис не ориентирован на детей младше <strong>13 лет</strong>. Платные тарифы — для пользователей <strong>от 18 лет</strong>. Если считаете, что мы получили данные ребёнка без оснований — напишите нам, удалим.</p>
+            <p>Не для детей младше <strong>13</strong>. Платные тарифы — от <strong>18</strong>.</p>
 
             <h2>8. Безопасность</h2>
-            <p>Применяются меры, в т.ч. HTTPS для API. Абсолютной безопасности в сети не существует.</p>
+            <p>В т.ч. HTTPS для API. Абсолютной безопасности в сети нет.</p>
 
-            <h2>9. Cookie и аналоги</h2>
-            <p>Используем необходимое хранилище для настроек, сессии и предпочтений. Рекламные cookie третьих сторон не используем. Согласие на cookies даётся вместе с Условиями и Политикой при входе (тумблер на странице входа).</p>
+            <h2 data-anchor="cookies">9. Cookie и аналоги</h2>
+            <p>В основном <strong>собственное</strong> хранилище (cookies / <strong>localStorage</strong> / session storage), без рекламных cookies третьих сторон.</p>
+            <ul>
+                <li><strong>Необходимые / функциональные:</strong> язык, тема, шрифт, UI; кэш входа; локальные чаты; счётчики тарифа; флаги согласия (<code>solfai_cookie_consent</code>, <code>solfai_pd_consent</code>).</li>
+                <li><strong>Не используем</strong> рекламные cookies рекламных сетей.</li>
+            </ul>
+            <p>Согласие — тумблером при входе, хранится как <code>solfai_cookie_consent=accepted</code>. Очистка данных сайта в браузере может отключить часть функций.</p>
 
-            <h2>10. Изменения</h2>
-            <p>Мы можем обновлять Политику; актуальная дата указана выше.</p>
+            <h2 data-anchor="consent">10. Согласие на обработку персональных данных</h2>
+            <p>Включая тумблер при входе, вы даёте Solf.ai согласие на обработку ПДн, описанных в Политике: данные Google/VK; чат и изображения; тариф/использование и техданные; статус оплаты ЮKassa.</p>
+            <p>Цели: Сервис, вход, лимиты/тарифы, оплата, безопасность, поддержка, закон. Возможна обработка за рубежом (в т.ч. США), если нужна для функций (Gemini, логин, хостинг).</p>
+            <p>Отзыв: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> и/или удаление данных. Без согласия функции аккаунта с ПДн могут быть недоступны.</p>
 
-            <h2>11. Контакты</h2>
+            <h2>11. Изменения</h2>
+            <p>Политику можно обновлять; дата выше актуальна.</p>
+
+            <h2>12. Контакты</h2>
             <p>Solf.ai · Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Условия использования</a></p>
         </div>
 
@@ -210,31 +187,40 @@
     </div>
 
     <script>
-        const theme = localStorage.getItem('solfai_theme');
-        if (theme && theme !== 'default') document.documentElement.setAttribute('data-theme', theme);
-        const color = localStorage.getItem('solfai_color');
-        if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
-
         const backTexts = { en: '← Back to Solf.ai', ru: '← Вернуться на Solf.ai' };
         const contactTexts = {
             en: 'Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>',
             ru: 'Solf.ai · Контакт: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>'
         };
 
+        function applyLang(lang) {
+            document.querySelectorAll('.lang-btn').forEach(b => b.classList.toggle('active', b.dataset.lang === lang));
+            document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+            document.getElementById('content-' + lang).classList.add('active');
+            document.getElementById('backLink').textContent = backTexts[lang];
+            document.getElementById('siteContactLine').innerHTML = contactTexts[lang];
+        }
+
+        function scrollToHash() {
+            const id = (location.hash || '').replace(/^#/, '');
+            if (!id) return;
+            const active = document.querySelector('.content.active');
+            const el = active && active.querySelector('[data-anchor="' + id + '"]');
+            if (el) setTimeout(() => el.scrollIntoView({ behavior: 'smooth', block: 'start' }), 50);
+        }
+
         document.querySelectorAll('.lang-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const lang = btn.dataset.lang === 'ru' ? 'ru' : 'en';
-                document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
-                btn.classList.add('active');
-                document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
-                document.getElementById('content-' + lang).classList.add('active');
-                document.getElementById('backLink').textContent = backTexts[lang];
-                document.getElementById('siteContactLine').innerHTML = contactTexts[lang];
+                applyLang(lang);
+                scrollToHash();
             });
         });
 
-        const savedLang = (localStorage.getItem('solfai_lang') === 'ru') ? 'ru' : 'en';
-        document.querySelector(`.lang-btn[data-lang="${savedLang}"]`)?.click();
+        const savedLang = localStorage.getItem('solfai_lang') === 'ru' ? 'ru' : 'en';
+        applyLang(savedLang);
+        scrollToHash();
+        window.addEventListener('hashchange', scrollToHash);
     </script>
 </body>
 </html>

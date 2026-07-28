@@ -313,14 +313,14 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     const copy = {
         en: {
             subtitle: 'Sign in to save your chat history',
-            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>, <a href="consent.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">data processing</a> &amp; <a href="cookies.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Cookies</a>',
+            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>, <a href="privacy.html#consent" target="_blank" rel="noopener" onclick="event.stopPropagation()">data processing</a> &amp; <a href="privacy.html#cookies" target="_blank" rel="noopener" onclick="event.stopPropagation()">Cookies</a>',
             hint: 'Accept to continue',
             later: 'Maybe later',
             termsAlert: 'Please accept the terms first.',
         },
         ru: {
             subtitle: 'Войдите, чтобы сохранить историю чатов',
-            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a>, <a href="consent.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">обработку данных</a> и <a href="cookies.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Cookies</a>',
+            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a>, <a href="privacy.html#consent" target="_blank" rel="noopener" onclick="event.stopPropagation()">обработку данных</a> и <a href="privacy.html#cookies" target="_blank" rel="noopener" onclick="event.stopPropagation()">Cookies</a>',
             hint: 'Примите, чтобы продолжить',
             later: 'Позже',
             termsAlert: 'Сначала примите условия.',

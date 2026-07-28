@@ -123,7 +123,7 @@
          в app.js). Это убирает accounts.google.com из критического пути загрузки — у части
          пользователей без VPN запрос подвисает на несколько секунд и тормозит весь UI. -->
     
-    <link rel="stylesheet" href="styles.css?v=7">
+    <link rel="stylesheet" href="styles.css?v=8">
 
     <style>
         /* Auth-dependent visibility — classes set synchronously in <head>, no FOUC */
@@ -517,18 +517,11 @@
                     </svg>
                 </div>
             </div>
-            <div id="sidebarAuthContainer" style="padding: 16px; padding-bottom: 0; border-top: 1px solid var(--border-color);">
+            <div id="sidebarAuthContainer" style="padding: 16px; padding-bottom: max(16px, env(safe-area-inset-bottom)); border-top: 1px solid var(--border-color);">
                 <button class="login-btn" id="sidebarLoginBtn" style="width: 100%; justify-content: center;">
                     <svg class="svg-icon" viewBox="0 0 24 24"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"></path><polyline points="10 17 15 12 10 7"></polyline><line x1="15" y1="12" x2="3" y2="12"></line></svg>
                     <span data-i18n="signIn">Sign In</span>
                 </button>
-            </div>
-            <div class="sidebar-legal" id="sidebarLegal">
-                <a href="terms.html" data-i18n="cookieTerms">Terms</a>
-                <span aria-hidden="true">·</span>
-                <a href="privacy.html" data-i18n="cookiePrivacy">Privacy</a>
-                <span aria-hidden="true">·</span>
-                <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>
             </div>
         </div>
     </aside>
