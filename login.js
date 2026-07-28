@@ -79,10 +79,7 @@ function updateAuthGate() {
     const hint = document.getElementById('termsHint');
     if (providers) providers.classList.toggle('auth-disabled', !termsAccepted);
     if (hint) hint.hidden = termsAccepted;
-    if (termsAccepted && !providersLoaded) {
-        providersLoaded = true;
-        ensureLoginProvidersLoaded();
-    }
+    // Скрипты провайдеров грузятся сразу при открытии страницы (см. низ файла).
 }
 
 function ensureGoogleSignInLoaded() {
@@ -201,7 +198,7 @@ function exchangeVkCode(payload) {
 async function startVkLogin(e) {
     e?.preventDefault?.();
     if (!termsAccepted) {
-        alert('Please accept the terms first.');
+        alert(window.__solfTermsAlert || 'Please accept the terms first.');
         return;
     }
     const VKID = window.VKIDSDK || await ensureVkIdLoaded();
@@ -288,6 +285,39 @@ document.getElementById('termsAccept')?.addEventListener('change', (e) => {
 document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     window.location.href = getReturnUrl() === 'index.html' ? 'index.html' : getReturnUrl();
 });
+
+(function applyLoginLocale() {
+    const lang = localStorage.getItem('solfai_lang') === 'ru' ? 'ru' : 'en';
+    const copy = {
+        en: {
+            subtitle: 'Sign in to save your chat history',
+            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a> &amp; <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>',
+            hint: 'Accept terms to continue',
+            later: 'Maybe later',
+            termsAlert: 'Please accept the terms first.',
+        },
+        ru: {
+            subtitle: 'Войдите, чтобы сохранить историю чатов',
+            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a> и <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a>',
+            hint: 'Примите условия, чтобы продолжить',
+            later: 'Позже',
+            termsAlert: 'Сначала примите условия.',
+        },
+    };
+    const t = copy[lang];
+    const sub = document.querySelector('.login-subtitle');
+    const termsText = document.getElementById('termsText');
+    const hint = document.getElementById('termsHint');
+    const later = document.getElementById('loginLaterBtn');
+    if (sub) sub.textContent = t.subtitle;
+    if (termsText) termsText.innerHTML = t.termsHtml;
+    if (hint) hint.textContent = t.hint;
+    if (later) later.textContent = t.later;
+    window.__solfTermsAlert = t.termsAlert;
+})();
+
+// Грузим Google/VK заранее — к моменту галочки скрипты уже на месте (быстрее вход).
+ensureLoginProvidersLoaded();
 
 completeVkRedirectIfNeeded();
 updateAuthGate();
