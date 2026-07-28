@@ -1,0 +1,136 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <script>
+        (function() {
+            try {
+                var theme = localStorage.getItem('solfai_theme');
+                if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+                var color = localStorage.getItem('solfai_color');
+                if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
+            } catch (e) {}
+        })();
+    </script>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cookie Policy — Solf.ai</title>
+    <link rel="icon" type="image/png" sizes="192x192" href="assets/favicon-192.png?v=8">
+    <link rel="icon" href="favicon.ico?v=8" sizes="48x48">
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" media="print" onload="this.media='all'">
+    <style>
+        * { font-family: 'Inter', sans-serif; box-sizing: border-box; }
+        :root {
+            --bg-primary: #0a0a0f; --bg-secondary: #13131a; --text-primary: #f1f5f9;
+            --text-secondary: #94a3b8; --purple-soft: #8b5cf6; --purple-glow: #a78bfa;
+            --border-color: rgba(139,92,246,0.2); --hover-accent-bg: rgba(139,92,246,0.1);
+        }
+        [data-theme="light"] {
+            --bg-primary: #f8f7fc; --bg-secondary: #ffffff; --text-primary: #1e1b2e;
+            --text-secondary: #64607a; --purple-soft: #7c3aed; --purple-glow: #8b5cf6;
+            --border-color: rgba(139,92,246,0.2); --hover-accent-bg: rgba(139,92,246,0.1);
+        }
+        [data-color="blue"] { --purple-soft: #3b82f6; --purple-glow: #60a5fa; --border-color: rgba(59,130,246,0.2); --hover-accent-bg: rgba(59,130,246,0.1); }
+        [data-color="green"] { --purple-soft: #10b981; --purple-glow: #34d399; --border-color: rgba(16,185,129,0.2); --hover-accent-bg: rgba(16,185,129,0.1); }
+        [data-color="rose"] { --purple-soft: #f43f5e; --purple-glow: #fb7185; --border-color: rgba(244,63,94,0.2); --hover-accent-bg: rgba(244,63,94,0.1); }
+        body { background: var(--bg-primary); color: var(--text-primary); min-height: 100vh; margin: 0; padding: 40px 20px; }
+        .container { max-width: 800px; margin: 0 auto; }
+        .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 32px; flex-wrap: wrap; gap: 16px; }
+        .back-link { color: var(--purple-soft); text-decoration: none; font-size: 14px; }
+        .lang-btn { padding: 8px 12px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; color: var(--text-primary); cursor: pointer; font-size: 14px; }
+        .lang-btn.active, .lang-btn:hover { border-color: var(--purple-soft); background: var(--hover-accent-bg); }
+        h1 { font-size: 1.75rem; margin-bottom: 8px; }
+        .date { color: var(--text-secondary); font-size: 14px; margin-bottom: 32px; }
+        h2 { font-size: 1.15rem; margin: 28px 0 12px; }
+        p, li { font-size: 15px; color: var(--text-secondary); line-height: 1.8; margin-bottom: 14px; }
+        ul { padding-left: 24px; }
+        strong { color: var(--text-primary); }
+        a { color: var(--purple-soft); }
+        .content { display: none; }
+        .content.active { display: block; }
+        .site-contact { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border-color); font-size: 14px; color: var(--text-secondary); }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <a href="index.html" class="back-link" id="backLink">← Back to Solf.ai</a>
+            <div>
+                <button class="lang-btn active" data-lang="en">EN</button>
+                <button class="lang-btn" data-lang="ru">RU</button>
+            </div>
+        </div>
+
+        <div class="content active" id="content-en">
+            <h1>Cookie Policy</h1>
+            <p class="date">Effective date: July 28, 2026 · <a href="privacy.html">Privacy Policy</a> · <a href="consent.html">Consent</a> · <a href="terms.html">Terms</a></p>
+            <p>This Cookie Policy explains how Solf.ai uses cookies and similar technologies (including <strong>localStorage</strong> / session storage in your browser).</p>
+
+            <h2>1. What we use</h2>
+            <p>We mainly use <strong>first-party</strong> storage on your device, not third-party advertising cookies.</p>
+            <ul>
+                <li><strong>Necessary / functional:</strong> language, theme, font size, UI preferences; auth/session cache; chat history stored locally; plan/usage counters in the browser; consent flags (<code>solfai_cookie_consent</code>, <code>solfai_pd_consent</code>).</li>
+                <li><strong>We do not use</strong> third-party advertising or analytics cookies of the kind described for ad networks.</li>
+            </ul>
+
+            <h2>2. Why</h2>
+            <p>To make the Service work (remember settings, keep you signed in where applicable, store chats on your device, remember that you accepted legal consents).</p>
+
+            <h2>3. How you agree</h2>
+            <p>By enabling the consent switch on the sign-in page (Terms, Privacy, personal data processing &amp; cookies), you agree to this Cookie Policy and the use of the technologies above. Consent is stored locally as <code>solfai_cookie_consent=accepted</code>.</p>
+
+            <h2>4. How to refuse or clear</h2>
+            <p>You can clear site data in your browser settings (this removes local chats/settings/consent flags). You may also contact <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. If you refuse cookies/local storage needed for the Service, some features may not work.</p>
+
+            <h2>5. Related documents</h2>
+            <p><a href="privacy.html">Privacy Policy</a> · <a href="consent.html">Consent to personal data processing</a> · <a href="terms.html">Terms of Service</a></p>
+        </div>
+
+        <div class="content" id="content-ru">
+            <h1>Политика cookies</h1>
+            <p class="date">Дата: 28 июля 2026 г. · <a href="privacy.html">Политика</a> · <a href="consent.html">Согласие</a> · <a href="terms.html">Условия</a></p>
+            <p>Настоящая Политика объясняет, как Solf.ai использует cookies и похожие технологии (в т.ч. <strong>localStorage</strong> / session storage в браузере).</p>
+
+            <h2>1. Что используем</h2>
+            <p>В основном <strong>собственное</strong> хранилище на вашем устройстве, без рекламных cookies третьих сторон.</p>
+            <ul>
+                <li><strong>Необходимые / функциональные:</strong> язык, тема, размер шрифта, настройки интерфейса; кэш входа/сессии; история чатов локально; счётчики тарифа в браузере; флаги согласия (<code>solfai_cookie_consent</code>, <code>solfai_pd_consent</code>).</li>
+                <li><strong>Не используем</strong> рекламные и аналитические cookies рекламных сетей.</li>
+            </ul>
+
+            <h2>2. Зачем</h2>
+            <p>Чтобы Сервис работал: помнить настройки, сохранять чаты на устройстве, фиксировать согласие с документами.</p>
+
+            <h2>3. Как даётся согласие</h2>
+            <p>Включая тумблер на странице входа (Условия, Политика, обработка ПДн и cookies), вы соглашаетесь с настоящей Политикой cookies. Согласие сохраняется локально как <code>solfai_cookie_consent=accepted</code>.</p>
+
+            <h2>4. Как отказаться или очистить</h2>
+            <p>Можно очистить данные сайта в настройках браузера (удалятся локальные чаты/настройки/флаги согласия). Также можно написать <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. Без необходимого хранилища часть функций может не работать.</p>
+
+            <h2>5. Связанные документы</h2>
+            <p><a href="privacy.html">Политика конфиденциальности</a> · <a href="consent.html">Согласие на обработку ПДн</a> · <a href="terms.html">Условия использования</a></p>
+        </div>
+
+        <p class="site-contact" id="siteContactLine">Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a></p>
+    </div>
+    <script>
+        const backTexts = { en: '← Back to Solf.ai', ru: '← Вернуться на Solf.ai' };
+        const contactTexts = {
+            en: 'Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>',
+            ru: 'Solf.ai · Контакт: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>'
+        };
+        document.querySelectorAll('.lang-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                const lang = btn.dataset.lang === 'ru' ? 'ru' : 'en';
+                document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
+                btn.classList.add('active');
+                document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+                document.getElementById('content-' + lang).classList.add('active');
+                document.getElementById('backLink').textContent = backTexts[lang];
+                document.getElementById('siteContactLine').innerHTML = contactTexts[lang];
+            });
+        });
+        const savedLang = localStorage.getItem('solfai_lang') === 'ru' ? 'ru' : 'en';
+        document.querySelector(`.lang-btn[data-lang="${savedLang}"]`)?.click();
+    </script>
+</body>
+</html>
