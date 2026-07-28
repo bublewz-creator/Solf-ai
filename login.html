@@ -96,12 +96,9 @@
             border-radius: 10px;
             border: 1px solid var(--border-color);
             background: transparent;
-            margin-bottom: 8px;
+            margin-bottom: 18px;
             cursor: pointer;
             transition: border-color 0.2s ease;
-        }
-        .terms-row:last-of-type {
-            margin-bottom: 18px;
         }
         .terms-row:hover {
             border-color: var(--purple-soft);
@@ -366,14 +363,9 @@
                     <input type="checkbox" id="termsAccept">
                     <span class="terms-switch" aria-hidden="true"></span>
                     <span class="terms-text" id="termsText">
-                        Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>
-                    </span>
-                </label>
-                <label class="terms-row" for="privacyAccept">
-                    <input type="checkbox" id="privacyAccept">
-                    <span class="terms-switch" aria-hidden="true"></span>
-                    <span class="terms-text" id="privacyText">
-                        Agree to processing of personal data (<a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>)
+                        Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>,
+                        <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>
+                        &amp; personal data processing
                     </span>
                 </label>
 
@@ -397,7 +389,7 @@
                         </button>
                     </div>
                 </div>
-                <p class="terms-hint" id="termsHint">Accept both to continue</p>
+                <p class="terms-hint" id="termsHint">Accept to continue</p>
 
                 <a href="index.html" class="login-later" id="loginLaterBtn">Maybe later</a>
             </div>
@@ -416,6 +408,6 @@
     </div>
 
     <script src="auth.js?v=1"></script>
-    <script src="login.js?v=12"></script>
+    <script src="login.js?v=13"></script>
 </body>
 </html>

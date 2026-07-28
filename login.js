@@ -7,17 +7,16 @@ const VK_REDIRECT_URL = 'https://bublewz-creator.github.io/Solf-ai/';
 const VKID_SDK_URL = 'https://unpkg.com/@vkid/sdk@2.5.2/dist-sdk/umd/index.js';
 
 let termsAccepted = false;
-let privacyAccepted = false;
 let providersLoaded = false;
 let vkConfigReady = false;
 let vkButtonBound = false;
 
 function consentsOk() {
-    return termsAccepted && privacyAccepted;
+    return termsAccepted;
 }
 
 function persistPdConsent() {
-    if (!privacyAccepted) return;
+    if (!termsAccepted) return;
     try {
         localStorage.setItem('solfai_pd_consent', JSON.stringify({
             accepted: true,
@@ -318,12 +317,7 @@ function ensureLoginProvidersLoaded() {
 
 document.getElementById('termsAccept')?.addEventListener('change', (e) => {
     termsAccepted = Boolean(e.target.checked);
-    updateAuthGate();
-});
-
-document.getElementById('privacyAccept')?.addEventListener('change', (e) => {
-    privacyAccepted = Boolean(e.target.checked);
-    if (privacyAccepted) persistPdConsent();
+    if (termsAccepted) persistPdConsent();
     updateAuthGate();
 });
 
@@ -336,22 +330,20 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     const copy = {
         en: {
             subtitle: 'Sign in to save your chat history',
-            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>',
-            privacyHtml: 'Agree to processing of personal data (<a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a>)',
-            hint: 'Accept both to continue',
+            termsHtml: 'Agree to <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy</a> &amp; personal data processing',
+            hint: 'Accept to continue',
             later: 'Maybe later',
-            termsAlert: 'Please accept Terms and Privacy first.',
+            termsAlert: 'Please accept the terms first.',
             cookieText: 'We use cookies to save your settings. ',
             cookieAccept: 'Accept',
             cookieDecline: 'Decline',
         },
         ru: {
             subtitle: 'Войдите, чтобы сохранить историю чатов',
-            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>',
-            privacyHtml: 'Согласие на обработку персональных данных (<a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политика</a>)',
-            hint: 'Нужны оба согласия',
+            termsHtml: 'Принимаю <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Условия</a>, <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Политику</a> и обработку персональных данных',
+            hint: 'Примите, чтобы продолжить',
             later: 'Позже',
-            termsAlert: 'Сначала примите Условия и согласие на обработку данных.',
+            termsAlert: 'Сначала примите условия.',
             cookieText: 'Мы используем cookie для настроек. ',
             cookieAccept: 'Принять',
             cookieDecline: 'Отклонить',
@@ -360,13 +352,11 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
     const t = copy[lang];
     const sub = document.querySelector('.login-subtitle');
     const termsText = document.getElementById('termsText');
-    const privacyText = document.getElementById('privacyText');
     const hint = document.getElementById('termsHint');
     const later = document.getElementById('loginLaterBtn');
     const cookieText = document.getElementById('cookieBannerText');
     if (sub) sub.textContent = t.subtitle;
     if (termsText) termsText.innerHTML = t.termsHtml;
-    if (privacyText) privacyText.innerHTML = t.privacyHtml;
     if (hint) hint.textContent = t.hint;
     if (later) later.textContent = t.later;
     if (cookieText) {
@@ -384,7 +374,6 @@ document.getElementById('loginBackBtn')?.addEventListener('click', () => {
 
 initCookieBanner();
 
-// Грузим Google/VK заранее — к моменту галочек скрипты уже на месте (быстрее вход).
 ensureLoginProvidersLoaded();
 
 completeVkRedirectIfNeeded();
