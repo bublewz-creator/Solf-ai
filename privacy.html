@@ -2,7 +2,6 @@
 <html lang="en">
 <head>
     <script>
-        // Мгновенное применение темы до отрисовки DOM
         (function() {
             try {
                 var theme = localStorage.getItem('solfai_theme');
@@ -80,6 +79,7 @@
         a { color: var(--purple-soft); }
         .content { display: none; }
         .content.active { display: block; }
+        .site-contact { margin-top: 48px; padding-top: 24px; border-top: 1px solid var(--border-color); font-size: 14px; color: var(--text-secondary); }
     </style>
 </head>
 <body class="preload">
@@ -87,103 +87,140 @@
         <div class="header">
             <a href="index.html" class="back-link" id="backLink">← Back to Solf.ai</a>
             <div class="lang-selector">
-                <button class="lang-btn active" data-lang="en">🇺🇸 EN</button>
-                <button class="lang-btn" data-lang="ru">🇷🇺 RU</button>
+                <button class="lang-btn active" data-lang="en">EN</button>
+                <button class="lang-btn" data-lang="ru">RU</button>
             </div>
         </div>
 
-        <!-- English -->
         <div class="content active" id="content-en">
             <h1>Privacy Policy</h1>
-            <p class="date">Effective date: April 3, 2026 · <a href="terms.html">Terms of Service</a></p>
-            <p>This Privacy Policy describes how Solf.ai (“<strong>we</strong>”, “<strong>us</strong>”) processes personal data when you use our website and application (the “<strong>Service</strong>”). It should be read together with our <a href="terms.html">Terms of Service</a>.</p>
-            <h2>1. Data controller</h2>
-            <p>The controller of your personal data is the independent operator of Solf.ai, an individual entrepreneur / self-employed person established in the <strong>Russian Federation</strong>. Contact for privacy requests: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> on Telegram.</p>
+            <p class="date">Effective date: July 28, 2026 · <a href="terms.html">Terms of Service</a></p>
+            <p>This Privacy Policy describes how Solf.ai (“<strong>we</strong>”, “<strong>us</strong>”) processes personal data when you use our website and application (the “<strong>Service</strong>”). It should be read together with our <a href="terms.html">Terms of Service</a>. Where Russian law applies, processing is also guided by Federal Law No. 152-FZ “On Personal Data”.</p>
+
+            <h2>1. Operator / contact</h2>
+            <p>Solf.ai is operated as an independent online service. For privacy requests and other questions contact us on Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+
             <h2>2. Categories of data we process</h2>
             <ul>
-                <li><strong>Account &amp; identity (Google Sign-In):</strong> when you choose to sign in with Google, we receive identifiers and profile elements that Google shares with our app (typically name, email address, profile picture URL) to display your account in the interface.</li>
-                <li><strong>Messages &amp; prompts:</strong> when you send a message, your <strong>text</strong> and a <strong>limited amount of prior conversation context</strong> are transmitted to our backend API so that an AI model can generate a reply. This is <strong>essential</strong> to provide the chat feature.</li>
-                <li><strong>Images you attach:</strong> if you upload images for analysis, image data (e.g. encoded in the request) is sent to our backend for processing.</li>
-                <li><strong>Local chat history &amp; settings:</strong> chat threads and preferences (theme, language, font size, plan metadata, usage counters, etc.) may be stored in your browser using <strong>localStorage</strong> (and similar technologies) primarily on your device.</li>
-                <li><strong>Cookie / storage consent:</strong> we record whether you accepted or declined the cookie banner, where applicable.</li>
-                <li><strong>Technical &amp; connection data:</strong> when you call our API, our hosting providers may process technical data such as IP address, timestamps, and request metadata for <strong>security, abuse prevention, and service operation</strong>.</li>
+                <li><strong>Account &amp; identity:</strong> when you sign in with Google or VK, we receive identifiers and profile elements that the provider shares (typically name, email, profile picture URL) to create/display your account.</li>
+                <li><strong>Messages &amp; prompts:</strong> your <strong>text</strong> and a <strong>limited amount of prior conversation context</strong> are sent to our backend so an AI model can generate a reply. This is required for the chat feature.</li>
+                <li><strong>Images you attach:</strong> images uploaded for analysis are sent to our backend for processing.</li>
+                <li><strong>Local chat history &amp; settings:</strong> chats and preferences (theme, language, font size, plan metadata, usage counters, etc.) may be stored in your browser (<strong>localStorage</strong> and similar).</li>
+                <li><strong>Cookie / storage consent:</strong> we record whether you accepted or declined the cookie banner.</li>
+                <li><strong>Technical data:</strong> when you call our API, hosting providers may process IP address, timestamps, and request metadata for security, abuse prevention, and operation of the Service.</li>
+                <li><strong>Payments:</strong> if you buy a paid plan, payment is processed by <strong>YooKassa</strong>. We receive payment status / plan information needed to activate access; card details are handled by YooKassa, not stored by us as full card numbers.</li>
             </ul>
-            <h2>3. Purposes and legal bases (including GDPR)</h2>
-            <p>We process data to: operate and secure the Service; authenticate users; enforce usage limits and plans; comply with law; and communicate with you when you contact us. Where the EU/EEA/UK GDPR applies, legal bases may include: <strong>performance of a contract</strong> (providing the Service you request); <strong>legitimate interests</strong> (security, preventing fraud and abuse, improving reliability); <strong>consent</strong> where required (e.g. non-essential storage); and <strong>legal obligation</strong> where applicable.</p>
-            <h2>4. Recipients and international transfers</h2>
-            <p>We do <strong>not</strong> sell your personal data. We rely on infrastructure and service providers, which may include:</p>
+
+            <h2>3. Purposes</h2>
+            <p>We process data to: provide and secure the Service; authenticate users; enforce usage limits and plans; process payments and activate paid access; respond to your requests; and comply with applicable law.</p>
+
+            <h2>4. AI processing (Google Gemini) and other recipients</h2>
+            <p>We do <strong>not</strong> sell your personal data. To generate answers, prompts and attached images are processed via our backend using <strong>Google Gemini</strong> (Google LLC / Google API). We aim <strong>not</strong> to send your account name, email, or phone number to the model as separate profile fields; if you type such details into the chat yourself, they may appear in the prompt text.</p>
+            <p>Other infrastructure / service providers may include:</p>
             <ul>
-                <li><strong>Google LLC</strong> (authentication);</li>
-                <li><strong>Hosting / edge providers</strong> (e.g. Cloudflare or similar) that route and protect API traffic;</li>
-                <li><strong>AI inference providers</strong> engaged by our backend to process prompts and return model outputs.</li>
+                <li><strong>Google LLC</strong> — authentication and/or AI inference;</li>
+                <li><strong>VK</strong> — authentication when you choose VK sign-in;</li>
+                <li><strong>Hosting / edge providers</strong> (e.g. Cloudflare or similar) — routing and protecting API traffic;</li>
+                <li><strong>Database / session storage</strong> used by our backend;</li>
+                <li><strong>YooKassa</strong> — payment processing for paid plans;</li>
+                <li>optional email/SMS providers if one-time codes are enabled.</li>
             </ul>
-            <p>These providers may process data in countries other than your own (including the United States). Where required, transfers are safeguarded by appropriate mechanisms (such as standard contractual clauses offered by providers). You may request more detail about subprocessors by contacting us.</p>
+            <p>These providers may process data outside your country (including the United States). By using the Service and accepting this Policy, you acknowledge such international processing where it is necessary to operate the features you request.</p>
+
             <h2>5. Retention</h2>
-            <p>Data stored <strong>locally in your browser</strong> remains until you clear site data or use in-app controls. Server-side logs and processing are kept <strong>no longer than necessary</strong> for security, troubleshooting, and legal compliance—exact periods may depend on infrastructure defaults; contact us for specifics about your data.</p>
+            <p>Data in your browser remains until you clear site data or use in-app controls. Server-side account, usage, and logs are kept as needed to provide the Service, prevent abuse, and meet legal requirements. You may ask us to delete account-related data via <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+
             <h2>6. Your rights</h2>
-            <p>Depending on your jurisdiction, you may have rights to <strong>access</strong>, <strong>rectification</strong>, <strong>erasure</strong>, <strong>restriction</strong>, <strong>data portability</strong>, <strong>objection</strong>, and to <strong>withdraw consent</strong> where processing is consent-based. You may also lodge a complaint with a supervisory authority (e.g. in your EU Member State of residence). To exercise rights, contact <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. You can delete locally stored data by clearing your browser storage for our site.</p>
-            <h2>7. Children</h2>
-            <p>The Service is not directed at children under <strong>13</strong>. We do not knowingly collect personal data from children below the applicable minimum age. If you believe we have, please contact us and we will take steps to delete such information.</p>
+            <p>Depending on applicable law, you may request access, correction, deletion, restriction, or information about processing. Under Russian law you may also contact Roskomnadzor. To exercise rights, write to <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. You can delete locally stored data by clearing this site’s storage in your browser.</p>
+
+            <h2>7. Children / age</h2>
+            <p>The Service (including free use and paid plans) is intended for users aged <strong>18+</strong>. We do not knowingly collect personal data from children under 18. If you believe we have, contact us and we will take steps to delete such information.</p>
+
             <h2>8. Security</h2>
-            <p>We implement appropriate technical and organizational measures (such as HTTPS for API calls) to protect personal data. No method of transmission over the Internet is 100% secure.</p>
+            <p>We use appropriate measures such as HTTPS for API calls. No method of transmission over the Internet is 100% secure.</p>
+
             <h2>9. Cookies and similar technologies</h2>
-            <p>We use storage necessary for preferences and consent. We do <strong>not</strong> use third-party advertising or analytics cookies as described in our banner. See the cookie notice on first visit for choices where applicable.</p>
+            <p>We use storage needed for settings, session/auth cache, and consent choice. We do <strong>not</strong> use third-party advertising cookies. See the cookie banner on first visit for Accept / Decline.</p>
+
             <h2>10. Changes</h2>
-            <p>We may update this Policy; the “Effective date” at the top will change. Material changes may be highlighted by updating this page.</p>
+            <p>We may update this Policy; the effective date above will change.</p>
+
             <h2>11. Contact</h2>
-            <p>Privacy questions: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Terms of Service</a></p>
+            <p>Solf.ai · Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Terms of Service</a></p>
         </div>
 
-        <!-- Russian -->
         <div class="content" id="content-ru">
             <h1>Политика конфиденциальности</h1>
-            <p class="date">Дата вступления в силу: 3 апреля 2026 г. · <a href="terms.html">Условия использования</a></p>
-            <p>Настоящая Политика описывает обработку персональных данных при использовании Solf.ai («<strong>Сервис</strong>»). Действует совместно с <a href="terms.html">Условиями использования</a>. Обработка осуществляется с учётом Федерального закона № 152-ФЗ «О персональных данных».</p>
-            <h2>1. Оператор</h2>
-            <p>Оператор персональных данных — независимый оператор Solf.ai (физическое лицо / самозанятый), осуществляющий деятельность в <strong>Российской Федерации</strong>. Запросы по персональным данным: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+            <p class="date">Дата вступления в силу: 28 июля 2026 г. · <a href="terms.html">Условия использования</a></p>
+            <p>Настоящая Политика описывает обработку персональных данных при использовании Solf.ai («<strong>Сервис</strong>»). Действует совместно с <a href="terms.html">Условиями использования</a>. При применимости российского права учитывается Федеральный закон № 152-ФЗ «О персональных данных».</p>
+
+            <h2>1. Оператор / контакт</h2>
+            <p>Solf.ai — независимый онлайн-сервис. Запросы по персональным данным и иные обращения: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+
             <h2>2. Какие данные обрабатываются</h2>
             <ul>
-                <li><strong>Учётная запись (Google):</strong> при входе через Google мы получаем предоставляемые Google сведения (как правило имя, email, URL фото профиля) для отображения в интерфейсе.</li>
-                <li><strong>Сообщения и запросы:</strong> ваш <strong>текст</strong> и <strong>ограниченный контекст переписки</strong> передаются на бэкенд (API) для генерации ответа моделью ИИ — без этого чат невозможен.</li>
+                <li><strong>Учётная запись:</strong> при входе через Google или VK мы получаем сведения, которые передаёт провайдер (как правило имя, email, URL фото профиля) для создания/отображения аккаунта.</li>
+                <li><strong>Сообщения и запросы:</strong> ваш <strong>текст</strong> и <strong>ограниченный контекст переписки</strong> передаются на бэкенд для генерации ответа моделью ИИ — без этого чат невозможен.</li>
                 <li><strong>Изображения:</strong> прикреплённые изображения передаются на бэкенд для анализа.</li>
-                <li><strong>Локально в браузере:</strong> история чатов, настройки (тема, язык, шрифт, тариф, счётчики использования и т.д.) могут храниться в <strong>localStorage</strong> на вашем устройстве.</li>
-                <li><strong>Согласие на cookie / баннер:</strong> факт выбора в баннере cookie.</li>
-                <li><strong>Технические данные:</strong> при обращении к API у хостинг-провайдеров могут обрабатываться IP-адрес, время запроса и иные метаданные для <strong>безопасности и противодействия злоупотреблениям</strong>.</li>
+                <li><strong>Локально в браузере:</strong> история чатов, настройки (тема, язык, шрифт, тариф, счётчики) могут храниться в <strong>localStorage</strong>.</li>
+                <li><strong>Согласие на cookie:</strong> факт выбора в баннере cookie.</li>
+                <li><strong>Технические данные:</strong> у хостинг-провайдеров могут обрабатываться IP, время запроса и метаданные для безопасности и работы Сервиса.</li>
+                <li><strong>Оплата:</strong> платные тарифы оплачиваются через <strong>ЮKassa</strong>. Мы получаем статус оплаты / сведения, нужные для активации тарифа; полные данные карты обрабатывает ЮKassa, мы их не храним как номер карты.</li>
             </ul>
-            <h2>3. Цели и правовые основания</h2>
-            <p>Обработка для: предоставления Сервиса; аутентификации; соблюдения лимитов и тарифов; безопасности; выполнения закона; связи по вашим обращениям. Применимое право (в т.ч. GDPR в ЕЭЗ) может требовать согласия, договора, законного интереса или иного основания — мы стремимся соблюдать соответствующие требования.</p>
-            <h2>4. Получатели и трансграничная передача</h2>
-            <p>Мы <strong>не продаём</strong> персональные данные. Передача возможна инфраструктурным поставщикам: <strong>Google</strong> (авторизация); <strong>хостинг / CDN</strong> (напр. Cloudflare); <strong>поставщики вычислений для ИИ</strong>, используемые бэкендом. Данные могут обрабатываться за пределами РФ; при необходимости применяются механизмы обеспечения защиты (в т.ч. договорные гарантии). Уточнить список субоператоров можно по запросу.</p>
+
+            <h2>3. Цели</h2>
+            <p>Обработка для: предоставления и защиты Сервиса; входа в аккаунт; лимитов и тарифов; оплаты и активации доступа; ответов на обращения; исполнения закона.</p>
+
+            <h2>4. ИИ (Google Gemini) и получатели</h2>
+            <p>Мы <strong>не продаём</strong> персональные данные. Для ответов запросы и изображения обрабатываются через бэкенд с использованием <strong>Google Gemini</strong> (Google LLC / Google API). Мы стремимся <strong>не передавать</strong> в модель отдельно имя, email или телефон из профиля; если вы сами напишете их в чат, они могут попасть в текст запроса.</p>
+            <p>Также могут привлекаться:</p>
+            <ul>
+                <li><strong>Google LLC</strong> — авторизация и/или ИИ;</li>
+                <li><strong>VK</strong> — авторизация при входе через VK;</li>
+                <li><strong>хостинг / CDN</strong> (напр. Cloudflare) — маршрутизация и защита API;</li>
+                <li><strong>база данных / сессии</strong> бэкенда;</li>
+                <li><strong>ЮKassa</strong> — приём оплаты;</li>
+                <li>при необходимости — сервисы email/SMS для кодов входа.</li>
+            </ul>
+            <p>Обработка может происходить за пределами вашей страны (в т.ч. в США). Используя Сервис и принимая Политику, вы подтверждаете согласие с такой обработкой в объёме, необходимом для работы запрошенных функций.</p>
+
             <h2>5. Сроки хранения</h2>
-            <p>Данные в браузере хранятся до их удаления вами. Серверные журналы и обработка — в объёме, необходимом для безопасности и закона; конкретные сроки зависят от инфраструктуры — уточняйте по запросу.</p>
+            <p>Данные в браузере — до удаления вами. Серверные данные аккаунта, использования и журналы — пока нужны для Сервиса, безопасности и закона. Запрос на удаление: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>.</p>
+
             <h2>6. Ваши права</h2>
-            <p>В зависимости от применимого права вы можете иметь право на доступ, уточнение, удаление, ограничение обработки, возражение, отзыв согласия, переносимость данных; подать жалобу уполномоченному органу. Для обращений: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. Локальные данные можно удалить, очистив хранилище сайта в браузере.</p>
-            <h2>7. Дети</h2>
-            <p>Сервис не ориентирован на детей младше <strong>13 лет</strong>. Если вы считаете, что мы получили данные ребёнка без оснований, напишите нам — удалим.</p>
+            <p>В зависимости от применимого права вы можете запросить доступ, уточнение, удаление, ограничение обработки или сведения об обработке. По российскому праву также можно обратиться в Роскомнадзор. Для запросов: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>. Локальные данные можно удалить, очистив хранилище сайта в браузере.</p>
+
+            <h2>7. Возраст</h2>
+            <p>Сервис (включая бесплатное использование и платные тарифы) предназначен для пользователей <strong>от 18 лет</strong>. Мы сознательно не собираем данные детей младше 18. Если считаете, что такие данные получены — напишите нам, удалим.</p>
+
             <h2>8. Безопасность</h2>
-            <p>Применяются организационные и технические меры (в т.ч. HTTPS для API). Абсолютной безопасности в сети не существует.</p>
+            <p>Применяются меры, в т.ч. HTTPS для API. Абсолютной безопасности в сети не существует.</p>
+
             <h2>9. Cookie и аналоги</h2>
-            <p>Используем необходимое хранилище для настроек и согласия. Рекламные и аналитические cookie третьих сторон, о которых говорится в баннере, не используются в описанном там смысле.</p>
+            <p>Используем необходимое хранилище для настроек, сессии и выбора в баннере. Рекламные cookie третьих сторон не используем. При первом визите доступен баннер «Принять / Отклонить».</p>
+
             <h2>10. Изменения</h2>
             <p>Мы можем обновлять Политику; актуальная дата указана выше.</p>
+
             <h2>11. Контакты</h2>
-            <p><a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Условия использования</a></p>
+            <p>Solf.ai · Telegram: <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a> · <a href="terms.html">Условия использования</a></p>
         </div>
+
+        <p class="site-contact" id="siteContactLine">Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a></p>
     </div>
 
     <script>
-        // Apply saved theme
         const theme = localStorage.getItem('solfai_theme');
         if (theme && theme !== 'default') document.documentElement.setAttribute('data-theme', theme);
         const color = localStorage.getItem('solfai_color');
         if (color && color !== 'default') document.documentElement.setAttribute('data-color', color);
-        
-        // Language switching
-        const backTexts = {
-            en: '← Back to Solf.ai',
-            ru: '← Вернуться на Solf.ai'
+
+        const backTexts = { en: '← Back to Solf.ai', ru: '← Вернуться на Solf.ai' };
+        const contactTexts = {
+            en: 'Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>',
+            ru: 'Solf.ai · Контакт: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>'
         };
-        
+
         document.querySelectorAll('.lang-btn').forEach(btn => {
             btn.addEventListener('click', () => {
                 const lang = btn.dataset.lang === 'ru' ? 'ru' : 'en';
@@ -192,9 +229,10 @@
                 document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
                 document.getElementById('content-' + lang).classList.add('active');
                 document.getElementById('backLink').textContent = backTexts[lang];
+                document.getElementById('siteContactLine').innerHTML = contactTexts[lang];
             });
         });
-        
+
         const savedLang = (localStorage.getItem('solfai_lang') === 'ru') ? 'ru' : 'en';
         document.querySelector(`.lang-btn[data-lang="${savedLang}"]`)?.click();
     </script>

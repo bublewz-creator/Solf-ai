@@ -271,6 +271,18 @@
         .login-later:hover {
             color: var(--text-primary);
         }
+        .login-legal-links {
+            margin-top: 16px;
+            font-size: 0.78rem;
+            color: var(--text-secondary);
+        }
+        .login-legal-links a {
+            color: var(--purple-soft);
+            text-decoration: none;
+        }
+        .login-legal-links a:hover {
+            text-decoration: underline;
+        }
         @media (max-width: 480px) {
             .login-card {
                 padding: 32px 20px 24px;
@@ -308,8 +320,8 @@
                 <label class="terms-row" for="termsAccept">
                     <input type="checkbox" id="termsAccept">
                     <span class="terms-switch" aria-hidden="true"></span>
-                    <span class="terms-text">
-                        I agree to the <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms of Service</a>
+                    <span class="terms-text" id="termsText">
+                        I confirm I am 18+ and agree to the <a href="terms.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Terms</a>
                         and <a href="privacy.html" target="_blank" rel="noopener" onclick="event.stopPropagation()">Privacy Policy</a>
                     </span>
                 </label>
@@ -337,11 +349,18 @@
                 <p class="terms-hint" id="termsHint">Accept the terms above to continue</p>
 
                 <a href="index.html" class="login-later" id="loginLaterBtn">Maybe later</a>
+                <p class="login-legal-links" id="loginLegalLinks">
+                    <a href="terms.html" target="_blank" rel="noopener">Terms</a>
+                    ·
+                    <a href="privacy.html" target="_blank" rel="noopener">Privacy</a>
+                    ·
+                    <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>
+                </p>
             </div>
         </div>
     </div>
 
     <script src="auth.js?v=1"></script>
-    <script src="login.js?v=9"></script>
+    <script src="login.js?v=10"></script>
 </body>
 </html>

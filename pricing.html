@@ -669,7 +669,7 @@
                     <span id="faq2q">What payment methods do you accept?</span>
                     <span class="faq-arrow">▼</span>
                 </div>
-                <div class="faq-answer" id="faq2a">We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and Apple Pay.</div>
+                <div class="faq-answer" id="faq2a">Payment is processed via YooKassa (ЮKassa). You can pay with bank cards (including MIR, Visa, Mastercard) and other methods available in the YooKassa checkout.</div>
             </div>
             
             <div class="faq-item">
@@ -688,9 +688,12 @@
                 <div class="faq-answer" id="faq4a">Yes! All new users get 3 free requests per day. You can try Solf.ai before subscribing.</div>
             </div>
         </section>
+
+        <p id="ageNote" style="text-align:center;color:var(--text-secondary);font-size:13px;margin:8px 0 24px;">Paid plans are available to users aged 18+.</p>
         
         <footer class="footer">
-            <p>© 2026 Solf.ai. All rights reserved. | <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a> · <a href="https://t.me/vwirex" target="_blank">Support</a></p>
+            <p id="footerLegal">Solf.ai · Contact: Telegram <a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a></p>
+            <p>© 2026 Solf.ai | <a href="terms.html">Terms</a> · <a href="privacy.html">Privacy</a></p>
         </footer>
     </div>
     
@@ -721,9 +724,11 @@
 
                 faqTitle: 'Frequently Asked Questions',
                 faq1q: 'Can I cancel anytime?', faq1a: 'Yes! You can cancel your subscription at any time. Your access will continue until the end of your billing period.',
-                faq2q: 'What payment methods do you accept?', faq2a: 'We accept all major credit cards (Visa, MasterCard, American Express), PayPal, and Apple Pay.',
+                faq2q: 'What payment methods do you accept?', faq2a: 'Payment is processed via YooKassa (ЮKassa). You can pay with bank cards (including MIR, Visa, Mastercard) and other methods available in the YooKassa checkout.',
                 faq3q: 'Can I switch plans later?', faq3a: 'Absolutely! You can upgrade or downgrade your plan at any time. Changes take effect on your next billing date.',
-                faq4q: 'Is there a free trial?', faq4a: 'Yes! All new users get 3 free requests per day. You can try Solf.ai before subscribing.'
+                faq4q: 'Is there a free trial?', faq4a: 'Yes! All new users get 3 free requests per day. You can try Solf.ai before subscribing.',
+                ageNote: 'Paid plans are available to users aged 18+.',
+                footerLegal: 'Solf.ai · Contact: Telegram @vwirex'
             },
             ru: {
                 back: '← Вернуться на Solf.ai',
@@ -748,9 +753,11 @@
 
                 faqTitle: 'Частые вопросы',
                 faq1q: 'Могу ли я отменить подписку?', faq1a: 'Да! Вы можете отменить подписку в любое время. Доступ сохранится до конца оплаченного периода.',
-                faq2q: 'Какие способы оплаты принимаете?', faq2a: 'Мы принимаем все основные карты (Visa, MasterCard, МИР), PayPal и Apple Pay.',
+                faq2q: 'Какие способы оплаты принимаете?', faq2a: 'Оплата через ЮKassa. Доступны банковские карты (в т.ч. МИР, Visa, Mastercard) и другие способы, которые показывает форма ЮKassa.',
                 faq3q: 'Можно ли сменить тариф?', faq3a: 'Конечно! Вы можете повысить или понизить тариф в любое время. Изменения вступят в силу со следующего платежа.',
-                faq4q: 'Есть ли бесплатный период?', faq4a: 'Да! Все новые пользователи получают 3 бесплатных запроса в день. Попробуйте Solf.ai перед подпиской.'
+                faq4q: 'Есть ли бесплатный период?', faq4a: 'Да! Все новые пользователи получают 3 бесплатных запроса в день. Попробуйте Solf.ai перед подпиской.',
+                ageNote: 'Платные тарифы доступны пользователям от 18 лет.',
+                footerLegal: 'Solf.ai · Контакт: Telegram @vwirex'
             }
         };
     
@@ -835,6 +842,16 @@
         document.getElementById('faq3a').textContent = t.faq3a;
         document.getElementById('faq4q').textContent = t.faq4q;
         document.getElementById('faq4a').textContent = t.faq4a;
+
+        const ageNote = document.getElementById('ageNote');
+        if (ageNote) ageNote.textContent = t.ageNote;
+        const footerLegal = document.getElementById('footerLegal');
+        if (footerLegal) {
+            footerLegal.innerHTML = t.footerLegal.replace(
+                '@vwirex',
+                '<a href="https://t.me/vwirex" target="_blank" rel="noopener noreferrer">@vwirex</a>'
+            );
+        }
         
         document.querySelectorAll('.lang-btn').forEach(b => b.classList.remove('active'));
         document.querySelector(`.lang-btn[data-lang="${lang}"]`)?.classList.add('active');
@@ -916,8 +933,8 @@
             localStorage.setItem('solfai_user', JSON.stringify(currentUser));
 
             const alertMsg = currentPricingLang === 'ru'
-                ? `Тариф «${planName}» выбран! Напишите @vwirex в Telegram для оплаты.`
-                : `${planName} plan selected! Contact @vwirex on Telegram to complete payment.`;
+                ? `Тариф «${planName}» выбран. Оплата — через ЮKassa. Если форма оплаты ещё не открылась, напишите @vwirex в Telegram.`
+                : `${planName} plan selected. Payment is via YooKassa. If checkout is not available yet, contact @vwirex on Telegram.`;
             alert(alertMsg);
 
             const headers = { 'Content-Type': 'application/json' };
