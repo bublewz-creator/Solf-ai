@@ -646,11 +646,18 @@
         ['какая тональность с 3 диезами', ['ля мажор', 'фа-диез минор']],
         ['какая тональность с 4 бемолями', ['ля-бемоль мажор', 'фа минор']],
         ['обращение большой терции', ['м6']],
-        ['энгармонически равная тональность до-диез мажора', ['ре-бемоль мажор']]
+        ['энгармонически равная тональность до-диез мажора', ['ре-бемоль мажор']],
+        // EN — те же шаблоны, что и RU
+        ['how many sharps in D major', ['2', 'sharp']],
+        ['relative key of C major', ['A minor']],
+        ['parallel key of C major', ['C minor']],
+        ['what key has 3 sharps', ['A major', 'F# minor']],
+        ['inversion of major third', ['m6']],
+        ['enharmonic equivalent of C# major', ['Db major']]
     ];
     QUICK_CASES.forEach(([q, needles]) => {
         check('мгновенный ответ: "' + q + '"', () => {
-            T.setLabelLocale('ru');
+            T.setLabelLocale(/[а-яё]/i.test(q) ? 'ru' : 'en');
             const res = T.buildTheoryQuickAnswer(q);
             if (!res || !res.text) return 'ответа нет';
             for (const needle of needles) {
@@ -664,6 +671,35 @@
         T.setLabelLocale('ru');
         const res = T.buildTheoryQuickAnswer('построй б3 от ре');
         return res === null || 'текстовый ответ перехватил построение';
+    });
+
+    check('приветствия RU/EN — быстрый ответ', () => {
+        const cases = ['привет', 'Привет!', 'здравствуй', 'как дела', 'hello', 'Hi', 'hey', "what's up", 'good morning', 'thanks'];
+        for (const q of cases) {
+            T.setLabelLocale(/[а-яё]/i.test(q) ? 'ru' : 'en');
+            const res = T.buildTheoryQuickAnswer(q);
+            if (!res || !res.text) return 'нет ответа на "' + q + '"';
+            if (res.text.length < 8) return 'слишком короткий ответ на "' + q + '"';
+        }
+        return true;
+    });
+
+    check('привет + теория / несколько тем → не быстрый шаблон', () => {
+        T.setLabelLocale('ru');
+        const shouldMiss = [
+            'привет, сколько знаков в ре мажоре',
+            'hello how many sharps in D major',
+            'сколько знаков в ре мажоре и параллельная тональность до мажора',
+            'сколько знаков в ре мажоре и что такое синкопа'
+        ];
+        for (const q of shouldMiss) {
+            const res = T.buildTheoryQuickAnswer(q);
+            if (res && res.text) return 'неожиданный быстрый ответ на "' + q + '": ' + res.text;
+        }
+        // Чистая теория по-прежнему быстрая:
+        const ok = T.buildTheoryQuickAnswer('сколько знаков в ре мажоре');
+        if (!ok || !ok.text) return 'сломался обычный быстрый ответ';
+        return true;
     });
 
     // =====================================================================

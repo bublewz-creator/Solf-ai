@@ -2360,13 +2360,11 @@
     function answerRelatedKey(t, rawQuery, ru) {
         const key = parseKey(t);
         if (!key) return null;
-        const wantsRelative = ru
-            ? /параллельн[а-яё]*\s*(?:тональност|мажор|минор|гамм)/.test(t)
-            : /relative\s*(?:key|major|minor|tonality)/.test(t);
-        const wantsSameName = ru
-            ? /одноимен|одноимён/.test(t)
-            : /parallel\s*(?:key|major|minor)|same[\s-]?name\s*key/.test(t);
-        const wantsEnharmonic = /энгармонич[а-яё]*\s*(?:равн|тональност)|enharmonic\w*\s*(?:equal\s*)?(?:key|tonality)/.test(t);
+        // Паттерны RU и EN проверяем вместе: язык ответа отдельно (ru),
+        // иначе английский запрос при ru-локали не ловится.
+        const wantsRelative = /параллельн[а-яё]*\s*(?:тональност|мажор|минор|гамм)|relative\s*(?:key|major|minor|tonality)/.test(t);
+        const wantsSameName = /одноименн?|parallel\s*(?:key|major|minor)|same[\s-]?name\s*key/.test(t);
+        const wantsEnharmonic = /энгармонич[а-яё]*\s*(?:равн|тональност)|enharmonic(?:ally)?\s*(?:equivalent|equal|key|tonality)/.test(t);
 
         const srcName = tonalityDisplayName(key.tonic, key.mode, ru);
 
@@ -2437,7 +2435,180 @@
         };
     }
 
-    /** Мгновенный текстовый ответ без нотации (ключевые знаки, родство тональностей, обращение интервала). */
+    /**
+     * Чистый small-talk: привет / hello / как дела — без теории и без заданий.
+     * Если рядом музыкальный вопрос или несколько тем — не перехватываем (пойдёт в модель).
+     */
+    const NON_GREETING_SUBSTANCE_RE = /тональн|мажор|минор|диез|бемол|бекар|интервал|аккорд|трезвуч|септаккорд|гамм|звукоряд|тритон|характерн|ступен|цепоч|лад[аыуе]|пентатон|хроматич|синкоп|ритм|размер|такт|нотац|сольфедж|гармониз|модуляц|транспон|диктант|обращен|разрешени|построй|постро|сделай|напиши|выведи|нарисуй|покажи|объясни|расскажи|что\s+такое|сколько|какой|какая|какие|каков|определи|key\s*signature|sharp|flat|interval|chord|triad|seventh|scale|tritone|degree|mode|rhythm|syncop|build|draw|write|construct|show|explain|tell\s+me|what\s+is|how\s+many|identify|inversion|resolution|dominant|solfeg|major|minor|\bdur\b|\bmoll\b|\bd7\b|\bvii\b/i;
+
+    function normalizeGreetingText(t) {
+        return String(t || '')
+            .toLowerCase()
+            .replace(/ё/g, 'е')
+            .replace(/['’]/g, "'")
+            .replace(/[^\p{L}\p{N}\s'-]+/gu, ' ')
+            .replace(/\s+/g, ' ')
+            .trim();
+    }
+
+    function isPureGreetingQuery(t) {
+        const s = normalizeGreetingText(t);
+        if (!s || s.length > 64) return false;
+        if (NON_GREETING_SUBSTANCE_RE.test(s)) return false;
+        if (s.split(/\s+/).length > 8) return false;
+
+        const collapsed = s
+            .replace(/what'?s\s+up/g, 'whatsup')
+            .replace(/how'?s\s+it\s+going/g, 'howsitgoing')
+            .replace(/how\s+are\s+you/g, 'howareyou')
+            .replace(/good\s+(morning|afternoon|evening|night)/g, 'good$1')
+            .replace(/thank\s+you/g, 'thankyou')
+            .replace(/see\s+y(?:a|ou)/g, 'seeya')
+            .replace(/как\s+дела/g, 'какдела')
+            .replace(/как\s+жизнь/g, 'какжизнь')
+            .replace(/как\s+ты/g, 'какты')
+            .replace(/что\s+нового/g, 'чтонового')
+            .replace(/доброе\s+утро/g, 'доброеутро')
+            .replace(/добрый\s+день/g, 'добрыйдень')
+            .replace(/добрый\s+вечер/g, 'добрыйвечер')
+            .replace(/доброй\s+ночи/g, 'добройночи')
+            .replace(/до\s+встречи/g, 'довстречи')
+            .replace(/пока-пока/g, 'покапока');
+
+        const tokens = collapsed.split(/\s+/).filter(Boolean);
+        if (!tokens.length) return false;
+        const ok = /^(?:привет|приветик|приветы|здарова|здаров|здравствуй|здравствуйте|доброеутро|добрыйдень|добрыйвечер|добройночи|хай|хей|йоу|салют|хелло|хеллоу|какдела|какжизнь|какты|чтонового|пока|покапока|довстречи|увидимся|спасибо|благодарю|thanks|thankyou|ty|thx|hi|hello|hey|yo|howdy|sup|whatsup|wassup|howareyou|howsitgoing|goodmorning|goodafternoon|goodevening|goodnight|bye|goodbye|seeya)$/;
+        return tokens.every(tok => ok.test(tok));
+    }
+
+    /** «привет, сколько знаков…» / «hello how many sharps…» — не чистый small-talk. */
+    function hasGreetingPlusSubstance(t) {
+        if (isPureGreetingQuery(t)) return false;
+        if (!NON_GREETING_SUBSTANCE_RE.test(t)) return false;
+        // \b плохо работает с кириллицей — граница = начало/пробел/пунктуация и конец токена.
+        return /(?:^|[\s,;.!?:—\-])(?:привет(?:ик|ы)?|здарова|здаров|здравствуй(?:те)?|доброе\s+утро|добрый\s+(?:день|вечер)|хай|хей|йоу|салют|хелло(?:у)?|hi|hello|hey|yo|howdy|good\s+(?:morning|afternoon|evening))(?=$|[\s,;.!?:—\-])/i.test(t);
+    }
+
+    /** Два разных вопроса в одной фразе («… и …», «and», «also»). */
+    function looksLikeMultiClauseTheory(t) {
+        if (!/(?:\s+и\s+|\s+and\s+|\s+also\s+|\s+плюс\s+|;\s*|\b1[\.)]\s|\b2[\.)]\s)/i.test(t)) return false;
+        // Хотя бы два «кусочка» теории/вопроса.
+        const markers = [
+            /сколько|how\s+many|знаков|sharp|flat|key\s*signature/i,
+            /параллельн|relative\s*key|одноимен|parallel\s*key|энгармонич|enharmonic/i,
+            /интервал|interval|аккорд|chord|обращен|inversion/i,
+            /что\s+такое|what\s+is|синкоп|ритм|rhythm|модуляц|modulation/i,
+            /гамм|scale|тритон|tritone|ступен|degree/i
+        ];
+        let hits = 0;
+        for (const re of markers) {
+            if (re.test(t)) hits += 1;
+            if (hits >= 2) return true;
+        }
+        return false;
+    }
+
+    function answerGreeting(t, ru) {
+        if (!isPureGreetingQuery(t)) return null;
+        const s = normalizeGreetingText(t);
+        const isBye = /^(?:пока|пока-пока|до\s+встречи|увидимся|bye|goodbye|see\s+ya|see\s+you)(?:\s|$)/.test(s)
+            || /\b(?:пока|goodbye|\bbye\b|see\s+y)/.test(s);
+        const isThanks = /спасибо|благодарю|thanks|thank\s+you|\bty\b|\bthx\b/.test(s);
+        const pool = ru
+            ? (isBye
+                ? ['Пока! Если снова понадобится сольфеджио — пиши.', 'Удачи! Возвращайся с гаммами и интервалами.']
+                : isThanks
+                    ? ['Пожалуйста! Если ещё что-то по теории — спрашивай.', 'Всегда рад помочь по сольфеджио.']
+                    : [
+                        'Привет! Я Solf.ai — спрашивай про знаки, интервалы, тональности или попроси построить упражнение.',
+                        'Здорово! Чем помочь по сольфеджио?',
+                        'Привет! Могу разобрать теорию или быстро построить гамму, аккорд, тритоны — пиши.'
+                    ])
+            : (isBye
+                ? ['Bye! Come back anytime you need solfège help.', 'See you — bring scales and intervals next time.']
+                : isThanks
+                    ? ['You\'re welcome! Ask anytime about theory.', 'Glad to help with solfège.']
+                    : [
+                        'Hey! I\'m Solf.ai — ask about key signatures, intervals, tonalities, or ask me to build an exercise.',
+                        'Hi! What do you need in solfège?',
+                        'Hello! I can explain theory or quickly build scales, chords, tritones — just ask.'
+                    ]);
+        return { text: pool[Math.floor(Math.random() * pool.length)] };
+    }
+
+    /** Сколько разных «быстрых» интентов в одном запросе. >1 → лучше отдать модели. */
+    function listQuickIntents(t, rawQuery) {
+        const intents = [];
+        if (isKeySignatureQuery(t) && parseKey(t)) intents.push('keySignature');
+
+        if (/определи[а-яё]*\s*интервал|identify\s*(?:the\s*)?interval|какой\s*интервал|what\s*interval/i.test(t) && parseTwoNotes(t)) {
+            intents.push('identifyInterval');
+        }
+        if (/определи[а-яё]*\s*аккорд|identify\s*(?:the\s*)?chord|какой\s*аккорд|what\s*chord/i.test(t)) {
+            const notes = parseChordNotes(t);
+            if (notes && notes.length >= 3) intents.push('identifyChord');
+        }
+
+        const keyForDeg = parseKey(t);
+        if (keyForDeg && /какие\s*ступен|на\s*каких\s*ступен|образуют|which\s*degree|what\s*degree/i.test(t) && parseCharacteristicKind(t)) {
+            intents.push('charDegrees');
+        }
+        if (keyForDeg) {
+            if (/параллельн[а-яё]*\s*(?:тональност|мажор|минор|гамм)|relative\s*(?:key|major|minor|tonality)/.test(t)) {
+                intents.push('relative');
+            }
+            if (/одноименн?|parallel\s*(?:key|major|minor)|same[\s-]?name\s*key/.test(t)) {
+                intents.push('sameName');
+            }
+            if (/энгармонич[а-яё]*\s*(?:равн|тональност)|enharmonic(?:ally)?\s*(?:equivalent|equal|key|tonality)/.test(t)) {
+                intents.push('enharmonic');
+            }
+        }
+
+        if (/(?:по|с)\s*(\d+|один|одна|одним|одну|два|две|двум|двух|три|трем|трех|четыре|четырем|четырех|пять|пяти|шесть|шести|семь|семи|ноль)\s*(?:знаков?\s*)?(диез|бемол|sharps?|flats?)/.test(t)
+            || /(\d+|один|одна|одним|одну|два|две|двум|двух|три|трем|трех|четыре|четырем|четырех|пять|пяти|шесть|шести|семь|семи|ноль)\s*(?:знаков?\s*)?(диез|бемол|sharps?|flats?)/.test(t)) {
+            // «сколько знаков» уже keySignature — не дублируем, если это тот же смысл.
+            if (!intents.includes('keySignature')) intents.push('keyByAccidentals');
+        }
+
+        if (/обращен|inversion|invert/.test(t) && !CHORD_WORDS_RE.test(t) && !/от\s|from\s/.test(t) && parseIntervalSpec(rawQuery)) {
+            intents.push('inversion');
+        }
+
+        if (isPureGreetingQuery(t)) intents.push('greeting');
+        return intents;
+    }
+
+    const QUICK_INTENT_ALLOWED_TOPICS = {
+        keySignature: ['keys'],
+        keyByAccidentals: ['keys'],
+        relative: ['keys'],
+        sameName: ['keys'],
+        enharmonic: ['keys', 'notation'],
+        identifyInterval: ['intervals', 'kalinina'],
+        identifyChord: ['triads', 'sevenths', 'kalinina'],
+        charDegrees: ['intervals', 'degrees', 'keys', 'kalinina'],
+        inversion: ['intervals'],
+        greeting: []
+    };
+
+    function hasConflictingKbTopics(rawQuery, intents) {
+        if (intents.length !== 1) return false;
+        const intent = intents[0];
+        if (intent === 'greeting') return false;
+        try {
+            if (typeof window === 'undefined' || !window.SolfKB || typeof window.SolfKB.selectTopicIds !== 'function') return false;
+            const allowed = new Set(QUICK_INTENT_ALLOWED_TOPICS[intent] || []);
+            // english — язык ответа, не предметная тема.
+            const topics = (window.SolfKB.selectTopicIds(rawQuery) || []).filter(id => id !== 'english');
+            // Чужая тема (например keys + rhythm) при одном шаблоне → модель.
+            return topics.some(id => !allowed.has(id));
+        } catch (_) {
+            return false;
+        }
+    }
+
+    /** Мгновенный текстовый ответ без нотации (ключевые знаки, родство тональностей, обращение интервала, приветствия). */
     function buildTheoryQuickAnswer(rawQuery) {
         if (!rawQuery || typeof rawQuery !== 'string') return null;
         const t = rawQuery.toLowerCase().replace(/ё/g, 'е');
@@ -2445,6 +2616,11 @@
 
         // Просьбы что-то ПОСТРОИТЬ обслуживает нотный движок, а не текстовый ответ.
         const isBuildRequest = /построй|постро|сделай|напиши|выведи|нарисуй|покажи|build|draw|write|construct|show/i.test(t);
+
+        const intents = listQuickIntents(t, rawQuery);
+        // Несколько тем / смешанный запрос — не угадываем одним шаблоном, пусть отвечает нейросеть.
+        if (intents.length > 1 || hasConflictingKbTopics(rawQuery, intents)) return null;
+        if (hasGreetingPlusSubstance(t) || looksLikeMultiClauseTheory(t)) return null;
 
         if (isKeySignatureQuery(t)) {
             const key = parseKey(t);
@@ -2468,6 +2644,9 @@
             const inv = answerIntervalInversion(t, rawQuery, ru);
             if (inv) return inv;
         }
+
+        const greet = answerGreeting(t, ru);
+        if (greet) return greet;
         return null;
     }
 
