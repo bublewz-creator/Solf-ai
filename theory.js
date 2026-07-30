@@ -305,6 +305,18 @@
     function setLabelLocale(lang) {
         labelLocale = lang === 'ru' ? 'ru' : 'en';
     }
+    /**
+     * Язык подводок/текстовых ответов: кириллица в запросе → RU;
+     * явный английский в ЭТОМ сообщении бьёт «залипшую» ru-локаль из истории чата.
+     */
+    function isRuProse(rawQuery) {
+        const q = String(rawQuery || '');
+        if (/[а-яё]/i.test(q)) return true;
+        if (/\b(the|what|how|build|please|show|make|create|chord|scale|major|minor|hello|hi|hey|want|need|interval|tritone|inversion|resolution|with|from|of|me|for|all|both|natural|harmonic|melodic|relative|parallel|enharmonic|identify|thanks|thank)\b/i.test(q)) {
+            return false;
+        }
+        return labelLocale === 'ru';
+    }
     function intervalQualityTable() {
         return labelLocale === 'ru' ? INTERVAL_QUALITY_RU : INTERVAL_QUALITY_EN;
     }
@@ -2612,7 +2624,7 @@
     function buildTheoryQuickAnswer(rawQuery) {
         if (!rawQuery || typeof rawQuery !== 'string') return null;
         const t = rawQuery.toLowerCase().replace(/ё/g, 'е');
-        const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+        const ru = isRuProse(rawQuery);
 
         // Просьбы что-то ПОСТРОИТЬ обслуживает нотный движок, а не текстовый ответ.
         const isBuildRequest = /построй|постро|сделай|напиши|выведи|нарисуй|покажи|build|draw|write|construct|show/i.test(t);
@@ -3733,7 +3745,7 @@ D65 строится на VII СТУПЕНИ (первая инверсия D7).
 
     function getTheoryProse(rawQuery) {
         const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
-        const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+        const ru = isRuProse(rawQuery);
         const parts = [];
 
         if (wantsTritoneRules(t)) {
@@ -3784,7 +3796,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
      */
     function getBuildDescription(rawQuery) {
         const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
-        const ru = labelLocale === 'ru' || /[а-яё]/i.test(rawQuery);
+        const ru = isRuProse(rawQuery);
 
         if (isChromaticScaleQuery(t)) {
             const note = parseNoteAfterFrom(t) || parseKey(t)?.tonic;
@@ -3875,7 +3887,7 @@ In the **natural** form there is one tritone pair (A4 + d5); in the **harmonic**
      */
     function getExerciseIntro(rawQuery) {
         const t = String(rawQuery || '').toLowerCase().replace(/ё/g, 'е');
-        const ru = labelLocale === 'ru' || /[а-яе]/i.test(rawQuery);
+        const ru = isRuProse(rawQuery);
         const pick = (r, e) => (ru ? r : e);
 
         if (isChromaticScaleQuery(t)) {

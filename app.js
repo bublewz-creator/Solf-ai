@@ -251,25 +251,41 @@ TASK COMPLIANCE (ABSOLUTE):
 
 const TYPING_SPEED = 20;
 
-/** Язык ответа: из текущего сообщения, недавней истории пользователя, затем язык UI. */
+/** Язык ответа: сначала ТЕКУЩЕЕ сообщение, история — только если язык неочевиден. */
 function detectResponseLanguage(userText, chatMessages = []) {
-    const parts = [String(userText || '')];
-    (chatMessages || [])
+    const strip = (s) => String(s || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '').trim();
+    const current = strip(userText);
+
+    const EN_CUE = /\b(the|what|how|build|chord|hello|hi|hey|want|please|scale|interval|major|minor|need|with|inversion|resolution|can|could|would|should|explain|show|tell|help|thanks|thank|make|create|from|me|for|all|both|natural|harmonic|melodic|relative|parallel|enharmonic|identify)\b/i;
+    const DE_CUE = /\b(der|die|das|und|ich|nicht|wie|was|akkord|tonleiter|bitte|dominant|umkehrung|stufe|tonika|septakkord)\b/i;
+    const ES_CUE = /\b(el|la|los|las|cómo|qué|acorde|escala|por|para|con|gracias|hola)\b/i;
+
+    function detectFrom(text) {
+        if (!text) return null;
+        if (/[\u0400-\u04FF]/.test(text)) return 'ru';
+        if (/[\u4e00-\u9fff]/.test(text)) return 'zh';
+        if (/[\u3040-\u30ff]/.test(text)) return 'ja';
+        // English first: "Hi, build d7 B dur" must not become German because of dur/moll
+        if (EN_CUE.test(text)) return 'en';
+        if (DE_CUE.test(text)) return 'de';
+        if (/\b(dur|moll)\b/i.test(text) && DE_CUE.test(text)) return 'de';
+        if (ES_CUE.test(text)) return 'es';
+        if (/\b(mayor|menor)\b/i.test(text) && ES_CUE.test(text)) return 'es';
+        if (/[a-zA-Z]/.test(text)) return 'en';
+        return null;
+    }
+
+    const fromCurrent = detectFrom(current);
+    if (fromCurrent) return fromCurrent;
+
+    const history = (chatMessages || [])
         .filter(m => m.role === 'user')
         .slice(-5)
-        .forEach(m => parts.push(String(m.content || '').replace(/\n\n\[NOTATION MODE[\s\S]*$/, '')));
-    const combined = parts.join('\n');
-
-    if (/[\u0400-\u04FF]/.test(combined)) return 'ru';
-    if (/[\u4e00-\u9fff]/.test(combined)) return 'zh';
-    if (/[\u3040-\u30ff]/.test(combined)) return 'ja';
-    // English first: "Hi, build d7 B dur" must not become German because of dur/moll
-    if (/\b(the|what|how|build|chord|hello|hi|hey|want|please|scale|interval|major|minor|need|with|inversion|resolution|can|could|would|should|explain|show|tell|help|thanks|thank)\b/i.test(combined)) return 'en';
-    if (/\b(der|die|das|und|ich|nicht|wie|was|akkord|tonleiter|bitte|dominant|umkehrung|stufe|tonika|septakkord)\b/i.test(combined)) return 'de';
-    if (/\b(dur|moll)\b/i.test(combined) && /\b(der|die|das|und|ich|mit|von|dominant|stufe|tonika|umkehrung|septakkord|akkord)\b/i.test(combined)) return 'de';
-    if (/\b(el|la|los|las|cómo|qué|acorde|escala|por|para|con|gracias|hola)\b/i.test(combined)) return 'es';
-    if (/\b(mayor|menor)\b/i.test(combined) && /\b(el|la|los|las|acorde|escala|con|por|para|hola)\b/i.test(combined)) return 'es';
-    if (/[a-zA-Z]/.test(combined)) return 'en';
+        .map(m => strip(m.content))
+        .filter(Boolean)
+        .join('\n');
+    const fromHistory = detectFrom(history);
+    if (fromHistory) return fromHistory;
 
     const uiLang = (typeof currentLang === 'string' && currentLang) || localStorage.getItem('solfai_lang') || 'en';
     return uiLang;
@@ -884,23 +900,24 @@ function queryTheoryNotation(userQuery) {
 }
 
 function buildTheoryIntro(q) {
+    const isRu = /[а-яё]/i.test(q) || (window.__solfaiResponseLang === 'ru' && !/\b(build|show|make|create|please|scale|chord|major|minor|tritone|interval|inversion|resolution|from|with)\b/i.test(q));
     const isMultiScale = /гамм|scale/i.test(q) && /(?:во?\s+)?(?:все|всех)|(?:три|3)\s*(?:вид|форм)|all\s*(?:types?|forms?)|построй.*гамм|build.*scale/i.test(q);
     if (isMultiScale) {
-        return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+        return isRu
             ? 'Ниже — натуральная, гармоническая и мелодическая формы (вверх и вниз):'
-            : 'Natural, harmonic, and melodic forms (ascending and descending):');
+            : 'Natural, harmonic, and melodic forms (ascending and descending):';
     }
     if (/билет|\b1[\.)]\s|\b2[\.)]\s|\b3[\.)]\s|t53\s*[-–—]/i.test(q)
         || (/(?:тритон|tritone)/i.test(q) && /(?:д7|d7|цепоч|t53)/i.test(q))) {
-        return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+        return isRu
             ? 'Полное построение по заданию:'
-            : 'Full exercise:');
+            : 'Full exercise:';
     }
     if (/цепочк|chain/i.test(q)) {
         const useChain2 = isChain2Query(q) || (CHAIN_MINOR_RE.test(q) && !isChain1ExplicitQuery(q));
-        return (window.__solfaiResponseLang === 'ru' || /[а-яё]/i.test(q)
+        return isRu
             ? (useChain2 ? 'Цепочка 2 в заданной тональности:' : 'Цепочка 1 в заданной тональности:')
-            : (useChain2 ? 'Chain 2 in the requested key:' : 'Chain 1 in the requested key:'));
+            : (useChain2 ? 'Chain 2 in the requested key:' : 'Chain 1 in the requested key:');
     }
     return null;
 }
