@@ -136,6 +136,19 @@ function chatFreshnessScore(c) {
     return t * 1000 + n;
 }
 
+/** Слияние локальной и серверной версии одного чата. pinned — OR с обеих сторон. */
+function mergeChatRecords(local, server) {
+    const localFresher = chatFreshnessScore(local) > chatFreshnessScore(server);
+    const messages = (local.messages?.length || 0) >= (server.messages?.length || 0)
+        ? (local.messages || [])
+        : (server.messages || []);
+    return {
+        ...(localFresher ? { ...server, ...local } : { ...local, ...server }),
+        pinned: !!(local.pinned || server.pinned),
+        messages,
+    };
+}
+
 /**
  * Тянет чаты из БД и сливает с локальными.
  * Сервер — источник истины между устройствами; локальные-only дожимаем на сервер.
@@ -166,25 +179,11 @@ async function syncChatsFromServer() {
                 saveChatToServer(c);
                 continue;
             }
-            if (chatFreshnessScore(c) > chatFreshnessScore(prev)) {
-                byId.set(c.id, {
-                    ...prev,
-                    ...c,
-                    pinned: !!(c.pinned || prev.pinned),
-                    messages: (c.messages?.length || 0) >= (prev.messages?.length || 0)
-                        ? (c.messages || [])
-                        : (prev.messages || []),
-                });
-                saveChatToServer(c);
-            } else {
-                byId.set(c.id, {
-                    ...c,
-                    ...prev,
-                    pinned: !!(c.pinned || prev.pinned),
-                    messages: (prev.messages?.length || 0) >= (c.messages?.length || 0)
-                        ? (prev.messages || [])
-                        : (c.messages || []),
-                });
+            const merged = mergeChatRecords(c, prev);
+            byId.set(c.id, merged);
+            const pinChanged = !!merged.pinned !== !!prev.pinned;
+            if (chatFreshnessScore(c) > chatFreshnessScore(prev) || pinChanged) {
+                saveChatToServer(merged);
             }
         }
 
@@ -210,7 +209,7 @@ function scheduleServerSync(reason = '') {
     if (__serverSyncInflight) return __serverSyncInflight;
     const now = Date.now();
     // focus/visibility могут сыпаться часто — не долбим БД чаще раза в 8 сек
-    if (reason !== 'initApp' && reason !== 'updateUIForUser' && (now - __serverSyncLastAt) < SERVER_SYNC_MIN_INTERVAL_MS) {
+    if (reason !== 'initApp' && reason !== 'updateUIForUser' && reason !== 'pinChat' && (now - __serverSyncLastAt) < SERVER_SYNC_MIN_INTERVAL_MS) {
         return Promise.resolve();
     }
     __serverSyncLastAt = now;
@@ -1470,7 +1469,13 @@ function renderChatItemHTML(chat) {
 window.togglePinChat = function(id, e) {
     e.stopPropagation();
     const chat = chats.find(c => c.id === id);
-    if(chat) { chat.pinned = !chat.pinned; saveChatToStorage(); saveChatToServer(chat); renderChatsList(); }
+    if (!chat) return;
+    chat.pinned = !chat.pinned;
+    chat.updatedAt = new Date().toISOString();
+    saveChatToStorage();
+    saveChatToServer(chat);
+    renderChatsList();
+    scheduleServerSync('pinChat');
 };
 
 window.deleteChatFromSidebar = function(id, e) {
@@ -2015,7 +2020,7 @@ function saveChatToServer(chat) {
 function saveChatToStorage() {
     enforceChatLimit();
     const slimChats = chats.slice(0, MAX_SAVED_CHATS).map(c => ({
-        id: c.id, title: c.title, pinned: c.pinned, createdAt: c.createdAt,
+        id: c.id, title: c.title, pinned: c.pinned, createdAt: c.createdAt, updatedAt: c.updatedAt,
         messages: c.messages.slice(-60).map(m => ({ role: m.role, id: m.id, content: m.content.slice(0, 4000), attachments: m.attachments || [] }))
     }));
     try { localStorage.setItem(getChatsStorageKey(), JSON.stringify(slimChats)); } 
