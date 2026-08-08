@@ -1256,6 +1256,23 @@ function buildFreshTaskReminder(query, lang) {
     return parts.length ? `\n\n${header}\n${parts.join('\n')}` : `\n\n${header}`;
 }
 
+/** Запрос с несколькими темами/подзадачами — не быстрый ответ, нужен полный ответ модели. */
+function isMultiTopicQuery(query) {
+    const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
+    if (!t || t.length < 20) return false;
+    if ((t.match(/\?/g) || []).length >= 2) return true;
+    if ((t.match(/(?:^|\n|\s)\d+[\.)]\s+/g) || []).length >= 2) return true;
+
+    const actionRe = /(?:построй|постро|сделай|напиши|выведи|нарисуй|покажи|объясни|расскажи|опиши|разбери|определи|build|draw|write|explain|describe|show|construct|identify|analyze|harmoniz|гармониз)/gi;
+    const actions = t.match(actionRe);
+    if (actions && new Set(actions.map(a => a.toLowerCase())).size >= 2) return true;
+
+    const multiPartSep = /(?:\s+и\s+|\s+and\s+|\s+also\s+|\s+плюс\s+|\s+а\s+также\s+|\s+также\s+|\s+ещё\s+|\s+еще\s+|;\s*)/i;
+    if (t.length > 100 && multiPartSep.test(t)) return true;
+
+    return false;
+}
+
 function isBigNotationTask(query) {
     const t = String(query || '').toLowerCase();
     if (!t) return false;
@@ -2063,7 +2080,13 @@ async function addMessageToUI(role, content, attachments = [], withTyping = fals
 }
 
 async function typeMessage(contentEl, text, attachmentHTML) {
-    shouldAutoScroll = true; // Принудительно включаем фокус при начале нового ответа
+    // Автоскролл включён, пока пользователь не коснётся экрана / не прокрутит вручную.
+    shouldAutoScroll = true;
+    const disableAutoScrollOnInteraction = () => { shouldAutoScroll = false; };
+    const interactionEvents = ['touchstart', 'pointerdown', 'wheel'];
+    const scrollRoot = chatMessages || contentEl.closest('.chat-messages');
+    interactionEvents.forEach(ev => scrollRoot?.addEventListener(ev, disableAutoScrollOnInteraction, { passive: true }));
+
     const formattedText = formatMessage(text);
     // Печатаем только текстовую часть БЕЗ нотных блоков, чтобы не сыпать JSON по буквам
     const typingSource = stripNotationBlocks(text);
@@ -2072,24 +2095,27 @@ async function typeMessage(contentEl, text, attachmentHTML) {
     let displayedText = '';
     const cursor = document.createElement('span'); cursor.className = 'typing-cursor'; contentEl.appendChild(cursor);
 
-    for (let i = 0; i < plainText.length; i++) {
-        displayedText += plainText[i];
-        contentEl.innerHTML = formatPartialText(typingSource, i + 1) + '<span class="typing-cursor"></span>';
-        
-        // Автопрокрутка сработает только если пользователь не листал вверх
+    try {
+        for (let i = 0; i < plainText.length; i++) {
+            displayedText += plainText[i];
+            contentEl.innerHTML = formatPartialText(typingSource, i + 1) + '<span class="typing-cursor"></span>';
+
+            if (shouldAutoScroll) {
+                scrollToBottom();
+            }
+
+            await new Promise(r => setTimeout(r, '.!?'.includes(plainText[i]) ? TYPING_SPEED*4 : TYPING_SPEED));
+        }
+        contentEl.classList.remove('typing'); contentEl.innerHTML = formattedText + attachmentHTML;
+
+        // После завершения печати — рендерим все нотные блоки в этом сообщении
+        renderAllNotations(contentEl.parentElement || contentEl);
+
         if (shouldAutoScroll) {
             scrollToBottom();
         }
-        
-        await new Promise(r => setTimeout(r, '.!?'.includes(plainText[i]) ? TYPING_SPEED*4 : TYPING_SPEED));
-    }
-    contentEl.classList.remove('typing'); contentEl.innerHTML = formattedText + attachmentHTML;
-
-    // После завершения печати — рендерим все нотные блоки в этом сообщении
-    renderAllNotations(contentEl.parentElement || contentEl);
-
-    if (shouldAutoScroll) {
-        scrollToBottom();
+    } finally {
+        interactionEvents.forEach(ev => scrollRoot?.removeEventListener(ev, disableAutoScrollOnInteraction));
     }
 }
 function formatPartialText(fullText, charCount) {
@@ -3213,6 +3239,7 @@ async function generateResponse(query, imageData = null) {
     const harmonizationTask = isHarmonizationTask(baseUserContent, !!imageData);
     const chainTask = isChainTask(baseUserContent);
     const compositeBuildTask = isCompositeBuildQuery(baseUserContent);
+    const multiTopicTask = isMultiTopicQuery(baseUserContent);
     const usageType = imageData ? 'image' : 'request';
 
     // ——— БЫСТРЫЕ ОТВЕТЫ (theory.js) ———
@@ -3220,12 +3247,12 @@ async function generateResponse(query, imageData = null) {
     // раньше стоял ПЕРЕД выдачей и при любом сбое/429 убивал весь быстрый путь.
     let instantReplyText = null;
     try {
-        const theoryQuick = (harmonizationTask || imageData || compositeBuildTask)
+        const theoryQuick = (harmonizationTask || imageData || compositeBuildTask || multiTopicTask)
             ? null
             : queryTheoryQuickAnswer(baseUserContent);
         if (theoryQuick?.text) {
             instantReplyText = theoryQuick.text;
-        } else if (canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
+        } else if (!multiTopicTask && canAnswerFromTheoryOnly(baseUserContent, { harmonizationTask, hasImage: !!imageData })) {
             instantReplyText = patchAiWithTheory(baseUserContent, '') || null;
         }
     } catch (theoryErr) {
@@ -3315,8 +3342,10 @@ async function generateResponse(query, imageData = null) {
         // Бюджет токенов. Большие задачи (цепочки аккордов на 15+ строк, гармонизации,
         // диктанты, модуляции) требуют много выходных токенов — иначе длинный нотный блок обрежется.
         // isBigNotationTask() / isHarmonizationTask() поднимают лимит до 8192.
-        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask || chainTask || compositeBuildTask);
-        const tokenBudget = notationModeEnabled ? (bigTask ? 8192 : 2048) : (harmonizationTask ? 4096 : 1024);
+        const bigTask = notationModeEnabled && (isBigNotationTask(baseUserContent) || harmonizationTask || chainTask || compositeBuildTask || multiTopicTask);
+        const tokenBudget = notationModeEnabled
+            ? (bigTask ? 8192 : 2048)
+            : (harmonizationTask || multiTopicTask ? 4096 : 1024);
         const payload = {
             userId: currentUser?.id,
             // Уже списали через /increment-usage (в т.ч. для theory-only ответов)

@@ -2501,22 +2501,30 @@
         return /(?:^|[\s,;.!?:—\-])(?:привет(?:ик|ы)?|здарова|здаров|здравствуй(?:те)?|доброе\s+утро|добрый\s+(?:день|вечер)|хай|хей|йоу|салют|хелло(?:у)?|hi|hello|hey|yo|howdy|good\s+(?:morning|afternoon|evening))(?=$|[\s,;.!?:—\-])/i.test(t);
     }
 
-    /** Два разных вопроса в одной фразе («… и …», «and», «also»). */
+    /** Два разных вопроса в одной фразе («… и …», «and», «also», нумерованный список). */
     function looksLikeMultiClauseTheory(t) {
-        if (!/(?:\s+и\s+|\s+and\s+|\s+also\s+|\s+плюс\s+|;\s*|\b1[\.)]\s|\b2[\.)]\s)/i.test(t)) return false;
+        if ((t.match(/\?/g) || []).length >= 2) return true;
+        if ((t.match(/(?:^|\n|\s)\d+[\.)]\s+/g) || []).length >= 2) return true;
+
+        const multiPartSep = /(?:\s+и\s+|\s+and\s+|\s+also\s+|\s+плюс\s+|\s+а\s+также\s+|\s+также\s+|\s+ещё\s+|\s+еще\s+|;\s*|\b1[\.)]\s|\b2[\.)]\s)/i;
+        if (!multiPartSep.test(t)) return false;
+
         // Хотя бы два «кусочка» теории/вопроса.
         const markers = [
             /сколько|how\s+many|знаков|sharp|flat|key\s*signature/i,
             /параллельн|relative\s*key|одноимен|parallel\s*key|энгармонич|enharmonic/i,
             /интервал|interval|аккорд|chord|обращен|inversion/i,
             /что\s+такое|what\s+is|синкоп|ритм|rhythm|модуляц|modulation/i,
-            /гамм|scale|тритон|tritone|ступен|degree/i
+            /гамм|scale|тритон|tritone|ступен|degree/i,
+            /построй|постро|сделай|напиши|build|draw|write|construct|explain|объясни|расскаж/i
         ];
         let hits = 0;
         for (const re of markers) {
             if (re.test(t)) hits += 1;
             if (hits >= 2) return true;
         }
+        // Длинный составной запрос с разделителями — не угадываем одним шаблоном.
+        if (t.length > 80 && multiPartSep.test(t)) return true;
         return false;
     }
 
