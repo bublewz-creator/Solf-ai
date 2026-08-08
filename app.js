@@ -435,7 +435,10 @@ const chatFileInput = document.getElementById('chatFileInput');
 const chatAttachedFiles = document.getElementById('chatAttachedFiles');
 
 let isGenerating = false;
+let generatingChatId = null;
 let shouldAutoScroll = true;
+let autoScrollPausedByUser = false;
+let activeTypingCancel = null;
 let currentAbortController = null;
 let generationStartedAt = 0;
 let userAbortedGeneration = false;
@@ -990,6 +993,9 @@ function isCompositeBuildQuery(query) {
     const t = String(query || '').toLowerCase().replace(/ё/g, 'е');
     if (!t) return false;
 
+    if (/комплексн|complex\s*(?:exercise|task|assignment)/i.test(t)) return true;
+    if (/следующие\s+шаг|following\s+steps|выполни\s+(?:следующ|шаг)/i.test(t)) return true;
+
     if (/энгармон|enharmon/i.test(t)) return true;
 
     if (/(?:две|two|обе|both|разн[а-яё]*)\s*(?:разн[а-яё]*\s*)?(?:тональност|tonalit|keys?|лад[а-яё]*|modes?)/i.test(t)) return true;
@@ -998,9 +1004,16 @@ function isCompositeBuildQuery(query) {
     const fromSpecificNote = /(?:от|from)\s+(?:нот[ыаue]|note)?\s*[#♯a-gа-яё]|фа[\s-]*диез|f\s*#|f\s*sharp|соль[\s-]*бемоль|g\s*flat/i.test(t);
     const wantsResolution = /разреш|resolution|resolv/i.test(t);
     const wantsBuild = /построй|постро|сделай|build|construct|make\b|create\b|draw|show/i.test(t);
+    const wantsWrite = /напиши|выведи|write|list|состав/i.test(t);
 
     if (fromSpecificNote && (wantsResolution || /замен|replac|энгармон|enharmon/i.test(t))) return true;
     if (fromSpecificNote && wantsBuild && /(?:,\s*|\s+и\s+|\s+а\s+также\s+)/.test(t)) return true;
+
+    const functionChords = (t.match(/\b[tspd][3465]{2}\b|\b[псд]\s*5\s*3\b|\b[псд]\s*4\s*3\b|\b[псд]\s*6\s*5\b/gi) || []).length;
+    if (functionChords >= 2) return true;
+    if (/звуков[а-яё]*\s+состав/i.test(t) && (wantsBuild || /тритон|tritone|аккорд|chord/i.test(t))) return true;
+    if (wantsWrite && wantsBuild) return true;
+    if (/выбери|choose|select/i.test(t) && (wantsWrite || wantsBuild)) return true;
 
     const exerciseTypes = [
         /тритон|tritone/i.test(t),
@@ -1008,6 +1021,7 @@ function isCompositeBuildQuery(query) {
         /(?:^|[^a-zа-яё])d\s*7|dominant\s*7|д\s*7/i.test(t),
         /цепочк|chain/i.test(t),
         /(?:^|[^a-zа-яё])гамм|scale|звукоряд/i.test(t) && !/тритон|tritone/i.test(t),
+        /аккорд|chord|трезвуч|triad|t53|s53|d53/i.test(t),
         /энгармон|enharmon/i.test(t),
         /модуляц|modulat/i.test(t),
     ].filter(Boolean).length;
@@ -1016,7 +1030,7 @@ function isCompositeBuildQuery(query) {
     if (/\b[1-3][\.)]\s/.test(t) && /\b[2-9][\.)]\s/.test(t)) return true;
 
     const clauseMarkers = (t.match(/\b(?:и|а\s+также|also|then|затем|плюс)\b|,\s*и\s+/g) || []).length;
-    if (clauseMarkers >= 2 && (wantsBuild || wantsResolution)) return true;
+    if (clauseMarkers >= 2 && (wantsBuild || wantsResolution || wantsWrite)) return true;
 
     if (wantsResolution && /(?:две|two|обе|both|разн[а-яё]*)\s*(?:тональност|лад|mode|key|context)/i.test(t)) return true;
 
@@ -1033,13 +1047,11 @@ function countNotationBlocks(text) {
 /** Запрос полностью закрывается theory.js — модель не нужна (нет галлюцинаций в нотации). */
 function canAnswerFromTheoryOnly(userQuery, { harmonizationTask, hasImage } = {}) {
     if (harmonizationTask || hasImage) return false;
+    if (isCompositeBuildQuery(userQuery) || isMultiTopicQuery(userQuery)) return false;
     if (!notationModeEnabled || !window.SolfTheory?.buildNotationForQuery) return false;
     if (!isBuildTask(userQuery) && !isChainTask(userQuery)) return false;
     const det = queryTheoryNotation(userQuery);
     if (!det?.blockString) return false;
-    if (isCompositeBuildQuery(userQuery)) {
-        return countNotationBlocks(det.blockString) >= 2;
-    }
     return true;
 }
 
@@ -1237,8 +1249,8 @@ function buildFreshTaskReminder(query, lang) {
     }
     if (isCompositeBuildQuery(q)) {
         parts.push(ru
-            ? 'ОБЯЗАТЕЛЬНО: выполни ВСЕ части задания в одном ответе — построение, каждое разрешение, каждую тональность/лад и энгармонику, если они указаны. Не отвечай только на первый фрагмент.'
-            : 'MANDATORY: complete EVERY part in one answer — construction, each resolution, each key/mode, and enharmonic replacement if requested. Do NOT answer only the first fragment.');
+            ? 'ОБЯЗАТЕЛЬНО: выполни ВСЕ части задания в одном ответе — каждый шаг, каждый аккорд (T53, S53, D53…), каждое построение и каждое разрешение. Используй несколько [[NOTATION:...]] блоков при необходимости. Не отвечай только на первый фрагмент (например, только тритоны).'
+            : 'MANDATORY: complete EVERY part in one answer — each step, each chord (T53, S53, D53…), each construction and each resolution. Use multiple [[NOTATION:...]] blocks if needed. Do NOT answer only the first fragment (e.g. tritones only).');
     }
     if (/энгармон|enharmon/i.test(q)) {
         parts.push(ru
@@ -1262,8 +1274,9 @@ function isMultiTopicQuery(query) {
     if (!t || t.length < 20) return false;
     if ((t.match(/\?/g) || []).length >= 2) return true;
     if ((t.match(/(?:^|\n|\s)\d+[\.)]\s+/g) || []).length >= 2) return true;
+    if (/комплексн|следующие\s+шаг|выполни\s+(?:следующ|шаг)/i.test(t)) return true;
 
-    const actionRe = /(?:построй|постро|сделай|напиши|выведи|нарисуй|покажи|объясни|расскажи|опиши|разбери|определи|build|draw|write|explain|describe|show|construct|identify|analyze|harmoniz|гармониз)/gi;
+    const actionRe = /(?:построй|постро|сделай|напиши|выведи|нарисуй|покажи|объясни|расскажи|опиши|разбери|определи|выбери|build|draw|write|explain|describe|show|construct|identify|analyze|harmoniz|гармониз|choose|select)/gi;
     const actions = t.match(actionRe);
     if (actions && new Set(actions.map(a => a.toLowerCase())).size >= 2) return true;
 
@@ -1433,7 +1446,9 @@ function enforceChatLimit() {
 
 function renderChatItemHTML(chat) {
     const isActive = (typeof currentChatId !== 'undefined' && currentChatId === chat.id) ? 'active' : '';
+    const isGeneratingHere = generatingChatId === chat.id;
     let title = chat.title || 'New Chat';
+    if (isGeneratingHere && !isActive) title = `${title} …`;
     const isPinned = chat.pinned ? 'is-pinned' : '';
     const pinFill = chat.pinned ? 'currentColor' : 'none';
 
@@ -2019,6 +2034,7 @@ function createNewChat(firstMessage) {
 }
 
 function loadChat(chatId) {
+    cancelActiveTyping();
     const chat = chats.find(c => c.id === chatId);
     if (!chat) return;
     currentChatId = chatId; chatTitle.textContent = chat.title; chatMessages.innerHTML = '';
@@ -2030,13 +2046,23 @@ function loadChat(chatId) {
         let content = msg.content;
         if (msg.role === 'ai' && i > 0) {
             const prev = chat.messages[i - 1];
-            if (prev && prev.role === 'user') {
+            if (prev && prev.role === 'user' && !isCompositeBuildQuery(prev.content) && !isMultiTopicQuery(prev.content)) {
                 content = patchAiWithTheory(prev.content, content);
             }
         }
         addMessageToUI(msg.role, content, msg.attachments, false, msg.id);
     });
     renderChatsList();
+    if (generatingChatId === chatId) {
+        showTypingIndicator(chatId);
+    }
+}
+
+function cancelActiveTyping() {
+    if (activeTypingCancel) {
+        activeTypingCancel.cancelled = true;
+        activeTypingCancel = null;
+    }
 }
 
 function scrollToBottom(force = false) {
@@ -2048,6 +2074,7 @@ function scrollToBottom(force = false) {
 }
 
 async function addMessageToUI(role, content, attachments = [], withTyping = false, messageId = null) {
+    if (messageId && chatMessages?.querySelector(`[data-message-id="${messageId}"]`)) return;
     const div = document.createElement('div');
     div.className = `message message-${role}`;
     if (messageId) div.dataset.messageId = messageId;
@@ -2080,24 +2107,34 @@ async function addMessageToUI(role, content, attachments = [], withTyping = fals
 }
 
 async function typeMessage(contentEl, text, attachmentHTML) {
-    // Автоскролл включён, пока пользователь не коснётся экрана / не прокрутит вручную.
+    autoScrollPausedByUser = false;
     shouldAutoScroll = true;
-    const disableAutoScrollOnInteraction = () => { shouldAutoScroll = false; };
+    const disableAutoScrollOnInteraction = () => {
+        autoScrollPausedByUser = true;
+        shouldAutoScroll = false;
+    };
     const interactionEvents = ['touchstart', 'pointerdown', 'wheel'];
     const scrollRoot = chatMessages || contentEl.closest('.chat-messages');
+    const onScrollDuringTyping = () => {
+        if (!scrollRoot) return;
+        const isAtBottom = scrollRoot.scrollHeight - scrollRoot.scrollTop - scrollRoot.clientHeight < 20;
+        if (!isAtBottom) disableAutoScrollOnInteraction();
+    };
     interactionEvents.forEach(ev => scrollRoot?.addEventListener(ev, disableAutoScrollOnInteraction, { passive: true }));
+    scrollRoot?.addEventListener('scroll', onScrollDuringTyping, { passive: true });
+
+    const typingToken = { cancelled: false };
+    activeTypingCancel = typingToken;
 
     const formattedText = formatMessage(text);
-    // Печатаем только текстовую часть БЕЗ нотных блоков, чтобы не сыпать JSON по буквам
     const typingSource = stripNotationBlocks(text);
     const tempDiv = document.createElement('div'); tempDiv.innerHTML = formatMessage(typingSource);
     const plainText = tempDiv.textContent;
-    let displayedText = '';
     const cursor = document.createElement('span'); cursor.className = 'typing-cursor'; contentEl.appendChild(cursor);
 
     try {
         for (let i = 0; i < plainText.length; i++) {
-            displayedText += plainText[i];
+            if (typingToken.cancelled) break;
             contentEl.innerHTML = formatPartialText(typingSource, i + 1) + '<span class="typing-cursor"></span>';
 
             if (shouldAutoScroll) {
@@ -2106,16 +2143,17 @@ async function typeMessage(contentEl, text, attachmentHTML) {
 
             await new Promise(r => setTimeout(r, '.!?'.includes(plainText[i]) ? TYPING_SPEED*4 : TYPING_SPEED));
         }
-        contentEl.classList.remove('typing'); contentEl.innerHTML = formattedText + attachmentHTML;
-
-        // После завершения печати — рендерим все нотные блоки в этом сообщении
-        renderAllNotations(contentEl.parentElement || contentEl);
-
-        if (shouldAutoScroll) {
-            scrollToBottom();
+        if (!typingToken.cancelled) {
+            contentEl.classList.remove('typing'); contentEl.innerHTML = formattedText + attachmentHTML;
+            renderAllNotations(contentEl.parentElement || contentEl);
+            if (shouldAutoScroll) {
+                scrollToBottom();
+            }
         }
     } finally {
+        if (activeTypingCancel === typingToken) activeTypingCancel = null;
         interactionEvents.forEach(ev => scrollRoot?.removeEventListener(ev, disableAutoScrollOnInteraction));
+        scrollRoot?.removeEventListener('scroll', onScrollDuringTyping);
     }
 }
 function formatPartialText(fullText, charCount) {
@@ -3166,8 +3204,10 @@ function removeTypingIndicator(forChatId = null) {
 
 function resetGeneratingUi() {
     isGenerating = false;
+    generatingChatId = null;
     userAbortedGeneration = false;
     currentAbortController = null;
+    renderChatsList();
     if (chatSendBtn) {
         chatSendBtn.classList.remove('stop-btn');
         chatSendBtn.innerHTML = `<svg class="svg-icon" style="color: white;" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"></line><polygon points="22 2 15 22 11 13 2 9 22 2"></polygon></svg>`;
@@ -3182,17 +3222,18 @@ function resetGeneratingUi() {
 async function deliverAiReplyToChat(chatId, text, { withTyping = true } = {}) {
     removeTypingIndicator(chatId);
     const chat = chats.find(c => c.id === chatId);
+    const msgId = Date.now().toString();
     if (chat) {
         chat.messages.push({
             role: 'ai',
             content: text,
             time: new Date().toISOString(),
-            id: Date.now().toString()
+            id: msgId
         });
         saveChatToStorage();
     }
     if (currentChatId === chatId) {
-        await addMessageToUI('ai', text, [], withTyping);
+        await addMessageToUI('ai', text, [], withTyping, msgId);
     }
 }
 
@@ -3220,9 +3261,11 @@ async function generateResponse(query, imageData = null) {
     const replyChatId = currentChatId;
 
     isGenerating = true;
+    generatingChatId = replyChatId;
     userAbortedGeneration = false;
     generationStartedAt = Date.now();
     currentAbortController = new AbortController();
+    renderChatsList();
     chatSendBtn.disabled = false; chatSendBtn.classList.add('stop-btn');
     chatSendBtn.innerHTML = `<svg class="svg-icon" style="color:white;" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="2" ry="2"></rect></svg>`;
     
@@ -3543,8 +3586,8 @@ async function generateResponse(query, imageData = null) {
             }
         }
 
-        // Подставляем готовый нотный блок из theory.js (перекрывает блок модели).
-        if (!harmonizationTask) {
+        // Подставляем готовый нотный блок из theory.js только для простых одиночных задач.
+        if (!harmonizationTask && !compositeBuildTask && !multiTopicTask) {
             aiText = patchAiWithTheory(baseUserContent, aiText, theoryDetFinal ?? queryTheoryNotation(baseUserContent));
         }
 
@@ -3678,6 +3721,7 @@ function dismissMobileChatKeyboard() {
 
 function startNewChat(options = {}) {
     closeAllOverlays();
+    cancelActiveTyping();
     saveChatToStorage(); currentChatId = null; chatMessages.innerHTML = '';
     chatTitle.textContent = (typeof solfaiGetText === 'function' ? solfaiGetText('newChat') : '') || 'New Chat';
     chatInput.value = '';
@@ -4082,9 +4126,10 @@ async function initApp() {
     }
     if (chatMessages) {
         chatMessages.addEventListener('scroll', () => {
-            // Если скролл находится почти в самом низу (погрешность 20px)
             const isAtBottom = chatMessages.scrollHeight - chatMessages.scrollTop - chatMessages.clientHeight < 20;
-            shouldAutoScroll = isAtBottom;
+            if (!autoScrollPausedByUser) {
+                shouldAutoScroll = isAtBottom;
+            }
         });
     }
     
